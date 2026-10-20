@@ -62,7 +62,11 @@ PRECIPITATION_SENSOR_TYPES = ("10minrain",)
 
 @dataclass(frozen=True, kw_only=True)
 class SummaryDescription(SensorEntityDescription):
-    """A summary of the hourly forecast over a local time window."""
+    """A summary of the hourly forecast over a local time window.
+
+    Without a state class: long-term statistics of forecasts would only grow
+    the database.
+    """
 
     # None when its data is missing, e.g. temperatures with hourly
     # temperatures turned off.
@@ -76,7 +80,6 @@ def _snow(description: str, window) -> SummaryDescription:
         icon="mdi:snowflake",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value=lambda hourly, now: summaries.snow(hourly, window(now)),
     )
@@ -89,7 +92,6 @@ def _sunshine(description: str, window) -> SummaryDescription:
         icon="mdi:weather-sunny",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.HOURS,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value=lambda hourly, now: summaries.sunshine_hours(hourly, window(now)),
     )
@@ -111,7 +113,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
         icon="mdi:weather-windy",
         device_class=SensorDeviceClass.WIND_SPEED,
         native_unit_of_measurement=UnitOfSpeed.KILOMETERS_PER_HOUR,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         value=lambda hourly, now: summaries.max_gust(
             hourly, summaries.tomorrow(now, *summaries.MIDDAY)
@@ -123,7 +124,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
         icon="mdi:weather-rainy",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value=lambda hourly, now: summaries.precipitation(
             hourly, summaries.next_hour(now)
@@ -135,7 +135,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
         translation_key="precipitation_probability_next_hour",
         icon="mdi:umbrella-outline",
         native_unit_of_measurement=PERCENTAGE,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
         value=lambda hourly, now: summaries.precipitation_probability(
             hourly, summaries.next_hour(now)
@@ -147,7 +146,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
         icon="mdi:thermometer-low",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value=lambda hourly, now: summaries.min_temperature(
             hourly, summaries.tonight(now)
@@ -229,6 +227,8 @@ class MeteoSwissWarningSensor(
     _attr_options = [NO_WARNING, *LEVELS]
     _attr_icon = "mdi:alert-outline"
     _attr_attribution = "MeteoSwiss, via MeteoAlarm"
+    # The texts of the warnings would be stored with every change of state.
+    _unrecorded_attributes = frozenset({"warnings"})
 
     def __init__(
         self,
@@ -367,7 +367,7 @@ class MeteoSwissFreezingLevelSensor(
 
     _attr_device_class = SensorDeviceClass.DISTANCE
     _attr_native_unit_of_measurement = UnitOfLength.METERS
-    _attr_state_class = SensorStateClass.MEASUREMENT
+    # A forecast, so without long-term statistics.
     _attr_icon = "mdi:snowflake-thermometer"
     # Shown after the name of the device, e.g. "Bristen Freezing level".
     _attr_has_entity_name = True

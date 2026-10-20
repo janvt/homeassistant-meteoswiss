@@ -162,6 +162,12 @@ The snow and temperature sensors need *Hourly temperatures*.  A sensor is
 unavailable when any hour of its window, or a value it needs, is missing,
 rather than showing a partial result.
 
+These sensors, like the freezing level, are forecasts, so they keep no
+long-term statistics.  After updating from a beta that kept them, Home
+Assistant lists their old statistics under *Developer tools → Statistics*,
+where they can be deleted.  The texts of weather warnings are not stored in
+the history either, only their types.
+
 ## Weather warnings
 
 Every forecast has two sensors with MeteoSwiss's official weather warnings
