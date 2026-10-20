@@ -155,7 +155,7 @@ class TestHourlyFilesOrderedByTime:
         rows = await client.get_hourly_rows([point((999, 3))], RUNS[0], "t")
 
         assert rows == {(999, 3): {}}
-        assert len(session.requests) == 1  # the head
+        assert [m for m, _, _ in session.requests] == ["HEAD", "GET"]  # the head
 
     async def test_so_many_places_that_the_whole_file_is_cheaper(self):
         keys = PLACES[::20]  # 100 places
@@ -168,6 +168,7 @@ class TestHourlyFilesOrderedByTime:
         assert rows[keys[50]] == expected(files[url("t", RUNS[1])], keys[50])
         # No search at all: the whole file, as it is (here) under 8 MB.
         assert [r[2] for r in session.requests] == [None]
+        assert client.whole_downloads == 0  # by choice, not for lack of a way
 
     async def test_the_order_of_the_places_changed(self):
         shuffled = list(PLACES)
@@ -199,6 +200,7 @@ class TestHourlyFilesOrderedByTime:
         assert rows[MIDDLE] == expected(body, MIDDLE)
         whole = ogd._whole_cost(len(body))
         assert session.transferred() - len(body) <= whole + 2000
+        assert client.whole_downloads == 1  # for the repair notice
 
     async def test_longer_values(self):
         client, session, files = self.setup()
@@ -232,11 +234,11 @@ class TestDailyFilesOrderedByTime:
 
         rows = await client._point_values(url("d", RUNS[0]), point(key))
         assert rows == expected(files[url("d", RUNS[0])], key)
-        # The probe, the head and a request per block: about the whole file
-        # compressed, which it falls back to when it would cost more.
-        assert len(session.requests) <= 2 + 9 + 3
-        cold = session.transferred()
-        assert cold <= ogd.HEAD_BYTES + ogd.BLOCK_HEAD + 30_000
+        # The probe and the whole file (counted uncompressed here), as
+        # learning its layout would cost about as much.
+        assert [r for _, _, r in session.requests][1:] == [None]
+        whole = len(files[url("d", RUNS[0])])
+        assert session.transferred() - whole <= ogd.HEAD_BYTES + 2000
         session.clear()
 
         rows = await client._point_values(url("d", RUNS[1]), point(key))
@@ -258,6 +260,51 @@ class TestDailyFilesOrderedByTime:
         # then the whole file (counted uncompressed here).
         searched = session.transferred() - len(body)
         assert searched <= 2 * ogd._whole_cost(len(body)) + 2000 * len(keys)
+
+    async def test_a_cold_start_downloads_a_small_file_whole(self, monkeypatch):
+        # When learning the layout would cost as much as the whole file.
+        client, session, files = self.setup()
+        monkeypatch.setattr(ogd, "BLOCK_HEAD", len(files[url("d", RUNS[0])]))
+
+        rows = await client.get_hourly_rows([point(MIDDLE)], RUNS[0], "d")
+
+        assert rows[MIDDLE] == expected(files[url("d", RUNS[0])], MIDDLE)
+        assert [(m, r) for m, _, r in session.requests] == [
+            ("HEAD", None),
+            ("GET", None),
+        ]
+        session.clear()
+
+        # Where the rows were is known from it, so the next run searches.
+        rows = await client.get_hourly_rows([point(MIDDLE)], RUNS[1], "d")
+        assert rows[MIDDLE] == expected(files[url("d", RUNS[1])], MIDDLE)
+        assert all(r is not None for _, _, r in session.requests)
+        assert len(session.requests) <= 9 + 3
+
+
+class TestServerThatIgnoresRanges:
+    async def test_the_reading_stops_at_the_first_whole_file(self):
+        files = {
+            url("p", RUNS[0]): by_place("p", 0),
+            url("t", RUNS[0]): by_time("t", 0),
+        }
+        session = FakeSession(files)
+        session.ignore_ranges = True
+        client = MeteoSwissOGD(session, "tests")  # type: ignore[arg-type]
+
+        with pytest.raises(ogd.RangesIgnoredError):
+            await client._point_values(url("p", RUNS[0]), point(MIDDLE))
+        with pytest.raises(ogd.RangesIgnoredError):
+            await client.get_hourly_rows([point(MIDDLE)], RUNS[0], "t")
+
+        assert client.ranges_ignored
+        # One request each, not read; and the size of the hourly file.
+        assert [m for m, _, _ in session.requests] == ["GET", "HEAD", "GET"]
+
+        session.ignore_ranges = False
+        rows = await client._point_values(url("p", RUNS[0]), point(MIDDLE))
+        assert rows == expected(files[url("p", RUNS[0])], MIDDLE)
+        assert not client.ranges_ignored
 
 
 class TestFilesOrderedByPlace:

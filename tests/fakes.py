@@ -64,6 +64,8 @@ class FakeSession:
     def __init__(self, files: dict[str, bytes], chunk_size: int = 1000) -> None:
         self.files = files
         self.chunk_size = chunk_size
+        # Like a server that sends whole files when asked for part of them.
+        self.ignore_ranges = False
         self.requests: list[tuple[str, str, str | None]] = []
         self.headers: list[dict[str, str]] = []
         # The size of each response's body.
@@ -77,7 +79,7 @@ class FakeSession:
         body = self.files.get(url)
         if body is None:
             return FakeResponse(403)
-        if byte_range is None:
+        if byte_range is None or self.ignore_ranges:
             # Like S3: the ETag is a hash of the content.
             etag = f'"{hashlib.md5(body).hexdigest()}"'
             if headers.get("If-None-Match") == etag:
@@ -279,6 +281,10 @@ class FakeOGD:
     large_downloads: dict[str, list[set[tuple[int, int]]]] = {}
     # When set, large downloads wait for it, like a slow connection.
     download_gate: asyncio.Event | None = None
+    # Like MeteoSwissOGD's: files downloaded whole lately as they could not be
+    # searched, and whether the server ignores ranges.
+    whole_downloads = 0
+    ranges_ignored = False
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
@@ -298,6 +304,8 @@ class FakeOGD:
         cls.large_downloads = {}
         cls.download_gate = None
         cls.hours = 12
+        cls.whole_downloads = 0
+        cls.ranges_ignored = False
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]

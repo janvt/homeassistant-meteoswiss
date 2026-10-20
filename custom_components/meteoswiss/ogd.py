@@ -86,7 +86,13 @@ SMALL_FILE = 8 * 1024 * 1024
 # Each request costs about this many bytes of headers, and whole files up to
 # SMALL_FILE are sent compressed, to about this share of their size.
 REQUEST_OVERHEAD = 650
-COMPRESSED_SHARE = 0.2
+COMPRESSED_SHARE = 0.17
+# A cold start costs the head and then walking the blocks: about this much
+# more than the head alone, at most.
+COLD_START_SHARE = 1.25
+# Whole downloads of files that could not be searched are counted over this
+# long, for the repair notice when they keep happening.
+WHOLE_DOWNLOADS_PERIOD = datetime.timedelta(hours=24)
 # Station measurements and the latest run are shared by entries this long.
 STATION_CACHE_SECONDS = 60
 RUN_CACHE = datetime.timedelta(minutes=5)
@@ -160,6 +166,14 @@ class UnknownPointError(OGDError):
 
 class UnknownPostcodeError(UnknownPointError):
     """MeteoSwiss has no forecast for a postal code."""
+
+
+class RangesIgnoredError(OGDError):
+    """The server sends whole files when asked for part of them.
+
+    The forecast is then not read at all: it would mean downloading several
+    hundred megabytes an hour.
+    """
 
 
 class StationType(str, Enum):
@@ -565,6 +579,16 @@ class MeteoSwissOGD:
         self._small_file_lock = asyncio.Lock()
         # The ETag and Last-Modified of files fetched whole, by URL.
         self._validators: dict[str, tuple[str | None, str | None]] = {}
+        # Small files ordered by time, downloaded whole on a cold start, by
+        # parameter: the URL and every point's rows with their positions.
+        self._block_files: dict[
+            str, tuple[str, dict[tuple[int, int], dict[str, tuple[int, str]]]]
+        ] = {}
+        # When files were downloaded whole because they could not be searched.
+        self._whole_downloads: list[float] = []
+        # Whether the server sent a whole file when asked for part of it, the
+        # last time it was.
+        self.ranges_ignored = False
         # Recently fetched station files: URL to (monotonic time, body).
         self._station_files: dict[str, tuple[float, bytes]] = {}
         self._latest_run: tuple[datetime.datetime, str] | None = None
@@ -596,6 +620,11 @@ class MeteoSwissOGD:
                 url, headers=headers, timeout=REQUEST_TIMEOUT
             ) as response:
                 response.raise_for_status()
+                if byte_range:
+                    # Not read: it is the whole file.
+                    self.ranges_ignored = response.status != 206
+                    if self.ranges_ignored:
+                        raise RangesIgnoredError(f"{url} was sent whole")
                 body = await response.read()
                 total = len(body)
                 content_range = response.headers.get("Content-Range", "")
@@ -994,15 +1023,21 @@ class MeteoSwissOGD:
         costs as much as the whole file, are looked up in the whole file.
         """
         parameter = _parameter(url)
-        cached = self._small_files.get(parameter)
+        cached = self._block_files.get(parameter)
         if cached is not None and cached[0] == url:
             # Downloaded whole for this run already.
-            return await self._whole_file_rows(url, points, None)
+            return self._rows_from_known(parameter, points, cached[1])
         size = self._known_size(url) or (self._files.get(parameter) or (url, None))[1]
         blocks = self._blocks.get(parameter)
         # The order of the points is read once a day; points not read before
         # are found from it.
         fresh = blocks is None or blocks.date != _run_of(url)[:8]
+        if fresh:
+            if self._known_size(url) is None and (size := await self._size(url)):
+                self._note_size(url, size)
+            if size is not None and _whole_cost(size) <= COLD_START_SHARE * BLOCK_HEAD:
+                # Learning the order would cost as much as the whole file.
+                return await self._small_blocked_rows(url, points)
         if size is not None and blocks is not None and blocks.cost is not None:
             expected = len(points) * blocks.cost + (BLOCK_HEAD if fresh else 0)
             if expected > _whole_cost(size):
@@ -1041,9 +1076,70 @@ class MeteoSwissOGD:
             if point not in todo:
                 found.setdefault(point.key, {})
         if todo:
-            _LOGGER.debug("Reading %s whole for %s", url, [p.key for p in todo])
+            _LOGGER.info("Reading %s whole for %s", url, [p.key for p in todo])
+            self._note_whole_download()
             found.update(await self._whole_file_rows(url, todo, size))
         return found
+
+    async def _small_blocked_rows(
+        self, url: str, points: list[Point]
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        """Download a small file ordered by time whole, learning its layout."""
+        parameter = _parameter(url)
+        body, total = await self._get(url)
+        self._note_size(url, total)
+        parsed = _parse_blocks(body, total, _run_of(url)[:8])
+        if parsed is None:
+            _LOGGER.info("%s cannot be read by block", url)
+            self._note_whole_download()
+            text = body.decode("latin-1")
+            return {
+                p.key: _rows_with_prefix(text, f"{p.point_id};{p.point_type};")
+                for p in points
+            }
+        blocks, known = parsed
+        self._adopt_blocks(parameter, blocks)
+        self._block_files[parameter] = (url, known)
+        return self._rows_from_known(parameter, points, known)
+
+    def _rows_from_known(
+        self,
+        parameter: str,
+        points: list[Point],
+        known: dict[tuple[int, int], dict[str, tuple[int, str]]],
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        """The rows of points from a whole file, remembering where they were."""
+        found = {}
+        for point in points:
+            rows = known.get(point.key, {})
+            found[point.key] = {t: v for t, (_, v) in rows.items()}
+            if rows:
+                self._block_positions[(parameter, point.key)] = {
+                    t: p for t, (p, _) in rows.items()
+                }
+        return found
+
+    def _adopt_blocks(self, parameter: str, blocks: _Blocks) -> None:
+        """Use a newly read layout, keeping what was learnt about the file."""
+        old = self._blocks.get(parameter)
+        if old is not None:
+            blocks.margin, blocks.cost = old.margin, old.cost
+            if old.date != blocks.date:
+                # Where the rows were in another day's file says little.
+                for key in [k for k in self._block_positions if k[0] == parameter]:
+                    del self._block_positions[key]
+        self._blocks[parameter] = blocks
+
+    def _note_whole_download(self) -> None:
+        self._whole_downloads.append(time.monotonic())
+
+    @property
+    def whole_downloads(self) -> int:
+        """How many files were downloaded whole lately, as they could not be
+        searched (not those that were cheaper whole)."""
+        since = time.monotonic() - WHOLE_DOWNLOADS_PERIOD.total_seconds()
+        self._whole_downloads = [t for t in self._whole_downloads if t >= since]
+        return len(self._whole_downloads)
 
     async def _learn_blocks(self, url: str, budget: _Budget):
         """Read the first block of a file for the order of the points.
@@ -1059,15 +1155,8 @@ class MeteoSwissOGD:
         parsed = _parse_blocks(head, total, _run_of(url)[:8])
         if parsed is None:
             return None
-        old = self._blocks.get(parameter)
         blocks, known = parsed
-        if old is not None:
-            blocks.margin, blocks.cost = old.margin, old.cost
-            if old.date != blocks.date:
-                # Where the rows were in another day's file says little.
-                for key in [k for k in self._block_positions if k[0] == parameter]:
-                    del self._block_positions[key]
-        self._blocks[parameter] = blocks
+        self._adopt_blocks(parameter, blocks)
         return blocks, known, total, total <= len(head)
 
     async def _walk_points(
@@ -1376,7 +1465,8 @@ class MeteoSwissOGD:
             _LOGGER.debug("Point %s not found in %s, read whole today", point.key, url)
             return {}
         self._whole_reads[(parameter, point.key)] = date
-        _LOGGER.warning("%s is in no known order; reading it whole", url)
+        _LOGGER.info("%s is in no known order; reading it whole", url)
+        self._note_whole_download()
         where: dict[str, tuple[int, int]] = {}
         rows = (await self._streamed_point_values(url, [prefix], where))[prefix]
         if prefix in where:

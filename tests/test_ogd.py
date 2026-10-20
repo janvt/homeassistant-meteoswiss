@@ -189,9 +189,12 @@ class TestPointValues:
 
         assert len(result) == 50
         assert result[HOURS[0]] == value(point.point_id, HOURS[0])
-        # The probe of the order, then the file in the first range read.
-        assert len(session.requests) == 2
-        assert all(r is not None for _, _, r in session.requests)
+        # The probe of the order, then the whole file, compressed: it is no
+        # larger than reading enough to learn its layout.
+        assert [r for _, _, r in session.requests] == [
+            f"bytes=0-{ogd.HEAD_BYTES - 1}",
+            None,
+        ]
 
     @pytest.mark.parametrize("chunk_size", [7, 1000, 1 << 16])
     @pytest.mark.parametrize("target", [BIG_POINTS[0], BIG_POINTS[-1]])
@@ -326,8 +329,10 @@ class TestGetForecast:
         rows = await client.get_hourly_rows(points, RUN, "tre200h0")
 
         # One read for all three points, as the file is small.
+        # Its size, then the whole file for all three, as it is small.
         assert [r for r in session.requests if r[1] == url("tre200h0")] == [
-            ("GET", url("tre200h0"), f"bytes=0-{ogd.BLOCK_HEAD - 1}")
+            ("HEAD", url("tre200h0"), None),
+            ("GET", url("tre200h0"), None),
         ]
         assert {k: len(v) for k, v in rows.items()} == {
             (100025, 2): 218,
@@ -778,7 +783,7 @@ class TestBlocks:
         body = files[url("tre200h0")]
         assert rows[point.key] == self.expected(body, target)
         assert len(rows[point.key]) == 217
-        assert all(r is not None for _, _, r in session.requests)
+        assert all(r is not None for m, _, r in session.requests if m == "GET")
         # The head, then a window around the row in each block.
         window = 2 * ogd.BLOCK_MARGIN + ogd.BLOCK_ROW
         assert session.ranged_bytes < ogd.BLOCK_HEAD + 220 * window
@@ -811,7 +816,7 @@ class TestBlocks:
 
         rows = await client.get_hourly_rows([point], tomorrow, "tre200h0")
 
-        assert session.requests[0][2] == f"bytes=0-{ogd.BLOCK_HEAD - 1}"
+        assert f"bytes=0-{ogd.BLOCK_HEAD - 1}" in [r for _, _, r in session.requests]
         assert rows[point.key] == self.expected(
             files[url("tre200h0", tomorrow)], point.key
         )
