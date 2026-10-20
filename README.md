@@ -15,6 +15,7 @@ This is the MeteoSwiss integration for Home Assistant.
 * Forecasts for mountains, huts and passes, with a freezing level sensor.
 * MeteoSwiss weather warnings for the place, and pollen measurements.
 * A Föhn outlook from the pressure difference across the Alps.
+* Today and this month against the station's climate normals, and records.
 * Entities are grouped by forecast and by station, each as a device of its
   integration entry.
 * Supports two different real-time stations: a weather station
@@ -204,6 +205,24 @@ Every forecast has two Föhn sensors, and its weather station a third:
 Under *Configure* they can be turned off, and the stations and thresholds
 changed.  The defaults are the classic pair Lugano and Zürich/Kloten, with
 Föhn likely from 4 hPa and strong from 8 hPa.
+
+## Climate normals
+
+With a weather station, these sensors compare it with its normals for
+1991–2020, computed from the station's own history (MeteoSwiss publishes its
+official normals only as maps):
+
+* *High vs normal* and *Low vs normal*: today's highest and lowest temperature
+  so far against the normal for the date (the mean over 1991–2020 of a week
+  either side of it), in °C above or below.
+* *Month vs normal*: this month's mean temperature so far, in °C above or below.
+* *Month's rain vs normal* and *Month's sunshine vs normal*: this month so far,
+  in % of the normal for as many days.
+* *Record high for the date*, with the year, and the record low as attributes.
+
+Days are UTC days, as in MeteoSwiss's data, so early in the morning today's
+high is still low.  The history (about 6 MB) is downloaded once a week and
+this year's days every six hours.  Turn it off under *Configure*.
 
 ## Pollen
 

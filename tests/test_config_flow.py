@@ -639,6 +639,7 @@ async def test_foehn_options_have_sane_defaults(hass, entry):
     assert defaults(result) == {
         "hourly_temperature": True,
         "freezing_level": False,  # a postal code
+        "climate_normals": True,
         "foehn": True,
         "foehn_south_station": "LUG",
         "foehn_north_station": "KLO",

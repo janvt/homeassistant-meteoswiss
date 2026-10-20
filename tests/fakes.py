@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import aiohttp
 
+from custom_components.meteoswiss.climate import Climate, Day
 from custom_components.meteoswiss.ogd import (
     LocalForecast,
     Point,
@@ -212,6 +213,25 @@ STATION_MEASUREMENTS = {
 }
 
 
+def make_climate():
+    """Like Altdorf's on 20 October 2026: a warm, dry, sunny October."""
+    normals = Climate(
+        normal_high={(10, 20): 14.3},
+        normal_low={(10, 20): 6.0},
+        record_high={(10, 20): (24.8, 2001)},
+        record_low={(10, 20): (-1.4, 2009)},
+        month_mean={10: 10.8},
+        month_rain={10: 84.2},
+        month_sunshine={10: 105.6},
+        first_year=1864,
+    )
+    recent = [
+        Day(datetime.date(2026, 10, d), 14.0, 19.0, 9.0, 0.7, 230.0)
+        for d in range(1, 20)
+    ]
+    return normals, recent
+
+
 class FakeOGD:
     """Replacement for MeteoSwissOGD that never touches the network."""
 
@@ -224,6 +244,8 @@ class FakeOGD:
     run_checks = 0
     temperature_calls = 0
     temperature_error: Exception | None = None
+    climate_calls = 0
+    climate_error: Exception | None = None
     # Hours of hourly forecast, from 09:00 UTC on the 20th.
     hours = 12
     # The points each download of a large file was for, by parameter.
@@ -244,6 +266,8 @@ class FakeOGD:
         cls.run_checks = 0
         cls.temperature_calls = 0
         cls.temperature_error = None
+        cls.climate_calls = 0
+        cls.climate_error = None
         cls.large_downloads = {}
         cls.download_gate = None
         cls.hours = 12
@@ -280,6 +304,17 @@ class FakeOGD:
         if station_type == StationType.POLLEN:
             return POLLEN_STATIONS
         return PRECIPITATION_STATIONS
+
+    async def get_station_today(self, abbr, now=None):
+        if self.station_error:
+            raise self.station_error
+        return {"high": 22.3, "low": 6.6}
+
+    async def get_climate(self, abbr, now=None):
+        FakeOGD.climate_calls += 1
+        if self.climate_error:
+            raise self.climate_error
+        return make_climate()
 
     async def get_pollen_now(self, abbr, now=None):
         if self.station_error:

@@ -22,6 +22,7 @@ from homeassistant.helpers.selector import (
 )
 
 from custom_components.meteoswiss.const import (
+    CONF_CLIMATE_NORMALS,
     CONF_FOEHN,
     CONF_FOEHN_NORTH,
     CONF_FOEHN_SOUTH,
@@ -42,6 +43,7 @@ from custom_components.meteoswiss.const import (
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_CLIMATE_NORMALS,
     DEFAULT_HOURLY_TEMPERATURE,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
@@ -716,6 +718,7 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
                 CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE
             ),
             CONF_FREEZING_LEVEL: freezing_level_setting(entry.data, entry.options),
+            CONF_CLIMATE_NORMALS: DEFAULT_CLIMATE_NORMALS,
             **FOEHN_DEFAULTS,
             **entry.options,
         }
@@ -756,6 +759,7 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
                 {
                     required(CONF_HOURLY_TEMPERATURE): bool,
                     required(CONF_FREEZING_LEVEL): bool,
+                    required(CONF_CLIMATE_NORMALS): bool,
                     required(CONF_FOEHN): bool,
                     required(CONF_FOEHN_SOUTH): SelectSelector(
                         SelectSelectorConfig(

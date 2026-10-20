@@ -111,7 +111,8 @@
                     "foehn_north_station": "Stazione a nord delle Alpi",
                     "foehn_threshold": "Favonio probabile da",
                     "foehn_strong_threshold": "Favonio forte da",
-                    "freezing_level": "Zero termico"
+                    "freezing_level": "Zero termico",
+                    "climate_normals": "Norme climatiche"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Lo zero termico è un'impostazione a sé. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora.",
@@ -120,7 +121,8 @@
                     "foehn_north_station": "Zurigo/Kloten è la scelta classica.",
                     "foehn_threshold": "Differenza di pressione da cui il favonio è probabile; circa 4 hPa raggiungono le valli del nord, come ad Altdorf. Lo stesso al contrario per il favonio da nord.",
                     "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa.",
-                    "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un altro file di 33 MB ogni tre ore (circa 260 MB al giorno), scaricato una volta per tutte le previsioni MeteoSwiss: non costa nulla in più se una di esse lo ha già."
+                    "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un altro file di 33 MB ogni tre ore (circa 260 MB al giorno), scaricato una volta per tutte le previsioni MeteoSwiss: non costa nulla in più se una di esse lo ha già.",
+                    "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 6 MB) viene scaricata una volta alla settimana, i giorni di quest'anno ogni sei ore."
                 }
             }
         },
@@ -217,6 +219,24 @@
                     "mixed": "Misto",
                     "foehn": "Favonio"
                 }
+            },
+            "high_vs_normal": {
+                "name": "Massima rispetto alla norma"
+            },
+            "low_vs_normal": {
+                "name": "Minima rispetto alla norma"
+            },
+            "month_vs_normal": {
+                "name": "Mese rispetto alla norma"
+            },
+            "month_rain_vs_normal": {
+                "name": "Pioggia del mese rispetto alla norma"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Sole del mese rispetto alla norma"
+            },
+            "record_high": {
+                "name": "Record di caldo per la data"
             }
         }
     }

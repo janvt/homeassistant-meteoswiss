@@ -111,7 +111,8 @@
                     "foehn_north_station": "Stasjon nord for Alpene",
                     "foehn_threshold": "Føhn sannsynlig fra",
                     "foehn_strong_threshold": "Sterk føhn fra",
-                    "freezing_level": "Nullgradersgrense"
+                    "freezing_level": "Nullgradersgrense",
+                    "climate_normals": "Klimanormaler"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned), delt av alle MeteoSwiss-varslene dine. Nullgradersgrensen er en egen innstilling. Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen.",
@@ -120,7 +121,8 @@
                     "foehn_north_station": "Zürich/Kloten er det klassiske valget.",
                     "foehn_threshold": "Trykkforskjell fra der føhn er sannsynlig; omtrent 4 hPa når dalene i nord, som i Altdorf. Det samme omvendt for nordføhn.",
                     "foehn_strong_threshold": "Trykkforskjell fra der føhnen blåser kraftig; omtrent 8 hPa.",
-                    "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en annen fil på 33 MB hver tredje time (omtrent 260 MB per dag), som lastes ned én gang for alle MeteoSwiss-varslene dine, så den koster ikke noe ekstra hvis ett av dem allerede har den."
+                    "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en annen fil på 33 MB hver tredje time (omtrent 260 MB per dag), som lastes ned én gang for alle MeteoSwiss-varslene dine, så den koster ikke noe ekstra hvis ett av dem allerede har den.",
+                    "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 6 MB) lastes ned én gang i uken, årets dager hver sjette time."
                 }
             }
         },
@@ -217,6 +219,24 @@
                     "mixed": "Blandet",
                     "foehn": "Føhn"
                 }
+            },
+            "high_vs_normal": {
+                "name": "Maksimum mot normalen"
+            },
+            "low_vs_normal": {
+                "name": "Minimum mot normalen"
+            },
+            "month_vs_normal": {
+                "name": "Måneden mot normalen"
+            },
+            "month_rain_vs_normal": {
+                "name": "Månedens nedbør mot normalen"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Månedens sol mot normalen"
+            },
+            "record_high": {
+                "name": "Varmerekord for datoen"
             }
         }
     }

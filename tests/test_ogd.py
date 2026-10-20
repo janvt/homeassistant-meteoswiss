@@ -736,3 +736,46 @@ class TestPollen:
         )
         stations = await client.get_stations(StationType.POLLEN)
         assert [(s.abbr, s.name) for s in stations] == [("PZH", "Zürich")]
+
+
+class TestClimate:
+    NOW_FILE = f"{ogd.SMN_URL}/alt/ogd-smn_alt_t_now.csv"
+    HISTORY = f"{ogd.SMN_URL}/alt/ogd-smn_alt_d_historical.csv"
+    RECENT = f"{ogd.SMN_URL}/alt/ogd-smn_alt_d_recent.csv"
+    HEADER = (
+        "station_abbr;reference_timestamp;"
+        "tre200d0;tre200dx;tre200dn;rre150d0;sre000d0\n"
+    )
+
+    async def test_today_is_the_current_utc_day(self):
+        body = (
+            "station_abbr;reference_timestamp;tre200s0\n"
+            "ALT;19.10.2026 23:50;3.0\n"
+            "ALT;20.10.2026 00:10;6.6\n"
+            "ALT;20.10.2026 11:40;22.3\n"
+            "ALT;20.10.2026 11:50;\n"
+        )
+        client, _ = make_client({self.NOW_FILE: body.encode()})
+
+        today = await client.get_station_today("ALT", now=STATIONS_NOW)
+
+        assert today == {"high": 22.3, "low": 6.6}
+
+    async def test_the_history_is_fetched_weekly_and_this_year_every_six_hours(self):
+        history = self.HEADER + "ALT;20.10.2001 00:00;15;24.8;7;0;300\n"
+        recent = self.HEADER + "ALT;19.10.2026 00:00;14;19;9;0.7;230\n"
+        client, session = make_client(
+            {self.HISTORY: history.encode(), self.RECENT: recent.encode()}
+        )
+
+        normals, days = await client.get_climate("ALT", now=STATIONS_NOW)
+        assert normals.record_high[(10, 20)] == (24.8, 2001)
+        assert days[0].date == datetime.date(2026, 10, 19)
+
+        hour = datetime.timedelta(hours=1)
+        await client.get_climate("ALT", now=STATIONS_NOW + 5 * hour)
+        assert len(session.requests) == 2
+        await client.get_climate("ALT", now=STATIONS_NOW + 7 * hour)
+        assert [r[1] for r in session.requests][2:] == [self.RECENT]
+        await client.get_climate("ALT", now=STATIONS_NOW + 8 * 24 * hour)
+        assert [r[1] for r in session.requests][3:] == [self.HISTORY, self.RECENT]

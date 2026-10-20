@@ -21,6 +21,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from custom_components.meteoswiss.alerts import AlertError, MeteoAlarm, WeatherWarning
 from custom_components.meteoswiss.const import (
+    CONF_CLIMATE_NORMALS,
     CONF_FOEHN,
     CONF_FOEHN_NORTH,
     CONF_FOEHN_SOUTH,
@@ -35,6 +36,7 @@ from custom_components.meteoswiss.const import (
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_CLIMATE_NORMALS,
     DEFAULT_HOURLY_TEMPERATURE,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
@@ -72,6 +74,8 @@ FORECAST_CHECK_INTERVAL = datetime.timedelta(minutes=15)
 FORECAST_TIMEOUT = 300
 # Stations, pollen and warnings, which are updated without waiting for those.
 UPDATE_TIMEOUT = 60
+# The client keeps a station's history for longer; this is how often to ask.
+CLIMATE_CHECK_INTERVAL = datetime.timedelta(hours=1)
 # Shared by all entries.
 DATA_CLIENT = f"{DOMAIN}_client"
 DATA_ALERTS = f"{DOMAIN}_alerts"
@@ -158,6 +162,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         precipitation_station=entry.data.get(CONF_PRECIPITATION_STATION, None),
         pollen_station=entry.data.get(CONF_POLLEN_STATION),
         foehn={**FOEHN_DEFAULTS, **entry.options},
+        climate_normals=entry.options.get(
+            CONF_CLIMATE_NORMALS, DEFAULT_CLIMATE_NORMALS
+        ),
         real_time_precipitation_station_name=entry.data.get(
             CONF_REAL_TIME_PRECIPITATION_NAME, None
         ),
@@ -217,6 +224,10 @@ class MeteoSwissClientResult(TypedDict):
     warnings: list[WeatherWarning] | None
     # Sea-level pressures for the Föhn outlook; None when it is turned off.
     foehn: dict[str, Any] | None
+    # The weather station's highest and lowest temperature today.
+    today: dict[str, float | None]
+    # Its normals and records (climate.Climate) and this year's days, if known.
+    climate: tuple[Any, list] | None
     # Forecast attributes.
     postcode: int | None  # e.g. 8005, None for mountains
     point: Point | None  # where the forecast is for
@@ -254,6 +265,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         pollen_station: str | None = None,
         freezing_level: bool = False,
         foehn: dict[str, Any] | None = None,
+        climate_normals: bool = False,
     ) -> None:
         """Initialize."""
         self.first_error: dict[str, float | None] = {
@@ -294,6 +306,11 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         self.precipitation_station = precipitation_station
         self.pollen_station = pollen_station
         self.freezing_level = freezing_level
+        # Normals need the weather station's history.
+        self.climate_normals = bool(climate_normals and weather_station)
+        self._climate: tuple[Any, list] | None = None
+        self._climate_checked: datetime.datetime | None = None
+        self._climate_task: asyncio.Task | None = None
         # The Föhn settings (see const.FOEHN_DEFAULTS), or None.
         self.foehn = foehn if foehn and foehn[CONF_FOEHN] else None
         # Looked up with the first update, for the name of its device.
@@ -483,6 +500,42 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             _LOGGER.warning("Weather warnings: %s", exc)
             return None
 
+    async def _async_get_today(self) -> dict[str, float | None]:
+        """The weather station's highest and lowest temperature today."""
+        if not self.climate_normals:
+            return {}
+        try:
+            return await self.client.get_station_today(self.weather_station)
+        except OGDError as exc:
+            _LOGGER.warning("Station %s: %s", self.weather_station, exc)
+            return {}
+
+    @callback
+    def _async_refresh_climate_soon(self) -> None:
+        """Fetch the station's history in the background (6 MB at first)."""
+        if not self.climate_normals:
+            return
+        now = datetime.datetime.now(datetime.timezone.utc)
+        running = self._climate_task is not None and not self._climate_task.done()
+        due = self._climate_checked is None or (
+            now - self._climate_checked >= CLIMATE_CHECK_INTERVAL
+        )
+        if not running and due:
+            self._climate_task = self.config_entry.async_create_background_task(
+                self.hass, self._async_refresh_climate(now), "meteoswiss climate"
+            )
+
+    async def _async_refresh_climate(self, now: datetime.datetime) -> None:
+        try:
+            async with asyncio.timeout(FORECAST_TIMEOUT):
+                self._climate = await self.client.get_climate(self.weather_station)
+            self._climate_checked = now
+        except (OGDError, TimeoutError) as exc:
+            _LOGGER.warning("Climate of %s: %s", self.weather_station, exc)
+            return
+        if self.data is not None:
+            self.async_set_updated_data({**self.data, "climate": self._climate})
+
     async def _async_get_foehn(self) -> dict[str, Any] | None:
         """The sea-level pressures south and north of the Alps, if wanted.
 
@@ -540,6 +593,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                         condition_by_station[station] = {}
                 pollen = await self._async_get_pollen()
                 foehn = await self._async_get_foehn()
+                today = await self._async_get_today()
+                self._async_refresh_climate_soon()
                 if first:
                     await self._async_get_forecast()
                 else:
@@ -561,6 +616,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             "pollen": pollen,
             "warnings": warnings,
             "foehn": foehn,
+            "today": today,
+            "climate": self._climate,
         }
 
         # _LOGGER.debug("Data obtained (%s):\n%s", type(data), pprint.pformat(data))

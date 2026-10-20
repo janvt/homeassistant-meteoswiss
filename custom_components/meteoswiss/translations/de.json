@@ -111,7 +111,8 @@
                     "foehn_north_station": "Station nördlich der Alpen",
                     "foehn_threshold": "Föhn wahrscheinlich ab",
                     "foehn_strong_threshold": "Starker Föhn ab",
-                    "freezing_level": "Nullgradgrenze"
+                    "freezing_level": "Nullgradgrenze",
+                    "climate_normals": "Klimanormwerte"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Die Nullgradgrenze ist eine eigene Einstellung. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde.",
@@ -120,7 +121,8 @@
                     "foehn_north_station": "Zürich/Kloten ist die klassische Wahl.",
                     "foehn_threshold": "Druckdifferenz, ab der Föhn wahrscheinlich ist; etwa 4 hPa erreichen die nördlichen Täler wie in Altdorf. Für Nordföhn gleich, umgekehrt.",
                     "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
-                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer weiteren Datei von 33 MB alle drei Stunden (etwa 260 MB pro Tag), die für alle deine MeteoSwiss-Prognosen einmal heruntergeladen wird; sie kostet also nichts zusätzlich, wenn eine davon sie schon hat."
+                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer weiteren Datei von 33 MB alle drei Stunden (etwa 260 MB pro Tag), die für alle deine MeteoSwiss-Prognosen einmal heruntergeladen wird; sie kostet also nichts zusätzlich, wenn eine davon sie schon hat.",
+                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 6 MB) wird einmal pro Woche heruntergeladen, die Tage dieses Jahres alle sechs Stunden."
                 }
             }
         },
@@ -217,6 +219,24 @@
                     "mixed": "Gemischt",
                     "foehn": "Föhn"
                 }
+            },
+            "high_vs_normal": {
+                "name": "Höchstwert gegenüber Norm"
+            },
+            "low_vs_normal": {
+                "name": "Tiefstwert gegenüber Norm"
+            },
+            "month_vs_normal": {
+                "name": "Monat gegenüber Norm"
+            },
+            "month_rain_vs_normal": {
+                "name": "Monatsniederschlag gegenüber Norm"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Monatssonnenschein gegenüber Norm"
+            },
+            "record_high": {
+                "name": "Rekordhöchstwert für das Datum"
             }
         }
     }

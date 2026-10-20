@@ -111,7 +111,8 @@
                     "foehn_north_station": "Estación al norte de los Alpes",
                     "foehn_threshold": "Foehn probable desde",
                     "foehn_strong_threshold": "Foehn fuerte desde",
-                    "freezing_level": "Isoterma de cero grados"
+                    "freezing_level": "Isoterma de cero grados",
+                    "climate_normals": "Normales climáticas"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. La isoterma de cero grados es un ajuste aparte. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora.",
@@ -120,7 +121,8 @@
                     "foehn_north_station": "Zúrich/Kloten es la elección clásica.",
                     "foehn_threshold": "Diferencia de presión a partir de la cual el foehn es probable; unos 4 hPa llegan a los valles del norte, como en Altdorf. Igual en sentido contrario para el foehn del norte.",
                     "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa.",
-                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en otro archivo de 33 MB cada tres horas (unos 260 MB al día), que se descarga una vez para todas sus previsiones de MeteoSwiss, así que no cuesta nada más si una de ellas ya la tiene."
+                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en otro archivo de 33 MB cada tres horas (unos 260 MB al día), que se descarga una vez para todas sus previsiones de MeteoSwiss, así que no cuesta nada más si una de ellas ya la tiene.",
+                    "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 6 MB) se descarga una vez por semana, los días de este año cada seis horas."
                 }
             }
         },
@@ -217,6 +219,24 @@
                     "mixed": "Mixto",
                     "foehn": "Foehn"
                 }
+            },
+            "high_vs_normal": {
+                "name": "Máxima respecto a lo normal"
+            },
+            "low_vs_normal": {
+                "name": "Mínima respecto a lo normal"
+            },
+            "month_vs_normal": {
+                "name": "Mes respecto a lo normal"
+            },
+            "month_rain_vs_normal": {
+                "name": "Lluvia del mes respecto a lo normal"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Sol del mes respecto a lo normal"
+            },
+            "record_high": {
+                "name": "Récord de calor para la fecha"
             }
         }
     }

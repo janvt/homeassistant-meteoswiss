@@ -29,6 +29,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.meteoswiss import (
     MeteoSwissDataUpdateCoordinator,
+    climate,
     foehn,
     summaries,
 )
@@ -218,6 +219,11 @@ async def async_setup_entry(
         if c.weather_station:
             foehn_sensors.append(MeteoSwissStationFoehnSensor(entry.entry_id, c))
         async_add_entities(foehn_sensors, True)
+    if c.climate_normals:
+        async_add_entities(
+            [MeteoSwissClimateSensor(entry.entry_id, c, d) for d in CLIMATE_SENSORS],
+            True,
+        )
     if c.pollen_station:
         async_add_entities(
             [
@@ -226,6 +232,170 @@ async def async_setup_entry(
             ],
             True,
         )
+
+
+@dataclass(frozen=True, kw_only=True)
+class ClimateDescription(SensorEntityDescription):
+    """Today or this month at the weather station against its climate.
+
+    value returns the state and its attributes from the coordinator's data
+    and the UTC date (the station's days are UTC days).
+    """
+
+    value: Callable[
+        [dict[str, typing.Any], date], tuple[float | None, dict[str, typing.Any]]
+    ]
+
+
+def _against_normal(kind: str):
+    def value(data, today):
+        measured = data["today"].get(kind)
+        if not data["climate"] or measured is None:
+            return None, {}
+        normals = data["climate"][0]
+        normal = (normals.normal_high if kind == "high" else normals.normal_low).get(
+            (today.month, today.day)
+        )
+        if normal is None:
+            return None, {}
+        return round(measured - normal, 1), {kind: measured, f"normal_{kind}": normal}
+
+    return value
+
+
+def _month(key: str):
+    def value(data, today):
+        if not data["climate"]:
+            return None, {}
+        normals, recent = data["climate"]
+        so_far = climate.month_so_far(recent, normals, today)
+        if so_far is None:
+            return None, {}
+        if key == "mean":
+            return so_far.mean_anomaly, {
+                "mean": so_far.mean,
+                "normal_mean": normals.month_mean.get(today.month),
+                "days": so_far.days,
+            }
+        return getattr(so_far, f"{key}_percent"), {
+            key: getattr(so_far, key),
+            f"normal_{key}": getattr(so_far, f"{key}_normal"),
+            "days": so_far.days,
+        }
+
+    return value
+
+
+def _record(data, today):
+    if not data["climate"]:
+        return None, {}
+    normals = data["climate"][0]
+    high = normals.record_high.get((today.month, today.day))
+    low = normals.record_low.get((today.month, today.day))
+    if high is None:
+        return None, {}
+    return high[0], {
+        "year": high[1],
+        "record_low": low[0] if low else None,
+        "record_low_year": low[1] if low else None,
+        "since": normals.first_year,
+    }
+
+
+CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
+    ClimateDescription(
+        key="high_vs_normal",
+        translation_key="high_vs_normal",
+        icon="mdi:thermometer-chevron-up",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=_against_normal("high"),
+    ),
+    ClimateDescription(
+        key="low_vs_normal",
+        translation_key="low_vs_normal",
+        icon="mdi:thermometer-chevron-down",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=_against_normal("low"),
+    ),
+    ClimateDescription(
+        key="month_vs_normal",
+        translation_key="month_vs_normal",
+        icon="mdi:calendar-month",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=_month("mean"),
+    ),
+    ClimateDescription(
+        key="month_rain_vs_normal",
+        translation_key="month_rain_vs_normal",
+        icon="mdi:water-percent",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value=_month("rain"),
+    ),
+    ClimateDescription(
+        key="month_sunshine_vs_normal",
+        translation_key="month_sunshine_vs_normal",
+        icon="mdi:weather-sunny",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value=_month("sunshine"),
+    ),
+    ClimateDescription(
+        # No state class: a record, not a measurement.
+        key="record_high",
+        translation_key="record_high",
+        icon="mdi:trophy-outline",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        suggested_display_precision=1,
+        value=_record,
+    ),
+)
+
+
+class MeteoSwissClimateSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """The weather station today or this month, against its normals."""
+
+    entity_description: ClimateDescription
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        integration_id: str,
+        coordinator: MeteoSwissDataUpdateCoordinator,
+        description: ClimateDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
+        self._attr_device_info = coordinator.station_device_info(StationType.WEATHER)
+
+    def _value(self) -> tuple[float | None, dict[str, typing.Any]]:
+        today = datetime.now(timezone.utc).date()
+        return self.entity_description.value(self.coordinator.data, today)
+
+    @property
+    def native_value(self) -> float | None:
+        return self._value()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, typing.Any]:
+        return self._value()[1]
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
 
 
 class _FoehnSensor(

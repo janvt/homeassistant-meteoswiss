@@ -111,7 +111,8 @@
                     "foehn_north_station": "Station north of the Alps",
                     "foehn_threshold": "Föhn likely from",
                     "foehn_strong_threshold": "Strong Föhn from",
-                    "freezing_level": "Freezing level"
+                    "freezing_level": "Freezing level",
+                    "climate_normals": "Climate normals"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. The freezing level is a setting of its own. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour.",
@@ -120,7 +121,8 @@
                     "foehn_north_station": "Zürich/Kloten is the classic choice.",
                     "foehn_threshold": "Pressure difference from which Föhn is likely; about 4 hPa reaches the northern valleys, as in Altdorf. The same the other way round for north Föhn.",
                     "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa.",
-                    "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in another 33 MB file every three hours (about 260 MB a day), downloaded once for all your MeteoSwiss forecasts, so it costs nothing more if one of them already has it."
+                    "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in another 33 MB file every three hours (about 260 MB a day), downloaded once for all your MeteoSwiss forecasts, so it costs nothing more if one of them already has it.",
+                    "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 6 MB) is downloaded once a week, this year's days every six hours."
                 }
             }
         },
@@ -217,6 +219,24 @@
                     "mixed": "Mixed",
                     "foehn": "Föhn"
                 }
+            },
+            "high_vs_normal": {
+                "name": "High vs normal"
+            },
+            "low_vs_normal": {
+                "name": "Low vs normal"
+            },
+            "month_vs_normal": {
+                "name": "Month vs normal"
+            },
+            "month_rain_vs_normal": {
+                "name": "Month's rain vs normal"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Month's sunshine vs normal"
+            },
+            "record_high": {
+                "name": "Record high for the date"
             }
         }
     }

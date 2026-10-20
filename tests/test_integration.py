@@ -41,7 +41,8 @@ SUMMARY_NAMES = (
 
 async def setup(hass, entry):
     assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
+    # Including what is fetched in the background, like the climate normals.
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 def entity_id(hass, platform, unique_id):
@@ -850,3 +851,63 @@ async def test_a_postal_code_shares_the_mountains_freezing_level(
 
     # One download for both, after each fetched once when set up.
     assert fake_ogd.large_downloads["zprfr0hs"][2:] == [{(800500, 2), (864, 3)}]
+
+
+def climate_state(hass, entry, key):
+    return hass.states.get(entity_id(hass, "sensor", f"sensor.{entry.entry_id}-{key}"))
+
+
+async def test_climate_normals(hass, entry):
+    await setup(hass, entry)
+
+    high = climate_state(hass, entry, "high_vs_normal")
+    assert high.state == "8.0"  # 22.3 against 14.3
+    assert high.attributes["high"] == 22.3
+    assert high.attributes["normal_high"] == 14.3
+    assert high.attributes["friendly_name"] == "Fluntern High vs normal"
+    assert climate_state(hass, entry, "low_vs_normal").state == "0.6"
+    month = climate_state(hass, entry, "month_vs_normal")
+    assert month.state == "3.2"
+    assert month.attributes["days"] == 19
+    rain = climate_state(hass, entry, "month_rain_vs_normal")
+    # 13.3 mm in 19 days, against 84.2 mm x 19 / 31.
+    assert rain.state == "26"
+    assert rain.attributes["normal_rain"] == 51.6
+    assert climate_state(hass, entry, "month_sunshine_vs_normal").state == "113"
+    record = climate_state(hass, entry, "record_high")
+    assert record.state == "24.8"
+    assert record.attributes["year"] == 2001
+    assert record.attributes["record_low"] == -1.4
+    assert record.attributes["since"] == 1864
+
+
+async def test_climate_normals_turned_off(hass, entry_data):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data=entry_data, options={"climate_normals": False}
+    )
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    assert not er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"sensor.{entry.entry_id}-record_high"
+    )
+
+
+async def test_climate_normals_that_cannot_be_obtained(hass, entry, fake_ogd):
+    fake_ogd.climate_error = OGDError("down")
+
+    await setup(hass, entry)
+
+    assert climate_state(hass, entry, "record_high").state == "unavailable"
+    temperature = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-temperature")
+    assert hass.states.get(temperature).state == "13.4"
+
+
+async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_now):
+    await setup(hass, entry)
+    for _ in range(6):
+        await refresh_after(hass, frozen_now, 5)
+    assert fake_ogd.climate_calls == 1
+
+    await refresh_after(hass, frozen_now, 35)
+    assert fake_ogd.climate_calls == 2

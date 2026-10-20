@@ -22,6 +22,8 @@ from typing import Any, TypedDict
 
 import aiohttp
 
+from custom_components.meteoswiss import climate
+
 _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://data.geo.admin.ch"
@@ -68,6 +70,11 @@ STATION_MAX_AGE = datetime.timedelta(minutes=90)
 # Pollen stations report hourly means, also about half an hour late.
 POLLEN_MAX_AGE = datetime.timedelta(hours=6)
 POLLEN_CACHE_SECONDS = 10 * 60
+# A station's daily history: up to the end of last year (about 6 MB, changing
+# once a year), and the days of this year.
+CLIMATE_HISTORY_REFRESH = datetime.timedelta(days=7)
+CLIMATE_RECENT_REFRESH = datetime.timedelta(hours=6)
+
 # Hourly mean concentrations (pollen per m³) by pollen type.
 POLLEN_PARAMETERS = {
     "alder": "kaalnuh0",
@@ -357,6 +364,16 @@ class MeteoSwissOGD:
         # Recently fetched station files: URL to (monotonic time, body).
         self._station_files: dict[str, tuple[float, bytes]] = {}
         self._latest_run: tuple[datetime.datetime, str] | None = None
+        # By station: when its daily files were fetched, and their days.
+        self._climate_files: dict[
+            tuple[str, str], tuple[datetime.datetime, list[climate.Day]]
+        ] = {}
+        # By station: when the files its normals were computed from were
+        # fetched, and the normals.
+        self._climates: dict[
+            str, tuple[tuple[datetime.datetime, ...], climate.Climate]
+        ] = {}
+        self._climate_lock = asyncio.Lock()
 
     async def _get(
         self, url: str, byte_range: tuple[int, int] | None = None
@@ -545,6 +562,71 @@ class MeteoSwissOGD:
             if any(v is not None for v in values.values()):
                 return {**values, "measured": measured}
         return {}
+
+    async def get_station_today(
+        self, abbr: str, now: datetime.datetime | None = None
+    ) -> dict[str, float | None]:
+        """The highest and lowest temperature of a weather station today (UTC).
+
+        From the same file as get_station_now, so usually without a request.
+        """
+        low = abbr.lower()
+        body = await self._get_station_file(f"{SMN_URL}/{low}/ogd-smn_{low}_t_now.csv")
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+        temperatures = [
+            value
+            for row in csv.DictReader(
+                io.StringIO(body.decode("windows-1252")), delimiter=";"
+            )
+            if (measured := _station_time(row.get("reference_timestamp")))
+            and measured.date() == now.date()
+            and (value := _number(row.get("tre200s0"))) is not None
+        ]
+        return {
+            "high": max(temperatures, default=None),
+            "low": min(temperatures, default=None),
+        }
+
+    async def _climate_days(
+        self, abbr: str, kind: str, refresh: datetime.timedelta, now: datetime.datetime
+    ) -> list[climate.Day]:
+        cached = self._climate_files.get((abbr, kind))
+        if cached and abs(now - cached[0]) < refresh:
+            return cached[1]
+        low = abbr.lower()
+        body, _ = await self._get(f"{SMN_URL}/{low}/ogd-smn_{low}_d_{kind}.csv")
+        days = await asyncio.get_running_loop().run_in_executor(
+            None, climate.parse_days, body.decode("windows-1252")
+        )
+        self._climate_files[(abbr, kind)] = (now, days)
+        return days
+
+    async def get_climate(
+        self, abbr: str, now: datetime.datetime | None = None
+    ) -> tuple[climate.Climate, list[climate.Day]]:
+        """A weather station's normals and records, and this year's days.
+
+        Shared by all entries with the station; the history is fetched once a
+        week, this year's days every six hours.
+        """
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+        async with self._climate_lock:
+            history = await self._climate_days(
+                abbr, "historical", CLIMATE_HISTORY_REFRESH, now
+            )
+            recent = await self._climate_days(
+                abbr, "recent", CLIMATE_RECENT_REFRESH, now
+            )
+            key = tuple(
+                self._climate_files[(abbr, k)][0] for k in ("historical", "recent")
+            )
+            cached = self._climates.get(abbr)
+            if cached is None or cached[0] != key:
+                computed = await asyncio.get_running_loop().run_in_executor(
+                    None, climate.compute, history + recent
+                )
+                self._climates[abbr] = cached = (key, computed)
+            return cached[1], recent
 
     async def _get_station_file(
         self, url: str, cache_seconds: float = STATION_CACHE_SECONDS
