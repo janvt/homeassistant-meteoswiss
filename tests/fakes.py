@@ -1,0 +1,211 @@
+"""In-memory stand-ins for the MeteoSwiss servers and the OGD client."""
+
+from __future__ import annotations
+
+import datetime
+import re
+from unittest.mock import MagicMock
+
+import aiohttp
+
+from custom_components.meteoswiss.ogd import (
+    LocalForecast,
+    OGDError,
+    Point,
+    Station,
+    StationType,
+    distance_km,
+)
+
+UTC = datetime.timezone.utc
+
+
+class FakeResponse:
+    def __init__(self, status: int, body: bytes = b"", headers=None) -> None:
+        self.status = status
+        self.body = body
+        self.headers = headers or {}
+
+    async def __aenter__(self) -> FakeResponse:
+        return self
+
+    async def __aexit__(self, *exc) -> None:
+        return None
+
+    def raise_for_status(self) -> None:
+        if self.status >= 400:
+            raise aiohttp.ClientResponseError(MagicMock(), (), status=self.status)
+
+    async def read(self) -> bytes:
+        return self.body
+
+
+class FakeSession:
+    """Serves files by URL, with HTTP Range support; missing files are a 403."""
+
+    def __init__(self, files: dict[str, bytes]) -> None:
+        self.files = files
+        self.requests: list[tuple[str, str, str | None]] = []
+
+    def _respond(self, method: str, url: str, headers) -> FakeResponse:
+        byte_range = (headers or {}).get("Range")
+        self.requests.append((method, url, byte_range))
+        body = self.files.get(url)
+        if body is None:
+            return FakeResponse(403)
+        if byte_range is None:
+            return FakeResponse(200, b"" if method == "HEAD" else body)
+        match = re.fullmatch(r"bytes=(\d+)-(\d+)", byte_range)
+        assert match, byte_range
+        start, end = int(match[1]), min(int(match[2]), len(body) - 1)
+        return FakeResponse(
+            206,
+            body[start : end + 1],
+            {"Content-Range": f"bytes {start}-{end}/{len(body)}"},
+        )
+
+    def get(self, url, headers=None, timeout=None) -> FakeResponse:
+        return self._respond("GET", url, headers)
+
+    def head(self, url, headers=None, timeout=None) -> FakeResponse:
+        return self._respond("HEAD", url, headers)
+
+    @property
+    def ranged_bytes(self) -> int:
+        return sum(
+            int(m[2]) - int(m[1]) + 1
+            for _, _, r in self.requests
+            if r and (m := re.fullmatch(r"bytes=(\d+)-(\d+)", r))
+        )
+
+
+def point_major_csv(param: str, points, timestamps, value) -> bytes:
+    lines = [f"point_id;point_type_id;Date;{param}"]
+    for point_id, point_type in sorted(points):
+        for ts in timestamps:
+            lines.append(f"{point_id};{point_type};{ts};{value(point_id, ts)}")
+    return ("\n".join(lines) + "\n").encode("latin-1")
+
+
+def time_major_csv(param: str, points, timestamps, value) -> bytes:
+    lines = [f"point_id;point_type_id;Date;{param}"]
+    for ts in timestamps:
+        for point_id, point_type in sorted(points):
+            lines.append(f"{point_id};{point_type};{ts};{value(point_id, ts)}")
+    return ("\n".join(lines) + "\n").encode("latin-1")
+
+
+POINTS = [
+    Point(100025, 2, "Lausanne 25", "1000", 46.5576, 6.6831),
+    Point(100026, 2, "Lausanne 26", "1000", 46.5561, 6.6962),
+    Point(800100, 2, "Zürich", "8001", 47.3723, 8.5422),
+    Point(800500, 2, "Zürich", "8005", 47.3875, 8.5210),
+    Point(1, 1, "Arosa", "", 46.7927, 9.6790),
+]
+WEATHER_STATIONS = [
+    Station("SMA", "Zürich / Fluntern", 47.3810, 8.5672),
+    Station("ARO", "Arosa", 46.7927, 9.6790),
+]
+PRECIPITATION_STATIONS = [Station("ABE", "Aarberg", 47.0580, 7.2854)]
+
+NOW = datetime.datetime(2026, 10, 20, 12, 30, tzinfo=UTC)
+
+
+def make_forecast(run: str = "202610201200") -> LocalForecast:
+    """A forecast with 3 days and the hours around NOW."""
+    start = datetime.datetime(2026, 10, 20, 9, tzinfo=UTC)
+    return {
+        "run": run,
+        "daily": [
+            {
+                "date": f"2026-10-{20 + i}",
+                "temperature_min": 8.0 + i,
+                "temperature_max": 15.0 + i,
+                "precipitation": 0.5 * i,
+                "symbol": 3 if i == 0 else 20,
+            }
+            for i in range(3)
+        ],
+        "hourly": [
+            {
+                "time": start + datetime.timedelta(hours=i),
+                # Sunny by day, clear by night, one unknown symbol at the end.
+                "symbol": 1 if i < 8 else (101 if i < 10 else 999),
+                "precipitation": 0.1 * i,
+                "wind_speed": 5.0 + i,
+                "wind_bearing": 180.0,
+            }
+            for i in range(12)
+        ],
+    }
+
+
+STATION_MEASUREMENTS = {
+    "tre200s0": 13.4,
+    "ure200s0": 79.9,
+    "prestas0": 940.5,
+    "fu3010z0": 8.6,
+    "dkl010z0": 31.0,
+    "rre150z0": 0.0,
+}
+
+
+class FakeOGD:
+    """Replacement for MeteoSwissOGD that never touches the network."""
+
+    # Class attributes so tests can change behaviour before or after setup.
+    forecast_error: Exception | None = None
+    station_error: Exception | None = None
+    run = "202610201200"
+    instances: list[FakeOGD] = []
+    forecast_calls = 0
+    run_checks = 0
+
+    def __init__(self, session, user_agent) -> None:
+        FakeOGD.instances.append(self)
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.forecast_error = None
+        cls.station_error = None
+        cls.run = "202610201200"
+        cls.instances = []
+        cls.forecast_calls = 0
+        cls.run_checks = 0
+
+    async def get_postcode_points(self, postcode):
+        return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
+
+    async def get_nearest_postcode_point(self, lat, lon):
+        return min(
+            (p for p in POINTS if p.point_type == 2),
+            key=lambda p: distance_km(lat, lon, p.lat, p.lon),
+        )
+
+    async def resolve_point(self, postcode, point_id=None):
+        points = await self.get_postcode_points(postcode)
+        if not points:
+            raise OGDError(f"No forecast point for postal code {postcode}")
+        return points[0]
+
+    async def get_stations(self, station_type):
+        if station_type == StationType.WEATHER:
+            return WEATHER_STATIONS
+        return PRECIPITATION_STATIONS
+
+    async def get_station_now(self, abbr, station_type):
+        if self.station_error:
+            raise self.station_error
+        if station_type == StationType.PRECIPITATION:
+            return {"rre150z0": 0.2}
+        return dict(STATION_MEASUREMENTS)
+
+    async def latest_run(self, now=None):
+        FakeOGD.run_checks += 1
+        if self.forecast_error:
+            raise self.forecast_error
+        return FakeOGD.run
+
+    async def get_forecast(self, point, run):
+        FakeOGD.forecast_calls += 1
+        return make_forecast(run)

@@ -63,8 +63,8 @@ async def async_setup_entry(
         )
     else:
         _LOGGER.debug(
-            "The data update coordinator has no real-time precipitation station configured"
-            + " — not providing precipitation sensor data."
+            "The data update coordinator has no real-time precipitation station"
+            + " configured — not providing precipitation sensor data."
         )
 
 
