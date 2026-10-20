@@ -6,10 +6,12 @@ import datetime
 import logging
 
 from homeassistant.components.weather import (
+    ATTR_FORECAST_CLOUD_COVERAGE,
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
+    ATTR_FORECAST_NATIVE_WIND_GUST_SPEED,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_FORECAST_PRECIPITATION_PROBABILITY,
     ATTR_FORECAST_TIME,
@@ -183,6 +185,18 @@ class MeteoSwissWeather(
         )
 
     @property
+    def native_wind_gust_speed(self) -> float | None:
+        return condition_name_to_first_value(
+            self._condition_for_all_stations, "fu3010z1"
+        )
+
+    @property
+    def native_dew_point(self) -> float | None:
+        return condition_name_to_first_value(
+            self._condition_for_all_stations, "tde200s0"
+        )
+
+    @property
     def wind_bearing(self) -> float | None:
         return condition_name_to_first_value(
             self._condition_for_all_stations, "dkl010z0"
@@ -233,6 +247,7 @@ class MeteoSwissWeather(
                 ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast[
                     "precipitation_probability"
                 ],
+                ATTR_FORECAST_NATIVE_WIND_GUST_SPEED: forecast["wind_gust"],
             }
             fcdata_out.append(data_out)
         _LOGGER.debug("Daily forecast has %d items", len(fcdata_out))
@@ -262,6 +277,8 @@ class MeteoSwissWeather(
                 ],
                 ATTR_FORECAST_NATIVE_WIND_SPEED: forecast["wind_speed"],
                 ATTR_FORECAST_WIND_BEARING: forecast["wind_bearing"],
+                ATTR_FORECAST_NATIVE_WIND_GUST_SPEED: forecast["wind_gust"],
+                ATTR_FORECAST_CLOUD_COVERAGE: forecast["cloud_coverage"],
             }
             fcdata_out.append(data_out)
         _LOGGER.debug("Hourly forecast has %d items", len(fcdata_out))

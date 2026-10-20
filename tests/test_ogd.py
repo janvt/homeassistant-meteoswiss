@@ -63,6 +63,12 @@ def forecast_files() -> dict[str, bytes]:
     files[url("rp0003i0")] = point_major_csv(
         "rp0003i0", pts, HOURS, lambda i, ts: RAIN_PROBABILITY.get(ts, "0")
     )
+    for p, v in (("nprolohs", "0.50"), ("npromths", "0.00"), ("nprohihs", "0.50")):
+        files[url(p)] = point_major_csv(p, pts, HOURS, lambda i, ts, v=v: v)
+    # Gusts by the hour the interval ends, to check the daily maximum.
+    files[url("fu3010h1")] = point_major_csv(
+        "fu3010h1", pts, HOURS, lambda i, ts: str(int(ts[8:10]))
+    )
     # Hourly temperatures are ordered by time and start a few hours earlier.
     files[url("tre200h0")] = time_major_csv(
         "tre200h0", pts, ["202610192200", *HOURS], lambda i, ts: f"{i % 7}.{ts[9]}"
@@ -93,6 +99,22 @@ def test_key():
     assert ogd._key(b"12;2;2026") == (12, 2)
     assert ogd._key("point_id;point_type_id;Date;x") is None
     assert ogd._key("") is None
+
+
+@pytest.mark.parametrize(
+    ("layers", "expected"),
+    [
+        ((0.0, 0.0, 0.0), 0),
+        ((1.0, 0.0, 0.0), 100),
+        ((0.0, 0.0, 0.8), 80),
+        ((0.5, 0.5, 0.0), 75),
+        ((0.5, 0.5, 0.5), 88),
+        ((1.2, -0.1, 0.0), 100),  # out of range values are clamped
+        ((0.5, None, 0.5), None),
+    ],
+)
+def test_cloud_coverage(layers, expected):
+    assert ogd._cloud_coverage(*layers) == expected
 
 
 def test_distance_and_nearest():
@@ -209,6 +231,7 @@ class TestGetForecast:
             "temperature_max": 12.5,
             "precipitation": 5.0,
             "precipitation_probability": 40.0,
+            "wind_gust": 22.0,  # the hour ending 22:00 UTC is the last of the day
             "symbol": 3,
         }
         assert len(forecast["hourly"]) == 217
@@ -222,6 +245,10 @@ class TestGetForecast:
         noon = forecast["hourly"][12]
         assert noon["time"] == datetime.datetime(2026, 10, 20, 11, tzinfo=UTC)
         assert noon["precipitation_probability"] == 30.0
+        assert noon["wind_gust"] == 12.0
+        # Half the sky at two levels: three quarters covered.
+        assert noon["cloud_coverage"] == 75
+        assert forecast["daily"][1]["wind_gust"] == 23.0
 
     async def test_daily_chance_of_rain_follows_the_local_day(self):
         client, _ = make_client(forecast_files())

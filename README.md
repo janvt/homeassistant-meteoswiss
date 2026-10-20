@@ -256,7 +256,10 @@ all of Switzerland, so the integration downloads it at most every three hours
 (about 260 MB a day); the rest of the forecast takes a few kilobytes per hour.
 On a metered connection, turn off *Hourly temperatures* when setting up the
 integration or later in its options: the hourly forecast then has no temperatures.
-The daily chance of rain is the highest three-hour chance of rain of the day.
+The daily chance of rain and gusts are the highest of the day.  Cloud cover
+combines MeteoSwiss's separate low, medium and high cloud forecasts, assuming
+the layers overlap at random; thin high cloud counts fully, so a sunny symbol
+can come with high cloud cover.
 
 A primer on Swiss weather stations can be found at https://rudd-o.com/meteostations .
 Information on the provided values is available in the

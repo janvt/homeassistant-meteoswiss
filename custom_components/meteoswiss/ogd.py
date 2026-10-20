@@ -72,6 +72,11 @@ HOURLY_PARAMETERS = {
     "wind_speed": "fu3010h0",
     "wind_bearing": "dkl010h0",
     "precipitation_probability": "rp0003i0",
+    "wind_gust": "fu3010h1",
+    # Fractions (0-1) of the sky covered by each layer.
+    "cloud_low": "nprolohs",
+    "cloud_medium": "npromths",
+    "cloud_high": "nprohihs",
 }
 # Ordered by time rather than point, so it is downloaded whole: see
 # MeteoSwissOGD.get_hourly_temperature.
@@ -122,6 +127,7 @@ class DailyForecast(TypedDict):
     precipitation: float | None
     # Highest chance of rain of any three hours of the day, in %.
     precipitation_probability: float | None
+    wind_gust: float | None  # strongest gust of the day, km/h
     symbol: int | None  # MeteoSwiss pictogram of the day
 
 
@@ -134,6 +140,8 @@ class HourlyForecast(TypedDict):
     precipitation_probability: float | None
     wind_speed: float | None
     wind_bearing: float | None
+    wind_gust: float | None  # strongest gust of the hour, km/h
+    cloud_coverage: float | None  # %, all layers together
 
 
 class LocalForecast(TypedDict):
@@ -216,6 +224,33 @@ def _station_time(timestamp: str | None) -> datetime.datetime | None:
         )
     except ValueError:
         return None
+
+
+def _cloud_coverage(*layers: float | None) -> float | None:
+    """The share of the sky covered by any layer, in %.
+
+    MeteoSwiss forecasts low, medium and high cloud separately, and no total,
+    so the layers are assumed to overlap at random.
+    """
+    if any(layer is None for layer in layers):
+        return None
+    clear = 1.0
+    for layer in layers:
+        clear *= 1 - min(max(layer, 0.0), 1.0)  # type: ignore[arg-type]
+    return round((1 - clear) * 100)
+
+
+def _local_daily_max(values: dict[str, str]) -> dict[str, float]:
+    """The highest hourly value of each local day, by ISO date."""
+    highest: dict[str, float] = {}
+    for hour, value in values.items():
+        number = _number(value)
+        if number is None:
+            continue
+        start = _utc(hour) - datetime.timedelta(hours=1)
+        day = start.astimezone(LOCAL_TIME_ZONE).date().isoformat()
+        highest[day] = max(number, highest.get(day, number))
+    return highest
 
 
 def _utc(timestamp: str) -> datetime.datetime:
@@ -500,15 +535,9 @@ class MeteoSwissOGD:
             raise OGDError(f"Run {run} has no data for point {point}")
         hourly["temperature"] = hourly_temperature or {}
 
-        # MeteoSwiss has no daily chance of rain, so take the highest of the day.
-        daily_probability: dict[str, float] = {}
-        for hour, value in hourly["precipitation_probability"].items():
-            probability = _number(value)
-            if probability is None:
-                continue
-            start = _utc(hour) - datetime.timedelta(hours=1)
-            day = start.astimezone(LOCAL_TIME_ZONE).date().isoformat()
-            daily_probability[day] = max(probability, daily_probability.get(day, 0))
+        # MeteoSwiss has no daily chance of rain or gusts: take the highest.
+        daily_probability = _local_daily_max(hourly["precipitation_probability"])
+        daily_gust = _local_daily_max(hourly["wind_gust"])
 
         days = sorted(set().union(*(v.keys() for v in daily.values())))
         daily_out: list[DailyForecast] = [
@@ -520,6 +549,7 @@ class MeteoSwissOGD:
                 "precipitation_probability": daily_probability.get(
                     _utc(day).date().isoformat()
                 ),
+                "wind_gust": daily_gust.get(_utc(day).date().isoformat()),
                 "symbol": _integer(daily["symbol"].get(day)),
             }
             for day in days
@@ -538,6 +568,12 @@ class MeteoSwissOGD:
                 ),
                 "wind_speed": _number(hourly["wind_speed"].get(hour)),
                 "wind_bearing": _number(hourly["wind_bearing"].get(hour)),
+                "wind_gust": _number(hourly["wind_gust"].get(hour)),
+                "cloud_coverage": _cloud_coverage(
+                    _number(hourly["cloud_low"].get(hour)),
+                    _number(hourly["cloud_medium"].get(hour)),
+                    _number(hourly["cloud_high"].get(hour)),
+                ),
             }
             for hour in hours
         ]

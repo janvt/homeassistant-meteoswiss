@@ -142,6 +142,7 @@ def make_forecast(
                 "temperature_max": 15.0 + i,
                 "precipitation": 0.5 * i,
                 "precipitation_probability": 30.0 * i,
+                "wind_gust": 40.0 + i,
                 "symbol": 3 if i == 0 else 20,
             }
             for i in range(3)
@@ -156,6 +157,8 @@ def make_forecast(
                 "precipitation_probability": 5.0 * i,
                 "wind_speed": 5.0 + i,
                 "wind_bearing": 180.0,
+                "wind_gust": 20.0 + i,
+                "cloud_coverage": 10.0 * i,
             }
             for i in range(12)
         ],
@@ -168,6 +171,8 @@ STATION_MEASUREMENTS = {
     "prestas0": 940.5,
     "fu3010z0": 8.6,
     "dkl010z0": 31.0,
+    "fu3010z1": 25.2,
+    "tde200s0": 9.9,
     "rre150z0": 0.0,
 }
 

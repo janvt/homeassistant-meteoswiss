@@ -50,6 +50,8 @@ async def test_weather_entity(hass, entry):
     assert state.attributes["pressure"] == 940.5
     assert state.attributes["wind_speed"] == 8.6
     assert state.attributes["wind_bearing"] == 31.0
+    assert state.attributes["wind_gust_speed"] == 25.2
+    assert state.attributes["dew_point"] == 9.9
     assert "Forecasts from postal code 8005" in state.attributes["attribution"]
 
 
@@ -74,8 +76,9 @@ async def test_sensors(hass, entry):
         if e.unique_id.endswith("-precipitation")
     ]
     assert len(precipitation_sensors) == 1
+    assert value("dew_point") == "9.9"
     # Missing measurements are unavailable rather than wrong.
-    assert value("dew_point") == "unavailable"
+    assert value("pressure_qnh") == "unavailable"
 
 
 async def test_daily_forecast(hass, entry):
@@ -98,6 +101,7 @@ async def test_daily_forecast(hass, entry):
         "condition": "partlycloudy",  # symbol 3
         "precipitation": 0.0,
         "precipitation_probability": 0.0,
+        "wind_gust_speed": 40.0,
     }
     assert days[1]["condition"] == "pouring"  # symbol 20
     assert days[1]["precipitation_probability"] == 30.0
@@ -124,6 +128,8 @@ async def test_hourly_forecast_starts_with_the_current_hour(hass, entry):
     assert hours[0]["precipitation_probability"] == 15.0
     assert hours[0]["wind_speed"] == 8.0
     assert hours[0]["wind_bearing"] == 180.0
+    assert hours[0]["wind_gust_speed"] == 23.0
+    assert hours[0]["cloud_coverage"] == 30.0
     assert hours[5]["datetime"].startswith("2026-10-20T17:00")
     assert hours[5]["condition"] == "clear-night"  # symbol 101
     assert hours[7]["condition"] is None  # symbol 999 is unknown
