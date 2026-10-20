@@ -25,8 +25,8 @@
         "error": {
             "cannot_query_address": "OpenStreetMap ne ønsket å gueß adresse for din lokasjon; skriv inn informasjonen selv",
             "cannot_query_postcode": "OpenStreetMap ne ønsket å gueß postnummer for din lokasjon; skriv inn informasjonen selv",
-            "lat": "Høyden er utenfor grensene -90 til 90 grader",
-            "lon": "Breddelsen er utenfor grensene -180 til 180 grader",
+            "latitude_error": "Breddegraden er utenfor grensene -90 til 90 grader",
+            "longitude_error": "Lengdegraden er utenfor grensene -180 til 180 grader",
             "invalid_station_name": "Stasjonsnavnet er ugyldig; vennligst sjekk {station_url} for stasjonsliste",
             "invalid_postcode": "Postnummeret er ugyldig. Denne integrasjonen fungerer bare med Sveits' postnummer",
             "forecast_name_empty": "Været navn kan ikke være tomt",
@@ -46,10 +46,14 @@
                 "data": {
                     "postcode": "Postnummer",
                     "forecast_name": "Været navn (vær) enhetsnavn",
-                    "update_interval": "Oppdateringsintervall i minutter"
+                    "update_interval": "Oppdateringsintervall i minutter",
+                    "hourly_temperature": "Temperatur per time"
                 },
                 "description": "Postnummeret brukes til å lete opp 5-dagers værforslag. Navnet du skriver inn her, vil brukes for vær- (vær) enhetsnavn.",
-                "title": "Værforslag"
+                "title": "Værforslag",
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned). Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
+                }
             },
             "user_three": {
                 "data": {
@@ -60,6 +64,20 @@
                 },
                 "description": "Sanntids værstatonen brukes til å lete opp aktuell været ved stasjonen og å gi disse som sensorer. Hvis du velger første alternativ i listen, deaktiverer dette sanntids- og sensorenheter.\\n\\nHvis en værstasjon blir valgt, brukes feltet for navn på sanntids- og sensorenheter til å navngi sanntids- (sensore) enheter. Hvis ingen stasjon blir valgt, ignoreres feltet for navn på sanntids- og sensorenheter.\\n\\n{station_url} viser listen over tillgjengelige sanntids værstationer.",
                 "title": "Sanntidsvær"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "MeteoSwiss-alternativer",
+                "description": "Innstillinger for dette varselet.",
+                "data": {
+                    "hourly_temperature": "Temperatur per time"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned). Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
+                }
             }
         }
     }

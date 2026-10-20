@@ -273,3 +273,28 @@ async def test_failed_temperature_refresh_keeps_the_previous_ones(
     forecast = hass.data[DOMAIN][entry.entry_id].data["forecast"]
     assert forecast["run"] == "202610201600"
     assert forecast["temperature_run"] == "202610201200"
+
+
+async def test_hourly_temperatures_can_be_turned_off(
+    hass, entry_data, fake_ogd, frozen_now
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={**entry_data, "hourly_temperature": False}
+    )
+    entry.add_to_hass(hass)
+
+    await setup(hass, entry)
+    fake_ogd.run = "202610201600"
+    await refresh_after(hass, frozen_now, 4 * 60)
+
+    assert fake_ogd.temperature_calls == 0
+    response = await hass.services.async_call(
+        "weather",
+        "get_forecasts",
+        {"entity_id": weather_id(hass, entry), "type": "hourly"},
+        blocking=True,
+        return_response=True,
+    )
+    hours = response[weather_id(hass, entry)]["forecast"]
+    assert hours[0]["temperature"] is None
+    assert hours[0]["precipitation_probability"] is not None

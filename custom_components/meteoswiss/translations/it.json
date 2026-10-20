@@ -25,8 +25,8 @@
         "error": {
             "cannot_query_address": "OpenStreetMap rifiuta di indovinare l'indirizzo della tua posizione; per favore inserisci le informazioni manualmente",
             "cannot_query_postcode": "OpenStreetMap rifiuta di indovinare il codice postale della tua posizione; per favore inserisci le informazioni manualmente",
-            "lat": "La longitudine fornita non cade tra -90 e 90 gradi",
-            "lon": "La longitudine fornita non cade tra -180 e 180 gradi",
+            "latitude_error": "La latitudine fornita non cade tra -90 e 90 gradi",
+            "longitude_error": "La longitudine fornita non cade tra -180 e 180 gradi",
             "invalid_station_name": "Il nome della stazione è invalido; per favore controlla {station_url} per la lista delle stazioni",
             "invalid_postcode": "Il codice postale è invalido; questa integrazione funziona solo con i codici postali svizzeri",
             "forecast_name_empty": "Il nome del preavviso non può essere vuoto",
@@ -46,10 +46,14 @@
                 "data": {
                     "postcode": "Codice postale",
                     "forecast_name": "Nome dell'entità del preavviso (meteorologico)",
-                    "update_interval": "Intervallo di aggiornamento (minuti)"
+                    "update_interval": "Intervallo di aggiornamento (minuti)",
+                    "hourly_temperature": "Temperature orarie"
                 },
                 "description": "Il codice postale viene utilizzato per cercare il preavviso a 5 giorni. Il nome che inserisci qui verrà utilizzato per l'entità del preavviso.",
-                "title": "Preavviso"
+                "title": "Preavviso",
+                "data_description": {
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese). Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                }
             },
             "user_three": {
                 "data": {
@@ -60,6 +64,20 @@
                 },
                 "description": "La stazione meteorologica in tempo reale viene utilizzata per cercare il meteo attuale alla stazione e fornire loro come sensori. Selezionando la prima opzione della lista, si disattiva i sensori di meteo in tempo reale.\\n\\nSe una stazione meteorologica è selezionata, il campo dei nomi delle entità in tempo reale viene utilizzato per denominare le entità in tempo reale (sensori). Se nessuna stazione è scelta, si ignora il campo dei nomi delle entità in tempo reale.\\n\\n{station_url} elenca le stazioni meteorologiche in tempo reale disponibili.",
                 "title": "Meteo in tempo reale"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Opzioni MeteoSvizzera",
+                "description": "Impostazioni di questa previsione.",
+                "data": {
+                    "hourly_temperature": "Temperature orarie"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese). Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                }
             }
         }
     }

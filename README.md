@@ -249,6 +249,8 @@ of the postal code (updated hourly), and current conditions are the
 Hourly temperatures are only published in a file of over 30 MB that covers
 all of Switzerland, so the integration downloads it at most every three hours
 (about 260 MB a day); the rest of the forecast takes a few kilobytes per hour.
+On a metered connection, turn off *Hourly temperatures* when setting up the
+integration or later in its options: the hourly forecast then has no temperatures.
 The daily chance of rain is the highest three-hour chance of rain of the day.
 
 A primer on Swiss weather stations can be found at https://rudd-o.com/meteostations .

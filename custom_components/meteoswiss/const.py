@@ -27,10 +27,12 @@ CONF_PRECIPITATION_STATION = "precipitation_station"
 CONF_REAL_TIME_PRECIPITATION_NAME = "real_time_precipitation_name"
 CONF_FORECASTTYPE = "forecasttype"
 CONF_UPDATE_INTERVAL = "update_interval"
+CONF_HOURLY_TEMPERATURE = "hourly_temperature"
 CONF_LAT = "latitude"
 CONF_LON = "longitude"
 
 DEFAULT_UPDATE_INTERVAL = 5
+DEFAULT_HOURLY_TEMPERATURE = True
 
 USER_AGENT = "MeteoSwiss Home Assistant integration"
 

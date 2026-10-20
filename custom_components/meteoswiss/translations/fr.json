@@ -25,8 +25,8 @@
         "error": {
             "cannot_query_address": "OpenStreetMap a refusé de deviner l'adresse pour votre emplacement; veuillez entrer les informations manuellement",
             "cannot_query_postcode": "OpenStreetMap a refusé de deviner le code postal pour votre emplacement; veuillez entrer les informations manuellement",
-            "lat": "La latitude fournie ne tombe pas entre -90 et 90 degrés",
-            "lon": "La longitude fournie ne tombe pas entre -180 et 180 degrés",
+            "latitude_error": "La latitude fournie ne tombe pas entre -90 et 90 degrés",
+            "longitude_error": "La longitude fournie ne tombe pas entre -180 et 180 degrés",
             "invalid_station_name": "Le nom de la station est invalide; veuillez consulter {station_url} pour la liste des stations",
             "invalid_postcode": "Le code postal est invalide. Cette intégration ne fonctionne que avec les codes postaux suisses",
             "forecast_name_empty": "Le nom de prévision ne peut pas être vide",
@@ -46,10 +46,14 @@
                 "data": {
                     "postcode": "Code postal",
                     "forecast_name": "Nom de l'entité des prévisions (entity name)",
-                    "update_interval": "Intervalle de mise à jour en minutes"
+                    "update_interval": "Intervalle de mise à jour en minutes",
+                    "hourly_temperature": "Températures horaires"
                 },
                 "description": "Le code postal est utilisé pour consulter les prévisions météo à 5 jours. Le nom que vous entrez ici sera utilisé pour l'entité de prévision (météo).",
-                "title": "Prévisions"
+                "title": "Prévisions",
+                "data_description": {
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois). Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure."
+                }
             },
             "user_three": {
                 "data": {
@@ -60,6 +64,20 @@
                 },
                 "description": "La station météorologique en temps réel est utilisée pour consulter les conditions météorologiques actuelles de la station et les fournir en tant que capteur. La sélection de la première option de la liste désactive les capteurs en temps réel. \n- Si une station météorologique est sélectionnée, le champ des noms d'entités en temps réel est utilisé pour nommer les entités en temps réel (capteurs). Si aucune station n'est choisie, le champ des noms des entités en temps réel est ignoré.\n- {station_url} dresse la liste des stations météorologiques en temps réel disponibles.",
                 "title": "Météo en temps réel"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Options MeteoSuisse",
+                "description": "Réglages de cette prévision.",
+                "data": {
+                    "hourly_temperature": "Températures horaires"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois). Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure."
+                }
             }
         }
     }

@@ -25,8 +25,8 @@
         "error": {
             "cannot_query_address": "OpenStreetMap no pudo inferir su dirección; por favor entre la información manualmente",
             "cannot_query_postcode": "OpenStreetMap no pudo inferir su código postal; por favor entre la información manualmente",
-            "lat": "La latitud especificada no está entre -90 y 90 grados",
-            "lon": "La longitud especificada no está entre -180 y 180 grados",
+            "latitude_error": "La latitud especificada no está entre -90 y 90 grados",
+            "longitude_error": "La longitud especificada no está entre -180 y 180 grados",
             "invalid_station_name": "Estación inválida (deben ser 3 caracteres); verifique las estaciones aquí: {station_url}",
             "invalid_postcode": "Código postal incorrecto; esta integración sólo funciona con códigos postales suizos",
             "forecast_name_empty": "El nombre para el pronóstico no puede estar vacío",
@@ -46,10 +46,14 @@
                 "data": {
                     "postcode": "Código postal",
                     "forecast_name": "Nombre de la entidad de pronóstico (clima)",
-                    "update_interval": "Frecuencia de actualización en minutos"
+                    "update_interval": "Frecuencia de actualización en minutos",
+                    "hourly_temperature": "Temperaturas por hora"
                 },
                 "description": "El código postal se usa para obtener el pronóstico de los siguientos 5 días.  El nombre que usted suministre aquí se usará en el nombre de la entidad de pronóstico (clima).",
-                "title": "Pronóstico"
+                "title": "Pronóstico",
+                "data_description": {
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes). Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                }
             },
             "user_three": {
                 "data": {
@@ -60,6 +64,20 @@
                 },
                 "description": "The real-time weather station is used to look up the current weather at the station and provide them as sensors.  Selecting the first option of the list disables real-time weather sensors.\n\nIf a weather station is selected, the real-time entity names field is used to name the real-time (sensor) entities.  If no station is chosen, the real-time entity names field is ignored.\n\n{station_url} lists the available real-time weather stations.",
                 "title": "Estación meteorológica en tiempo real"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Opciones de MeteoSuiza",
+                "description": "Ajustes de esta previsión.",
+                "data": {
+                    "hourly_temperature": "Temperaturas por hora"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes). Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                }
             }
         }
     }

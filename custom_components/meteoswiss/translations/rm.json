@@ -25,8 +25,8 @@
         "error": {
             "cannot_query_address": "OpenStreetMap n'ha betg vulì engiavinar l'adressa per Vossa plazza; As inditgai p.pl. las infurmaziuns a maun",
             "cannot_query_postcode": "OpenStreetMap ha refusà d'enriclar il numer da posta per Vossa plazza; inditgai p.pl. las infurmaziuns a maun",
-            "lat": "La lita furnida na croda betg tranter -90 y 90 grad",
-            "lon": "La lunghezza furnida na croda betg tranter -180 y 180 grad",
+            "latitude_error": "La lita furnida na croda betg tranter -90 y 90 grad",
+            "longitude_error": "La lunghezza furnida na croda betg tranter -180 y 180 grad",
             "invalid_station_name": "Il num da la staziun è nunvalaivel; per plaschair controlla {station_url} per la glista da las staziuns",
             "invalid_postcode": "Il numer da posta è nunvalaivel; questa integraziun funcziuna mo cun ils numers postals svizzers",
             "forecast_name_empty": "Problems na pon ins betg dir vids",

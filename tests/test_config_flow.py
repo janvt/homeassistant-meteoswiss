@@ -2,6 +2,7 @@
 
 import pytest
 from homeassistant.data_entry_flow import FlowResultType
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
@@ -39,8 +40,8 @@ async def test_the_location_defaults_to_the_home_location(hass):
 @pytest.mark.parametrize(
     ("user_input", "error"),
     [
-        ({"latitude": 91.0, "longitude": 8.5}, {"lat": "latitude_error"}),
-        ({"latitude": 47.0, "longitude": 181.0}, {"lon": "longitude_error"}),
+        ({"latitude": 91.0, "longitude": 8.5}, {"latitude": "latitude_error"}),
+        ({"latitude": 47.0, "longitude": 181.0}, {"longitude": "longitude_error"}),
     ],
 )
 async def test_invalid_location(hass, user_input, error):
@@ -64,6 +65,7 @@ async def test_postcode_and_name_are_guessed_from_the_location(hass):
         "postcode": "8001",
         "forecast_name": "Zürich",
         "update_interval": 5,
+        "hourly_temperature": True,
     }
 
 
@@ -86,13 +88,18 @@ async def test_postcode_cannot_be_guessed_when_metadata_is_unavailable(hass, fak
     [
         ({"postcode": "80"}, {"postcode": "invalid_postcode"}),
         ({"postcode": "9999"}, {"postcode": "invalid_postcode"}),
-        ({"forecast_name": "  "}, {"forecast_name": "real_time_name_empty"}),
+        ({"forecast_name": "  "}, {"forecast_name": "forecast_name_empty"}),
         ({"update_interval": 0}, {"update_interval": "update_interval_too_low"}),
     ],
 )
 async def test_invalid_forecast_settings(hass, changes, error):
     result = await start(hass)
-    user_input = {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 5}
+    user_input = {
+        "postcode": "8005",
+        "forecast_name": "Zurich",
+        "update_interval": 5,
+        "hourly_temperature": True,
+    }
 
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {**user_input, **changes}
@@ -134,6 +141,7 @@ async def test_full_flow_with_stations(hass):
         "point_id": 800500,
         "forecast_name": "Zurich",
         "update_interval": 10,
+        "hourly_temperature": True,
         "station": "SMA",
         "real_time_name": "Fluntern",
         "precipitation_station": "ABE",
@@ -145,7 +153,12 @@ async def test_flow_without_stations(hass):
     result = await start(hass)
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
-        {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 5},
+        {
+            "postcode": "8005",
+            "forecast_name": "Zurich",
+            "update_interval": 5,
+            "hourly_temperature": False,
+        },
     )
 
     result = await hass.config_entries.flow.async_configure(
@@ -165,6 +178,7 @@ async def test_flow_without_stations(hass):
         "point_id": 800500,
         "forecast_name": "Zurich",
         "update_interval": 5,
+        "hourly_temperature": False,
     }
 
 
@@ -187,3 +201,41 @@ async def test_a_station_needs_a_name(hass):
 
     assert result["step_id"] == "user_three"
     assert result["errors"] == {"real_time_name": "empty_name"}
+
+
+@pytest.mark.parametrize(
+    ("data", "options", "shown"),
+    [
+        ({}, {}, True),  # entries from before the option existed
+        ({"hourly_temperature": False}, {}, False),
+        ({"hourly_temperature": False}, {"hourly_temperature": True}, True),
+    ],
+)
+async def test_options_show_the_current_setting(hass, entry_data, data, options, shown):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, **data}, options=options)
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["step_id"] == "init"
+    assert defaults(result) == {"hourly_temperature": shown}
+
+
+async def test_options_turn_hourly_temperatures_off(hass, entry, fake_ogd):
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert fake_ogd.temperature_calls == 1
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"hourly_temperature": False}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options == {"hourly_temperature": False}
+    # The entry was reloaded with the new setting and did not download again.
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.hourly_temperature is False
+    assert coordinator.data["forecast"]["temperature_run"] is None
+    assert fake_ogd.temperature_calls == 1

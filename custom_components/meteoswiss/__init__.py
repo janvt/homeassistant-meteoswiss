@@ -20,6 +20,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from custom_components.meteoswiss.const import (
     CONF_FORECAST_NAME,
+    CONF_HOURLY_TEMPERATURE,
     CONF_POINT_ID,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
@@ -27,6 +28,7 @@ from custom_components.meteoswiss.const import (
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_HOURLY_TEMPERATURE,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     USER_AGENT,
@@ -108,6 +110,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         interval,
         entry.data[CONF_POSTCODE],
         point_id=entry.data.get(CONF_POINT_ID),
+        # Set up with the entry, then changeable in the options.
+        hourly_temperature=entry.options.get(
+            CONF_HOURLY_TEMPERATURE,
+            entry.data.get(CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE),
+        ),
         forecast_name=entry.data.get(CONF_FORECAST_NAME, name),
         weather_station=entry.data.get(CONF_STATION, None),
         real_time_weather_station_name=entry.data.get(CONF_REAL_TIME_NAME, None),
@@ -176,6 +183,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         update_interval: datetime.timedelta,
         postcode: int,
         point_id: int | None,
+        hourly_temperature: bool,
         forecast_name: str,
         weather_station: str | None,
         real_time_weather_station_name: str | None,
@@ -196,6 +204,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         self.hass = hass
         self.postcode = postcode
         self.point_id = point_id
+        self.hourly_temperature = hourly_temperature
         self.forecast_name = forecast_name
         _LOGGER.debug(
             "Forecast %s will be provided for post code %s every %s",
@@ -255,7 +264,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 )
             run = await self.client.latest_run(now)
             if self._forecast is None or self._forecast["run"] != run:
-                await self._async_refresh_temperature(run, now)
+                if self.hourly_temperature:
+                    await self._async_refresh_temperature(run, now)
                 self._forecast = await self.client.get_forecast(
                     self._point, run, self._temperature
                 )

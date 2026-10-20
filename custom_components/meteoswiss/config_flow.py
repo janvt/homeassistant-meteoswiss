@@ -7,12 +7,14 @@ from typing import Any
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
+from homeassistant.core import callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity
 
 from custom_components.meteoswiss.const import (
     CONF_FORECAST_NAME,
+    CONF_HOURLY_TEMPERATURE,
     CONF_LAT,
     CONF_LON,
     CONF_POINT_ID,
@@ -23,6 +25,7 @@ from custom_components.meteoswiss.const import (
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
+    DEFAULT_HOURLY_TEMPERATURE,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     STATION_URL,
@@ -55,6 +58,13 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         self._point_id = None
         self._forecast_name = None
         self._update_interval = None
+        self._hourly_temperature = DEFAULT_HOURLY_TEMPERATURE
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry):
+        """Options that can be changed after setup."""
+        return MeteoSwissOptionsFlow()
 
     async def async_step_user(self, user_input=None):
         """Handle a flow initiated by the user.
@@ -86,9 +96,9 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         errors = {}
         if user_input is not None:
             if user_input[CONF_LAT] > 90 or user_input[CONF_LAT] < -90:
-                errors["lat"] = "latitude_error"
+                errors[CONF_LAT] = "latitude_error"
             if user_input[CONF_LON] > 180 or user_input[CONF_LON] < -180:
-                errors["lon"] = "longitude_error"
+                errors[CONF_LON] = "longitude_error"
             schema = data_schema(user_input[CONF_LAT], user_input[CONF_LON])
         else:
             schema = data_schema(
@@ -115,7 +125,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         """Handle the second step of setup.
 
         In this step we collect the postal code, the name of the forecast,
-        and the update interval.
+        the update interval and whether to download hourly temperatures.
         """
 
         _LOGGER.debug(
@@ -125,7 +135,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             self._postcode,
         )
 
-        def data_schema(postcode, name, interval):
+        def data_schema(postcode, name, interval, hourly_temperature):
             return vol.Schema(
                 {
                     vol.Required(
@@ -140,6 +150,10 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                         CONF_UPDATE_INTERVAL,
                         default=interval,
                     ): int,
+                    vol.Required(
+                        CONF_HOURLY_TEMPERATURE,
+                        default=hourly_temperature,
+                    ): bool,
                 }
             )
 
@@ -163,7 +177,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                     else:
                         point_id = point.point_id
             if not str(user_input[CONF_FORECAST_NAME]).strip():
-                errors[CONF_FORECAST_NAME] = "real_time_name_empty"
+                errors[CONF_FORECAST_NAME] = "forecast_name_empty"
             # check if the station name is 3 character
             if user_input[CONF_UPDATE_INTERVAL] < 1:
                 errors[CONF_UPDATE_INTERVAL] = "update_interval_too_low"
@@ -172,6 +186,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 user_input[CONF_POSTCODE],
                 user_input[CONF_FORECAST_NAME],
                 user_input[CONF_UPDATE_INTERVAL],
+                user_input[CONF_HOURLY_TEMPERATURE],
             )
         else:
             try:
@@ -191,6 +206,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 guessed_postal_code,
                 guessed_address,
                 DEFAULT_UPDATE_INTERVAL,
+                DEFAULT_HOURLY_TEMPERATURE,
             )
 
         if errors or user_input is None:
@@ -202,6 +218,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         self._point_id = point_id
         self._forecast_name = user_input[CONF_FORECAST_NAME].strip()
         self._update_interval = int(user_input[CONF_UPDATE_INTERVAL])
+        self._hourly_temperature = bool(user_input[CONF_HOURLY_TEMPERATURE])
         _LOGGER.debug(
             "step user two: continuing with lat %s lon %s post %s name %s",
             self._lat,
@@ -388,6 +405,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             CONF_POSTCODE: self._postcode,
             CONF_FORECAST_NAME: self._forecast_name,
             CONF_UPDATE_INTERVAL: self._update_interval,
+            CONF_HOURLY_TEMPERATURE: self._hourly_temperature,
         }
         if self._point_id is not None:
             data[CONF_POINT_ID] = self._point_id
@@ -452,4 +470,29 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         return self.async_create_entry(
             title=data[CONF_NAME],
             data=data,
+        )
+
+
+class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
+    """Change the options of a MeteoSwiss entry."""
+
+    async def async_step_init(self, user_input=None):
+        if user_input is not None:
+            return self.async_create_entry(data=user_input)
+
+        entry = self.config_entry
+        hourly_temperature = entry.options.get(
+            CONF_HOURLY_TEMPERATURE,
+            entry.data.get(CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE),
+        )
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_HOURLY_TEMPERATURE,
+                        default=hourly_temperature,
+                    ): bool,
+                }
+            ),
         )
