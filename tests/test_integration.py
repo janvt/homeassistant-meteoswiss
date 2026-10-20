@@ -96,8 +96,10 @@ async def test_daily_forecast(hass, entry):
         "templow": 8.0,
         "condition": "partlycloudy",  # symbol 3
         "precipitation": 0.0,
+        "precipitation_probability": 0.0,
     }
     assert days[1]["condition"] == "pouring"  # symbol 20
+    assert days[1]["precipitation_probability"] == 30.0
 
 
 async def test_hourly_forecast_starts_with_the_current_hour(hass, entry):
@@ -117,6 +119,8 @@ async def test_hourly_forecast_starts_with_the_current_hour(hass, entry):
     assert hours[-1]["datetime"].startswith("2026-10-20T20:00")
     assert len(hours) == 9
     assert hours[0]["condition"] == "sunny"
+    assert hours[0]["temperature"] == 13.0
+    assert hours[0]["precipitation_probability"] == 15.0
     assert hours[0]["wind_speed"] == 8.0
     assert hours[0]["wind_bearing"] == 180.0
     assert hours[5]["datetime"].startswith("2026-10-20T17:00")
@@ -215,3 +219,57 @@ async def test_unload(hass, entry):
 
     assert entry.state is ConfigEntryState.NOT_LOADED
     assert hass.states.get(weather_id(hass, entry)).state == "unavailable"
+
+
+async def test_hourly_temperatures_are_refreshed_every_three_hours(
+    hass, entry, fake_ogd, frozen_now
+):
+    await setup(hass, entry)
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert fake_ogd.temperature_calls == 1
+
+    # Every new run refreshes the rest of the forecast but reuses temperatures...
+    for hour in (13, 14):
+        fake_ogd.run = f"20261020{hour}00"
+        await refresh_after(hass, frozen_now, 60)
+        assert coordinator.data["forecast"]["run"] == fake_ogd.run
+        assert coordinator.data["forecast"]["temperature_run"] == "202610201200"
+    assert fake_ogd.temperature_calls == 1
+
+    # ...until they are three hours old.
+    fake_ogd.run = "202610201500"
+    await refresh_after(hass, frozen_now, 60)
+    assert fake_ogd.temperature_calls == 2
+    assert coordinator.data["forecast"]["temperature_run"] == "202610201500"
+
+
+async def test_forecast_works_without_hourly_temperatures(hass, entry, fake_ogd):
+    fake_ogd.temperature_error = OGDError("too slow")
+
+    await setup(hass, entry)
+
+    assert entry.state is ConfigEntryState.LOADED
+    response = await hass.services.async_call(
+        "weather",
+        "get_forecasts",
+        {"entity_id": weather_id(hass, entry), "type": "hourly"},
+        blocking=True,
+        return_response=True,
+    )
+    hours = response[weather_id(hass, entry)]["forecast"]
+    assert hours[0]["temperature"] is None
+    assert hours[0]["condition"] == "sunny"
+
+
+async def test_failed_temperature_refresh_keeps_the_previous_ones(
+    hass, entry, fake_ogd, frozen_now
+):
+    await setup(hass, entry)
+    fake_ogd.temperature_error = OGDError("too slow")
+
+    fake_ogd.run = "202610201600"
+    await refresh_after(hass, frozen_now, 4 * 60)
+
+    forecast = hass.data[DOMAIN][entry.entry_id].data["forecast"]
+    assert forecast["run"] == "202610201600"
+    assert forecast["temperature_run"] == "202610201200"

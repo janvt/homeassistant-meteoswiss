@@ -11,6 +11,7 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
     ATTR_FORECAST_NATIVE_WIND_SPEED,
+    ATTR_FORECAST_PRECIPITATION_PROBABILITY,
     ATTR_FORECAST_TIME,
     ATTR_FORECAST_WIND_BEARING,
     Forecast,
@@ -229,6 +230,9 @@ class MeteoSwissWeather(
                     else None
                 ),
                 ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast[
+                    "precipitation_probability"
+                ],
             }
             fcdata_out.append(data_out)
         _LOGGER.debug("Daily forecast has %d items", len(fcdata_out))
@@ -251,7 +255,11 @@ class MeteoSwissWeather(
                     if symbol
                     else None
                 ),
+                ATTR_FORECAST_NATIVE_TEMP: forecast["temperature"],
                 ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast[
+                    "precipitation_probability"
+                ],
                 ATTR_FORECAST_NATIVE_WIND_SPEED: forecast["wind_speed"],
                 ATTR_FORECAST_WIND_BEARING: forecast["wind_bearing"],
             }

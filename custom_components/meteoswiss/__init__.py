@@ -45,6 +45,11 @@ MAX_CONTINUOUS_ERROR_TIME = 60 * 60
 # MeteoSwiss publishes a new forecast run every hour.  Look for one this often
 # rather than on every (much more frequent) station update.
 FORECAST_CHECK_INTERVAL = datetime.timedelta(minutes=15)
+# Hourly temperatures are only published in a 33 MB file, so they are
+# downloaded at most this often rather than for every run.
+TEMPERATURE_REFRESH_INTERVAL = datetime.timedelta(hours=3)
+# Leaves time for that download on a slow connection.
+UPDATE_TIMEOUT = 300
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
@@ -223,6 +228,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         self._point: Point | None = None
         self._forecast: LocalForecast | None = None
         self._forecast_checked: datetime.datetime | None = None
+        self._temperature: dict[str, str] | None = None
+        self._temperature_fetched: datetime.datetime | None = None
         _LOGGER.debug("Client obtained")
 
         super().__init__(
@@ -248,7 +255,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 )
             run = await self.client.latest_run(now)
             if self._forecast is None or self._forecast["run"] != run:
-                self._forecast = await self.client.get_forecast(self._point, run)
+                await self._async_refresh_temperature(run, now)
+                self._forecast = await self.client.get_forecast(
+                    self._point, run, self._temperature
+                )
                 _LOGGER.debug("Forecast for run %s obtained", run)
             self._forecast_checked = now
         except OGDError as exc:
@@ -257,11 +267,35 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             _LOGGER.warning("Keeping the previous forecast: %s", exc)
         return self._forecast
 
+    async def _async_refresh_temperature(
+        self, run: str, now: datetime.datetime
+    ) -> None:
+        """Fetch hourly temperatures if they are missing or old.
+
+        Without them the forecast simply has no hourly temperatures, so a
+        failure only keeps the previous ones.
+        """
+        assert self._point is not None
+        if (
+            self._temperature is not None
+            and self._temperature_fetched is not None
+            and now - self._temperature_fetched < TEMPERATURE_REFRESH_INTERVAL
+        ):
+            return
+        try:
+            self._temperature = await self.client.get_hourly_temperature(
+                self._point, run
+            )
+            self._temperature_fetched = now
+            _LOGGER.debug("Hourly temperatures for run %s obtained", run)
+        except OGDError as exc:
+            _LOGGER.warning("Cannot update the hourly temperatures: %s", exc)
+
     async def _async_update_data(self) -> MeteoSwissClientResult:
         """Update data from MeteoSwiss open data."""
         condition_by_station: dict[str, dict[str, float | None]] = {}
         try:
-            async with asyncio.timeout(60):
+            async with asyncio.timeout(UPDATE_TIMEOUT):
                 for station, station_type in (
                     (self.weather_station, StationType.WEATHER),
                     (self.precipitation_station, StationType.PRECIPITATION),

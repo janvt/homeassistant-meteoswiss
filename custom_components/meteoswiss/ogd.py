@@ -14,6 +14,7 @@ import datetime
 import io
 import logging
 import math
+import zoneinfo
 from dataclasses import dataclass
 from enum import Enum
 from typing import TypedDict
@@ -36,7 +37,8 @@ MAX_RUN_LOOKBACK_HOURS = 12
 
 # The forecast files hold every point (up to 33 MB).  When a file is ordered by
 # point, the rows of one point are fetched with a binary search using HTTP
-# Range requests; otherwise the whole file is downloaded.
+# Range requests; otherwise the whole file is streamed and only the rows of
+# the point are kept.
 HEAD_BYTES = 4096
 PROBE_BYTES = 512
 # Narrow the search window to this many bytes before reading the final span.
@@ -48,6 +50,12 @@ ROW_SPAN = 16384
 STATION_ROWS_LOOKBACK = 3
 
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)
+# Streaming a whole file may take a while on a slow connection.
+STREAM_TIMEOUT = aiohttp.ClientTimeout(total=240, sock_read=30)
+STREAM_CHUNK = 1 << 16
+
+# Daily values are for the local day.
+LOCAL_TIME_ZONE = zoneinfo.ZoneInfo("Europe/Zurich")
 
 DAILY_PARAMETERS = {
     "temperature_min": "tre200pn",
@@ -60,7 +68,11 @@ HOURLY_PARAMETERS = {
     "precipitation": "rre150h0",
     "wind_speed": "fu3010h0",
     "wind_bearing": "dkl010h0",
+    "precipitation_probability": "rp0003i0",
 }
+# Ordered by time rather than point, so it is downloaded whole: see
+# MeteoSwissOGD.get_hourly_temperature.
+HOURLY_TEMPERATURE = "tre200h0"
 
 
 class OGDError(Exception):
@@ -101,13 +113,18 @@ class DailyForecast(TypedDict):
     temperature_min: float | None
     temperature_max: float | None
     precipitation: float | None
+    # Highest chance of rain of any three hours of the day, in %.
+    precipitation_probability: float | None
     symbol: int | None  # MeteoSwiss pictogram of the day
 
 
 class HourlyForecast(TypedDict):
     time: datetime.datetime  # UTC, start of the hour
     symbol: int | None
+    temperature: float | None
     precipitation: float | None
+    # Chance of rain in the three hours up to the end of this hour, in %.
+    precipitation_probability: float | None
     wind_speed: float | None
     wind_bearing: float | None
 
@@ -171,6 +188,17 @@ def _rows_with_prefix(text: str, prefix: str) -> dict[str, str]:
             if len(parts) >= 4:
                 rows[parts[2]] = parts[3]
     return rows
+
+
+def _rows_with_needle(rows: list[bytes], data: bytes, needle: bytes) -> None:
+    """Collect the lines of data that start right after a match of the needle."""
+    start = data.find(needle)
+    while start >= 0:
+        end = data.find(b"\n", start + 1)
+        rows.append(data[start + 1 : end if end >= 0 else None])
+        if end < 0:
+            break
+        start = data.find(needle, end)
 
 
 def _utc(timestamp: str) -> datetime.datetime:
@@ -343,9 +371,32 @@ class MeteoSwissOGD:
             keys = [_key(line) for line in lines]
             if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
                 return await self._ranged_point_values(url, total, point, prefix)
-            body, _ = await self._get(url)
-            return _rows_with_prefix(body.decode("latin-1"), prefix)
+            return await self._streamed_point_values(url, prefix)
         return _rows_with_prefix(head.decode("latin-1"), prefix)
+
+    async def _streamed_point_values(self, url: str, prefix: str) -> dict[str, str]:
+        """Stream a whole file, keeping only the rows starting with the prefix."""
+        needle = b"\n" + prefix.encode("latin-1")
+        rows: list[bytes] = []
+        # Carries the incomplete last line of a chunk, after its line break.
+        tail = b""
+        try:
+            async with self._session.get(
+                url, headers=self._headers, timeout=STREAM_TIMEOUT
+            ) as response:
+                response.raise_for_status()
+                async for chunk in response.content.iter_chunked(STREAM_CHUNK):
+                    data = tail + chunk
+                    cut = data.rfind(b"\n")
+                    if cut < 0:
+                        tail = data
+                        continue
+                    _rows_with_needle(rows, data[:cut], needle)
+                    tail = data[cut:]
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            raise OGDError(f"Cannot fetch {url}: {exc}") from exc
+        _rows_with_needle(rows, tail, needle)
+        return _rows_with_prefix(b"\n".join(rows).decode("latin-1"), prefix)
 
     async def _ranged_point_values(
         self, url: str, total: int, point: Point, prefix: str
@@ -376,8 +427,25 @@ class MeteoSwissOGD:
             prefix,
         )
 
-    async def get_forecast(self, point: Point, run: str) -> LocalForecast:
-        """The daily and hourly forecast of a point for a model run."""
+    async def get_hourly_temperature(self, point: Point, run: str) -> dict[str, str]:
+        """The hourly temperatures of a point, as the raw rows for get_forecast.
+
+        This downloads about 33 MB, so it is fetched separately from (and less
+        often than) the rest of the forecast.
+        """
+        return await self._point_values(self._run_url(run, HOURLY_TEMPERATURE), point)
+
+    async def get_forecast(
+        self,
+        point: Point,
+        run: str,
+        hourly_temperature: dict[str, str] | None = None,
+    ) -> LocalForecast:
+        """The daily and hourly forecast of a point for a model run.
+
+        The hourly temperatures come from get_hourly_temperature, possibly of
+        an earlier run.
+        """
         names = [
             *(("daily", k, p) for k, p in DAILY_PARAMETERS.items()),
             *(("hourly", k, p) for k, p in HOURLY_PARAMETERS.items()),
@@ -393,6 +461,17 @@ class MeteoSwissOGD:
 
         if not daily["symbol"] and not hourly["symbol"]:
             raise OGDError(f"Run {run} has no data for point {point}")
+        hourly["temperature"] = hourly_temperature or {}
+
+        # MeteoSwiss has no daily chance of rain, so take the highest of the day.
+        daily_probability: dict[str, float] = {}
+        for hour, value in hourly["precipitation_probability"].items():
+            probability = _number(value)
+            if probability is None:
+                continue
+            start = _utc(hour) - datetime.timedelta(hours=1)
+            day = start.astimezone(LOCAL_TIME_ZONE).date().isoformat()
+            daily_probability[day] = max(probability, daily_probability.get(day, 0))
 
         days = sorted(set().union(*(v.keys() for v in daily.values())))
         daily_out: list[DailyForecast] = [
@@ -401,6 +480,9 @@ class MeteoSwissOGD:
                 "temperature_min": _number(daily["temperature_min"].get(day)),
                 "temperature_max": _number(daily["temperature_max"].get(day)),
                 "precipitation": _number(daily["precipitation"].get(day)),
+                "precipitation_probability": daily_probability.get(
+                    _utc(day).date().isoformat()
+                ),
                 "symbol": _integer(daily["symbol"].get(day)),
             }
             for day in days
@@ -412,7 +494,11 @@ class MeteoSwissOGD:
                 # Timestamps mark the end of the interval; report its start.
                 "time": _utc(hour) - datetime.timedelta(hours=1),
                 "symbol": _integer(hourly["symbol"].get(hour)),
+                "temperature": _number(hourly["temperature"].get(hour)),
                 "precipitation": _number(hourly["precipitation"].get(hour)),
+                "precipitation_probability": _number(
+                    hourly["precipitation_probability"].get(hour)
+                ),
                 "wind_speed": _number(hourly["wind_speed"].get(hour)),
                 "wind_bearing": _number(hourly["wind_bearing"].get(hour)),
             }

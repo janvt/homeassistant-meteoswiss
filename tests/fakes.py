@@ -20,11 +20,25 @@ from custom_components.meteoswiss.ogd import (
 UTC = datetime.timezone.utc
 
 
+class FakeContent:
+    def __init__(self, body: bytes, chunk_size: int) -> None:
+        self.body = body
+        self.chunk_size = chunk_size
+
+    async def iter_chunked(self, n: int):
+        # Ignores n: small chunks exercise rows split across chunk boundaries.
+        for start in range(0, len(self.body), self.chunk_size):
+            yield self.body[start : start + self.chunk_size]
+
+
 class FakeResponse:
-    def __init__(self, status: int, body: bytes = b"", headers=None) -> None:
+    def __init__(
+        self, status: int, body: bytes = b"", headers=None, chunk_size: int = 1000
+    ) -> None:
         self.status = status
         self.body = body
         self.headers = headers or {}
+        self.content = FakeContent(body, chunk_size)
 
     async def __aenter__(self) -> FakeResponse:
         return self
@@ -43,8 +57,9 @@ class FakeResponse:
 class FakeSession:
     """Serves files by URL, with HTTP Range support; missing files are a 403."""
 
-    def __init__(self, files: dict[str, bytes]) -> None:
+    def __init__(self, files: dict[str, bytes], chunk_size: int = 1000) -> None:
         self.files = files
+        self.chunk_size = chunk_size
         self.requests: list[tuple[str, str, str | None]] = []
 
     def _respond(self, method: str, url: str, headers) -> FakeResponse:
@@ -54,7 +69,9 @@ class FakeSession:
         if body is None:
             return FakeResponse(403)
         if byte_range is None:
-            return FakeResponse(200, b"" if method == "HEAD" else body)
+            return FakeResponse(
+                200, b"" if method == "HEAD" else body, chunk_size=self.chunk_size
+            )
         match = re.fullmatch(r"bytes=(\d+)-(\d+)", byte_range)
         assert match, byte_range
         start, end = int(match[1]), min(int(match[2]), len(body) - 1)
@@ -111,7 +128,9 @@ PRECIPITATION_STATIONS = [Station("ABE", "Aarberg", 47.0580, 7.2854)]
 NOW = datetime.datetime(2026, 10, 20, 12, 30, tzinfo=UTC)
 
 
-def make_forecast(run: str = "202610201200") -> LocalForecast:
+def make_forecast(
+    run: str = "202610201200", with_temperature: bool = True
+) -> LocalForecast:
     """A forecast with 3 days and the hours around NOW."""
     start = datetime.datetime(2026, 10, 20, 9, tzinfo=UTC)
     return {
@@ -122,6 +141,7 @@ def make_forecast(run: str = "202610201200") -> LocalForecast:
                 "temperature_min": 8.0 + i,
                 "temperature_max": 15.0 + i,
                 "precipitation": 0.5 * i,
+                "precipitation_probability": 30.0 * i,
                 "symbol": 3 if i == 0 else 20,
             }
             for i in range(3)
@@ -131,7 +151,9 @@ def make_forecast(run: str = "202610201200") -> LocalForecast:
                 "time": start + datetime.timedelta(hours=i),
                 # Sunny by day, clear by night, one unknown symbol at the end.
                 "symbol": 1 if i < 8 else (101 if i < 10 else 999),
+                "temperature": 10.0 + i if with_temperature else None,
                 "precipitation": 0.1 * i,
+                "precipitation_probability": 5.0 * i,
                 "wind_speed": 5.0 + i,
                 "wind_bearing": 180.0,
             }
@@ -160,6 +182,8 @@ class FakeOGD:
     instances: list[FakeOGD] = []
     forecast_calls = 0
     run_checks = 0
+    temperature_calls = 0
+    temperature_error: Exception | None = None
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
@@ -172,6 +196,8 @@ class FakeOGD:
         cls.instances = []
         cls.forecast_calls = 0
         cls.run_checks = 0
+        cls.temperature_calls = 0
+        cls.temperature_error = None
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
@@ -206,6 +232,15 @@ class FakeOGD:
             raise self.forecast_error
         return FakeOGD.run
 
-    async def get_forecast(self, point, run):
+    async def get_hourly_temperature(self, point, run):
+        FakeOGD.temperature_calls += 1
+        if self.temperature_error:
+            raise self.temperature_error
+        return {"run": run}
+
+    async def get_forecast(self, point, run, hourly_temperature=None):
         FakeOGD.forecast_calls += 1
-        return make_forecast(run)
+        forecast = make_forecast(run, with_temperature=bool(hourly_temperature))
+        # Remember which run the temperatures came from.
+        forecast["temperature_run"] = (hourly_temperature or {}).get("run")
+        return forecast

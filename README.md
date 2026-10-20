@@ -246,8 +246,10 @@ Forecasts are the
 of the postal code (updated hourly), and current conditions are the
 10-minute measurements of the
 [automatic weather and precipitation stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased).
-The hourly forecast has no temperature, because MeteoSwiss only publishes it in a
-file of over 30 MB that covers all of Switzerland.
+Hourly temperatures are only published in a file of over 30 MB that covers
+all of Switzerland, so the integration downloads it at most every three hours
+(about 260 MB a day); the rest of the forecast takes a few kilobytes per hour.
+The daily chance of rain is the highest three-hour chance of rain of the day.
 
 A primer on Swiss weather stations can be found at https://rudd-o.com/meteostations .
 Information on the provided values is available in the

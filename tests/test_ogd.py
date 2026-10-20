@@ -60,7 +60,24 @@ def forecast_files() -> dict[str, bytes]:
     files[url("jww003i0")] = point_major_csv(
         "jww003i0", pts, HOURS, lambda i, ts: "101" if ts[8:10] < "06" else "1"
     )
+    files[url("rp0003i0")] = point_major_csv(
+        "rp0003i0", pts, HOURS, lambda i, ts: RAIN_PROBABILITY.get(ts, "0")
+    )
+    # Hourly temperatures are ordered by time and start a few hours earlier.
+    files[url("tre200h0")] = time_major_csv(
+        "tre200h0", pts, ["202610192200", *HOURS], lambda i, ts: f"{i % 7}.{ts[9]}"
+    )
     return files
+
+
+# By the end of the hour, in UTC; Zurich is UTC+2 until 25 October, then UTC+1.
+RAIN_PROBABILITY = {
+    "202610201200": "30",
+    "202610202200": "40",  # 21:00-22:00 UTC is 23:00 local on the 20th
+    "202610202300": "90",  # 22:00-23:00 UTC is midnight local, the 21st
+    "202610252300": "70",  # 22:00-23:00 UTC is 23:00 local (winter time), the 25th
+    "202610260000": "80",  # 23:00 UTC is midnight local, the 26th
+}
 
 
 @pytest.mark.parametrize(
@@ -120,6 +137,28 @@ class TestPointValues:
         assert result[HOURS[0]] == value(point.point_id, HOURS[0])
         assert ("GET", url("p"), None) in session.requests
 
+    @pytest.mark.parametrize("chunk_size", [7, 1000, 1 << 16])
+    @pytest.mark.parametrize("target", [BIG_POINTS[0], BIG_POINTS[-1]])
+    async def test_streaming_handles_any_chunking(self, chunk_size, target):
+        body = time_major_csv("p", BIG_POINTS, HOURS[:50], value)
+        # The last row may lack a line break.
+        files = {url("p"): body, url("q"): body.rstrip(b"\n")}
+        client, _ = make_client(files)
+        client._session.chunk_size = chunk_size
+        point = Point(target[0], target[1], "x", "", 0, 0)
+        expected = ogd._rows_with_prefix(body.decode(), f"{target[0]};{target[1]};")
+
+        assert await client._point_values(url("p"), point) == expected
+        assert await client._point_values(url("q"), point) == expected
+        assert len(expected) == 50
+
+    async def test_streaming_does_not_match_inside_a_row(self):
+        # Point 1;2 must not match the row of point 11;2 or 21;2.
+        body = time_major_csv("p", [(1, 2), (11, 2), (21, 2)] * 1, HOURS[:200], value)
+        client, _ = make_client({url("p"): body})
+        result = await client._point_values(url("p"), Point(1, 2, "x", "", 0, 0))
+        assert set(result.values()) == {value(1, ts) for ts in HOURS[:200]}
+
     async def test_small_file_needs_one_request(self):
         body = point_major_csv("p", [(1, 1), (2, 1)], DAYS, value)
         client, session = make_client({url("p"): body})
@@ -169,6 +208,7 @@ class TestGetForecast:
             "temperature_min": 4.5,
             "temperature_max": 12.5,
             "precipitation": 5.0,
+            "precipitation_probability": 40.0,
             "symbol": 3,
         }
         assert len(forecast["hourly"]) == 217
@@ -178,6 +218,42 @@ class TestGetForecast:
         assert first["symbol"] == 101
         assert forecast["hourly"][10]["symbol"] == 1
         assert first["wind_speed"] == 5.0
+        assert first["temperature"] is None  # not requested
+        noon = forecast["hourly"][12]
+        assert noon["time"] == datetime.datetime(2026, 10, 20, 11, tzinfo=UTC)
+        assert noon["precipitation_probability"] == 30.0
+
+    async def test_daily_chance_of_rain_follows_the_local_day(self):
+        client, _ = make_client(forecast_files())
+        point = Point(800500, 2, "Zürich", "8005", 47.39, 8.52)
+
+        forecast = await client.get_forecast(point, RUN)
+
+        by_day = {d["date"]: d["precipitation_probability"] for d in forecast["daily"]}
+        assert by_day["2026-10-20"] == 40.0
+        assert by_day["2026-10-21"] == 90.0
+        assert by_day["2026-10-22"] == 0.0
+        assert by_day["2026-10-25"] == 70.0
+        assert by_day["2026-10-26"] == 80.0
+
+    async def test_hourly_temperature(self):
+        client, session = make_client(forecast_files())
+        point = Point(100025, 2, "Lausanne 25", "1000", 46.56, 6.68)
+
+        temperature = await client.get_hourly_temperature(point, RUN)
+        forecast = await client.get_forecast(point, RUN, temperature)
+
+        # The whole file was streamed, as it is ordered by time.
+        assert ("GET", url("tre200h0"), None) in session.requests
+        assert len(temperature) == 218
+        hours = {h["time"]: h for h in forecast["hourly"]}
+        # The earlier hours from the temperature file are kept too.
+        early = hours[datetime.datetime(2026, 10, 19, 21, tzinfo=UTC)]
+        assert early["temperature"] == float(f"{100025 % 7}.2")
+        assert early["symbol"] is None
+        assert hours[datetime.datetime(2026, 10, 20, 11, tzinfo=UTC)][
+            "temperature"
+        ] == float(f"{100025 % 7}.2")  # the row ending 12:00
 
     async def test_unknown_point_is_an_error(self):
         client, _ = make_client(forecast_files())
