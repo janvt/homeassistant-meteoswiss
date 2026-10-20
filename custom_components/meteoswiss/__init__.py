@@ -8,7 +8,7 @@ from typing import Any, Literal, TypedDict, cast
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_NAME, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
@@ -64,7 +64,9 @@ MAX_CONTINUOUS_ERROR_TIME = 60 * 60
 # rather than on every (much more frequent) station update.
 FORECAST_CHECK_INTERVAL = datetime.timedelta(minutes=15)
 # Leaves time for the large downloads (see downloads.py) on a slow connection.
-UPDATE_TIMEOUT = 300
+FORECAST_TIMEOUT = 300
+# Stations, pollen and warnings, which are updated without waiting for those.
+UPDATE_TIMEOUT = 60
 # Shared by all entries.
 DATA_CLIENT = f"{DOMAIN}_client"
 DATA_ALERTS = f"{DOMAIN}_alerts"
@@ -296,6 +298,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         self._point: Point | None = None
         self._forecast: LocalForecast | None = None
         self._forecast_checked: datetime.datetime | None = None
+        # Refreshes the forecast while the stations go on updating.
+        self._forecast_task: asyncio.Task | None = None
         _LOGGER.debug("Client obtained")
 
         super().__init__(
@@ -306,14 +310,42 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             update_interval=update_interval,
         )
 
+    def _forecast_due(self, now: datetime.datetime) -> bool:
+        return (
+            self._forecast is None
+            or self._forecast_checked is None
+            or now - self._forecast_checked >= FORECAST_CHECK_INTERVAL
+        )
+
+    @callback
+    def _async_refresh_forecast_soon(self) -> None:
+        """Refresh the forecast in the background, if it is due.
+
+        A refresh can take minutes on a slow connection (the large downloads),
+        and the stations should not wait for it.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        # done(): a refresh can finish before it is even stored here.
+        running = self._forecast_task is not None and not self._forecast_task.done()
+        if not running and self._forecast_due(now):
+            self._forecast_task = self.config_entry.async_create_background_task(
+                self.hass, self._async_refresh_forecast(), "meteoswiss forecast"
+            )
+
+    async def _async_refresh_forecast(self) -> None:
+        try:
+            async with asyncio.timeout(FORECAST_TIMEOUT):
+                forecast = await self._async_get_forecast()
+        except Exception:
+            _LOGGER.exception("Keeping the previous forecast")
+            return
+        if self.data is not None and forecast is not self.data["forecast"]:
+            self.async_set_updated_data({**self.data, "forecast": forecast})
+
     async def _async_get_forecast(self) -> LocalForecast | None:
         """The forecast of the latest model run, kept if none can be obtained."""
         now = datetime.datetime.now(datetime.timezone.utc)
-        if (
-            self._forecast is not None
-            and self._forecast_checked is not None
-            and now - self._forecast_checked < FORECAST_CHECK_INTERVAL
-        ):
+        if not self._forecast_due(now):
             return self._forecast
         try:
             if self._point is None:
@@ -455,8 +487,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
     async def _async_update_data(self) -> MeteoSwissClientResult:
         """Update data from MeteoSwiss open data."""
         condition_by_station: dict[str, dict[str, float | None]] = {}
+        # Only the first forecast is waited for: there is none to show before.
+        first = self._forecast is None
         try:
-            async with asyncio.timeout(UPDATE_TIMEOUT):
+            async with asyncio.timeout(FORECAST_TIMEOUT if first else UPDATE_TIMEOUT):
                 for station, station_type in (
                     (self.weather_station, StationType.WEATHER),
                     (self.precipitation_station, StationType.PRECIPITATION),
@@ -471,7 +505,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                         _LOGGER.warning("Station %s: %s", station, exc)
                         condition_by_station[station] = {}
                 pollen = await self._async_get_pollen()
-                forecast = await self._async_get_forecast()
+                if first:
+                    await self._async_get_forecast()
+                else:
+                    self._async_refresh_forecast_soon()
                 warnings = await self._async_get_warnings()
         except UnknownPointError as exc:
             # This will not fix itself, so tell the user straight away.
@@ -482,7 +519,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             raise UpdateFailed(exc) from exc
 
         data = {
-            "forecast": forecast,
+            # Read only now: a refresh in the background may have finished.
+            "forecast": self._forecast,
             "condition_by_station": condition_by_station,
             "condition": [c for c in condition_by_station.values() if c],
             "pollen": pollen,

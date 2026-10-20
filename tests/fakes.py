@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import re
 from unittest.mock import MagicMock
@@ -223,6 +224,8 @@ class FakeOGD:
     hours = 12
     # The points each download of a large file was for, by parameter.
     large_downloads: dict[str, list[set[tuple[int, int]]]] = {}
+    # When set, large downloads wait for it, like a slow connection.
+    download_gate: asyncio.Event | None = None
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
@@ -238,6 +241,7 @@ class FakeOGD:
         cls.temperature_calls = 0
         cls.temperature_error = None
         cls.large_downloads = {}
+        cls.download_gate = None
         cls.hours = 12
 
     async def get_postcode_points(self, postcode):
@@ -292,6 +296,8 @@ class FakeOGD:
         return FakeOGD.run
 
     async def get_hourly_rows(self, points, run, parameter):
+        if FakeOGD.download_gate is not None:
+            await FakeOGD.download_gate.wait()
         FakeOGD.large_downloads.setdefault(parameter, []).append(
             {p.key for p in points}
         )

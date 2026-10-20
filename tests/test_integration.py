@@ -1,5 +1,6 @@
 """Setup, entities and forecasts, with the OGD client faked."""
 
+import asyncio
 import datetime
 
 import pytest
@@ -16,7 +17,7 @@ from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
 
-from .fakes import NOW, make_warning
+from .fakes import NOW, STATION_MEASUREMENTS, make_warning
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
@@ -54,7 +55,8 @@ def weather_id(hass, entry):
 async def refresh_after(hass, freezer, minutes):
     freezer.tick(datetime.timedelta(minutes=minutes))
     async_fire_time_changed(hass)
-    await hass.async_block_till_done()
+    # Including the forecast, which is refreshed in the background.
+    await hass.async_block_till_done(wait_background_tasks=True)
 
 
 async def test_weather_entity(hass, entry):
@@ -693,3 +695,52 @@ async def test_a_mountain_is_warned_at_its_height(hass, fake_alerts):
 
     lat, lon, height, _ = fake_alerts.calls[0]
     assert (lat, lon, height) == (46.7526, 8.7062, 3073.0)
+
+
+async def test_stations_update_during_a_slow_download(
+    hass, entry, fake_ogd, frozen_now, monkeypatch
+):
+    await setup(hass, entry)
+    temperature = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-temperature")
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+
+    # Four hours later there is a new run, and its temperatures download slowly.
+    fake_ogd.download_gate = asyncio.Event()
+    fake_ogd.run = "202610201600"
+    monkeypatch.setitem(STATION_MEASUREMENTS, "tre200s0", 15.5)
+    frozen_now.tick(datetime.timedelta(hours=4))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+
+    # The station is up to date while the download goes on...
+    assert hass.states.get(temperature).state == "15.5"
+    assert coordinator.data["forecast"]["run"] == "202610201200"
+
+    # ...and the forecast follows when it is done.
+    fake_ogd.download_gate.set()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert coordinator.data["forecast"]["run"] == "202610201600"
+    assert coordinator.data["forecast"]["temperature_run"] == "202610201600"
+    assert hass.states.get(temperature).state == "15.5"
+
+
+async def test_a_failed_background_refresh_keeps_the_forecast(
+    hass, entry, fake_ogd, frozen_now, monkeypatch
+):
+    await setup(hass, entry)
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(fake_ogd, "latest_run", broken)
+    fake_ogd.run = "202610201600"
+    await refresh_after(hass, frozen_now, 20)
+
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.last_update_success
+    assert coordinator.data["forecast"]["run"] == "202610201200"
+    # The next due refresh tries again.
+    monkeypatch.undo()
+    fake_ogd.run = "202610201600"
+    await refresh_after(hass, frozen_now, 20)
+    assert coordinator.data["forecast"]["run"] == "202610201600"
