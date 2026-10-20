@@ -2,6 +2,7 @@
 
 import pytest
 from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
@@ -10,6 +11,8 @@ from custom_components.meteoswiss.ogd import OGDError
 pytestmark = pytest.mark.usefixtures("fake_ogd")
 
 ZURICH = {"latitude": 47.3769, "longitude": 8.5417}
+NO_WEATHER = "No real-time weather station"
+NO_PRECIPITATION = "No real-time precipitation station"
 
 
 def defaults(result):
@@ -389,3 +392,203 @@ async def test_only_the_closest_mountains_are_listed(hass, monkeypatch):
     result = await start(hass, "mountain")
 
     assert [value for value, _ in options(result, "point_id")] == ["864", "442"]
+
+
+async def settle(hass, entry):
+    """Let the reload after reconfiguring finish, then stop the entry."""
+    await hass.async_block_till_done()
+    await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+
+
+async def reconfigure(hass, entry, step="user_two"):
+    result = await entry.start_reconfigure_flow(hass)
+    assert result["step_id"] == "user"
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], ZURICH)
+    return await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": step}
+    )
+
+
+STATIONS = {
+    "station": "Zürich / Fluntern (SMA)",
+    "real_time_name": "Fluntern",
+    "precipitation_station": "Aarberg (ABE)",
+    "real_time_precipitation_name": "Aarberg",
+}
+
+
+async def test_reconfigure_starts_from_the_current_settings(hass, entry):
+    result = await reconfigure(hass, entry)
+
+    assert defaults(result) == {
+        "postcode": "8005",
+        "forecast_name": "Zurich",
+        "update_interval": 5,
+        "hourly_temperature": True,
+    }
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**defaults(result), "update_interval": 10}
+    )
+    assert defaults(result) == STATIONS
+
+
+async def test_reconfigure_a_postcode(hass, entry):
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    result = await reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "postcode": "1000",
+            "forecast_name": "Lausanne",
+            "update_interval": 5,
+            "hourly_temperature": True,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**STATIONS, "precipitation_station": NO_PRECIPITATION}
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reconfigure_successful"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+    assert entry.title == "Lausanne / Fluntern"
+    assert entry.data == {
+        "postcode": 1000,
+        "point_id": 100026,  # the point of 1000 closest to the location
+        "forecast_name": "Lausanne",
+        "update_interval": 5,
+        "hourly_temperature": True,
+        "station": "SMA",
+        "real_time_name": "Fluntern",
+    }
+    # Reloaded with the new settings.
+    assert hass.data[DOMAIN][entry.entry_id].postcode == 1000
+
+
+async def test_reconfigure_a_postcode_into_a_mountain(hass, entry):
+    result = await reconfigure(hass, entry, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 5, "hourly_temperature": True},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "station": NO_WEATHER,
+            "real_time_name": "",
+            "precipitation_station": NO_PRECIPITATION,
+            "real_time_precipitation_name": "",
+        },
+    )
+
+    await settle(hass, entry)
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data == {
+        "point_type": 3,
+        "point_id": 864,
+        "forecast_name": "Bristen",
+        "update_interval": 5,
+        "hourly_temperature": True,
+    }
+
+
+async def test_reconfigure_a_mountain_starts_from_it(hass):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "point_type": 3,
+            "point_id": 442,
+            "forecast_name": "Hut",
+            "update_interval": 7,
+            "hourly_temperature": False,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await reconfigure(hass, entry, "mountain")
+
+    assert defaults(result) == {
+        "point_id": "442",
+        "forecast_name": "Hut",
+        "update_interval": 7,
+        "hourly_temperature": False,
+    }
+
+
+async def test_reconfigure_drops_a_station_that_is_gone(hass, entry_data):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={**entry_data, "station": "MRP", "real_time_name": "Old"}
+    )
+    entry.add_to_hass(hass)
+
+    result = await reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], defaults(result)
+    )
+
+    assert defaults(result)["station"] == NO_WEATHER
+    assert defaults(result)["precipitation_station"] == "Aarberg (ABE)"
+
+
+async def test_reconfigure_moves_the_option_into_the_settings(hass, entry_data):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data=entry_data, options={"hourly_temperature": False}
+    )
+    entry.add_to_hass(hass)
+
+    result = await reconfigure(hass, entry)
+    assert defaults(result)["hourly_temperature"] is False
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**defaults(result), "hourly_temperature": True}
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], STATIONS)
+
+    await settle(hass, entry)
+    assert entry.data["hourly_temperature"] is True
+    assert entry.options == {}
+
+
+async def test_reconfigure_clears_the_notices_of_the_old_settings(hass, entry):
+    for issue_id in (
+        "SMA_real_time_name_provides_no_data_meteoswiss",
+        "8005_provides_no_forecast_meteoswiss",
+    ):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="station_no_data",
+        )
+
+    result = await reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], defaults(result)
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**STATIONS, "station": NO_WEATHER, "real_time_name": ""}
+    )
+
+    await settle(hass, entry)
+    assert result["reason"] == "reconfigure_successful"
+    assert not [i for (d, i) in ir.async_get(hass).issues if d == DOMAIN]
+
+
+async def test_removing_an_entry_clears_its_notices(hass, entry):
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        "SMA_real_time_name_provides_no_data_meteoswiss",
+        is_fixable=False,
+        severity=ir.IssueSeverity.ERROR,
+        translation_key="station_no_data",
+    )
+
+    await hass.config_entries.async_remove(entry.entry_id)
+
+    assert not [i for (d, i) in ir.async_get(hass).issues if d == DOMAIN]

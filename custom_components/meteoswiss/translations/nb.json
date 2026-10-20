@@ -6,11 +6,11 @@
         },
         "station_no_data": {
             "title": "Værstatonen for MeteoSveits ser ut til å være gått",
-            "description": "Den sanntids værstasjonen MeteoSveits bruker ({station}) skiller ikke lenger ut data.\n\nFor tiden er det bare mulig å løse dette ved å fjerne og gjeninnføre MeteoSveits-integreringen, velge en ny sanntids værstasjon.\n\nIndtil dette løses, vil alle sanntids- og sensorenheter og rapporter som kommer fra denne stasjonen vises som uoppløselige."
+            "description": "Sanntids værstasjonen MeteoSwiss bruker ({station}) gir ikke lenger data.\n\nFor å velge en annen stasjon, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises alle sanntids værsensorer og rapporter fra denne stasjonen som utilgjengelige."
         },
         "postcode_no_data": {
             "title": "MeteoSveits viser ikke noen forutseigelser for postnummer",
-            "description": "Postnummer {postcode} ser ut til å ha ingen forutseigelser tilgjengelig.\n\nNåværende, den eneste reparasjon mulig består i å fjerne og gjeninnstille integreringen MeteoSveits, velge et nytt postnummer.\n\nInntil denne reparasjon er gjennomført, vil forutseigelser vise seg som uaktuell."
+            "description": "Det ser ikke ut til å finnes noe varsel for postnummeret {postcode}.\n\nFor å velge et annet postnummer, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises varselet som utilgjengelig."
         },
         "improperly_configured": {
             "title": "Integrasjonsfellet for MeteoSveits er ikke konfigurert korrekt",
@@ -18,7 +18,7 @@
         },
         "point_no_data": {
             "title": "MeteoSwiss gir ikke lenger varsel for et sted",
-            "description": "MeteoSwiss ser ikke lenger ut til å tilby varsel for {name}.\n\nFjern MeteoSwiss-integrasjonen for dette stedet og legg den til på nytt med et annet sted.\n\nInntil da vises varselet som utilgjengelig."
+            "description": "MeteoSwiss ser ikke lenger ut til å tilby varsel for {name}.\n\nFor å velge et annet sted, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises varselet som utilgjengelig."
         }
     },
     "config": {

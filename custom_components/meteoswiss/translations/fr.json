@@ -6,11 +6,11 @@
         },
         "station_no_data": {
             "title": "La station météo de MétéoSuisse semble avoir disparu",
-            "description": "La station météo en temps réel de MétéoSuisse, qui utilise ({station}), n'offre plus de données.\\n\\nActuellement, la seule possibilité de réparation consiste à supprimer et à re-ajouter l'intégration MétéoSuisse, tout en sélectionnant une nouvelle station météo en temps réel.\\n\\nJusqu'à ce que cette réparation soit effectuée, tous les capteurs météo et les rapports provenant de cette station afficheront comme indisponibles."
+            "description": "La station météo en temps réel utilisée par MeteoSuisse ({station}) ne fournit plus de données.\n\nPour choisir une autre station, allez dans Paramètres → Appareils et services → MeteoSwiss et sélectionnez « Reconfigurer » dans le menu de cette entrée.\n\nD'ici là, tous les capteurs et rapports météo en temps réel de cette station seront affichés comme indisponibles."
         },
         "postcode_no_data": {
             "title": "MétéoSuisse semble ne pas fournir de prévisions pour le code postal",
-            "description": "Le code postal {postcode} ne semble pas avoir de prévision disponible.\n\nActuellement, la seule correction possible consiste à supprimer et à ré-ajouter l'intégration MétéoSuisse, en sélectionnant un nouveau code postal.\n\nJusqu'à ce que cette correction soit effectuée, les prévisions apparaîtront comme indisponibles."
+            "description": "Aucune prévision ne semble disponible pour le code postal {postcode}.\n\nPour choisir un autre code postal, allez dans Paramètres → Appareils et services → MeteoSwiss et sélectionnez « Reconfigurer » dans le menu de cette entrée.\n\nD'ici là, la prévision sera affichée comme indisponible."
         },
         "improperly_configured": {
             "title": "L'intégration de MétéoSuisse est mal configurée",
@@ -18,7 +18,7 @@
         },
         "point_no_data": {
             "title": "MeteoSuisse ne fournit plus de prévision pour un lieu",
-            "description": "MeteoSuisse ne semble plus proposer de prévision pour {name}.\n\nSupprimez l'intégration MeteoSuisse de ce lieu et ajoutez-la à nouveau en choisissant un autre lieu.\n\nD'ici là, sa prévision sera affichée comme indisponible."
+            "description": "MeteoSuisse ne semble plus proposer de prévision pour {name}.\n\nPour choisir un autre lieu, allez dans Paramètres → Appareils et services → MeteoSwiss et sélectionnez « Reconfigurer » dans le menu de cette entrée.\n\nD'ici là, sa prévision sera affichée comme indisponible."
         }
     },
     "config": {

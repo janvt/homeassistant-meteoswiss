@@ -6,11 +6,11 @@
         },
         "station_no_data": {
             "title": "MeteoSwiss-Wetterstation scheint nicht mehr verfügbar zu sein",
-            "description": "Die Echtzeit-Wetterstation, die MeteoSwiss verwendet ({station}), liefert keine Daten mehr.\n\nAktuell besteht die einzige Lösung darin, die MeteoSwiss-Integration zu entfernen und wieder hinzuzufügen und dabei eine neue Echtzeit-Wetterstation auszuwählen.\n\nBis diese Reparatur durchgeführt wurde, werden alle Echtzeit-Wettersensoren und -berichte dieser Station als nicht verfügbar angezeigt."
+            "description": "Die von MeteoSwiss verwendete Echtzeit-Wetterstation ({station}) liefert keine Daten mehr.\n\nUm eine andere Station zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin werden alle Echtzeit-Wettersensoren und -Meldungen dieser Station als nicht verfügbar angezeigt."
         },
         "postcode_no_data": {
             "title": "MeteoSwiss scheint keine Prognosen für diese Postleitzahl bereitzustellen",
-            "description": "Für die Postleitzahl {postcode} scheint keine Prognose verfügbar zu sein.\n\nAktuell besteht die einzige Lösung darin, die MeteoSwiss-Integration zu entfernen und wieder hinzuzufügen und dabei eine neue Postleitzahl auszuwählen.\n\nBis diese Reparatur durchgeführt wurde, wird die Prognose als nicht verfügbar angezeigt."
+            "description": "Für die Postleitzahl {postcode} scheint keine Prognose verfügbar zu sein.\n\nUm eine andere Postleitzahl zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
         },
         "improperly_configured": {
             "title": "MeteoSwiss-Integration ist nicht korrekt konfiguriert",
@@ -18,7 +18,7 @@
         },
         "point_no_data": {
             "title": "MeteoSwiss bietet für einen Ort keine Prognose mehr an",
-            "description": "MeteoSwiss scheint für {name} keine Prognose mehr anzubieten.\n\nEntferne die MeteoSwiss-Integration für diesen Ort und füge sie mit einem anderen Ort neu hinzu.\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
+            "description": "MeteoSwiss scheint für {name} keine Prognose mehr anzubieten.\n\nUm einen anderen Ort zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
         }
     },
     "config": {

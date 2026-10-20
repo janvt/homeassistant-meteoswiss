@@ -38,6 +38,7 @@ from custom_components.meteoswiss.const import (
     STATION_URL,
     USER_AGENT,
 )
+from custom_components.meteoswiss.issues import async_delete_issues
 from custom_components.meteoswiss.ogd import (
     POINT_TYPE_POI,
     POINT_TYPE_POSTCODE,
@@ -56,6 +57,11 @@ NO_STATION = "No real-time weather station"
 NO_PRECIPITATION_STATION = "No real-time precipitation station"
 # The dropdown cannot be searched, so only the closest places are offered.
 MAX_MOUNTAINS = 100
+
+
+def station_selection(stations: dict[str, str], abbr: str | None, none: str) -> str:
+    """The choice of a station list for an abbreviation, if it is still listed."""
+    return next((label for label, a in stations.items() if abbr and a == abbr), none)
 
 
 def mountain_label(point: Point, lat: float, lon: float) -> str:
@@ -80,12 +86,31 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         self._forecast_name = None
         self._update_interval = None
         self._hourly_temperature = DEFAULT_HOURLY_TEMPERATURE
+        # The settings of the entry being reconfigured, if any.
+        self._previous: dict[str, Any] | None = None
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry):
         """Options that can be changed after setup."""
         return MeteoSwissOptionsFlow()
+
+    async def async_step_reconfigure(self, user_input=None):
+        """Change the place or stations of an entry, keeping its entities."""
+        entry = self._get_reconfigure_entry()
+        self._previous = {**entry.data, **entry.options}
+        return await self.async_step_user()
+
+    def _previously(self, key: str, default: Any) -> Any:
+        """A setting of the entry being reconfigured, as the default."""
+        return (self._previous or {}).get(key, default)
+
+    def _previous_place(self, point_type: int) -> bool:
+        """Whether the entry being reconfigured is for this kind of place."""
+        return (
+            self._previous is not None
+            and self._previous.get(CONF_POINT_TYPE, POINT_TYPE_POSTCODE) == point_type
+        )
 
     async def async_step_user(self, user_input=None):
         """Handle a flow initiated by the user.
@@ -179,9 +204,15 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 return await self.async_step_user_three()
 
         user_input = user_input or {}
-        default_point = user_input.get(
-            CONF_POINT_ID, str(points[0].point_id) if points else ""
-        )
+        if self._previous_place(POINT_TYPE_POI) and any(
+            p.point_id == self._previously(CONF_POINT_ID, None) for p in points
+        ):
+            closest = str(self._previously(CONF_POINT_ID, None))
+            name = self._previously(CONF_FORECAST_NAME, "")
+        else:
+            closest = str(points[0].point_id) if points else ""
+            name = ""
+        default_point = user_input.get(CONF_POINT_ID, closest)
         schema = vol.Schema(
             {
                 vol.Required(CONF_POINT_ID, default=default_point): SelectSelector(
@@ -198,18 +229,22 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 ),
                 vol.Optional(
                     CONF_FORECAST_NAME,
-                    default=user_input.get(CONF_FORECAST_NAME, ""),
+                    default=user_input.get(CONF_FORECAST_NAME, name),
                 ): str,
                 vol.Required(
                     CONF_UPDATE_INTERVAL,
                     default=user_input.get(
-                        CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                        CONF_UPDATE_INTERVAL,
+                        self._previously(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
                     ),
                 ): int,
                 vol.Required(
                     CONF_HOURLY_TEMPERATURE,
                     default=user_input.get(
-                        CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE
+                        CONF_HOURLY_TEMPERATURE,
+                        self._previously(
+                            CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE
+                        ),
                     ),
                 ): bool,
             }
@@ -298,12 +333,16 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 errors[CONF_FORECAST_NAME] = "cannot_query_address"
                 guessed_postal_code = ""
                 guessed_address = ""
+            if self._previous_place(POINT_TYPE_POSTCODE):
+                errors = {}
+                guessed_postal_code = str(self._previously(CONF_POSTCODE, ""))
+                guessed_address = self._previously(CONF_FORECAST_NAME, "")
 
             schema = data_schema(
                 guessed_postal_code,
                 guessed_address,
-                DEFAULT_UPDATE_INTERVAL,
-                DEFAULT_HOURLY_TEMPERATURE,
+                self._previously(CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL),
+                self._previously(CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE),
             )
 
         if errors or user_input is None:
@@ -480,6 +519,20 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 )
             else:
                 default_precipitation_station_selection = NO_PRECIPITATION_STATION
+            if self._previous is not None:
+                # Keep the stations, as long as they are still listed.
+                default_station_selection = station_selection(
+                    weather_stations, self._previously(CONF_STATION, None), NO_STATION
+                )
+                default_weather_station_name = self._previously(CONF_REAL_TIME_NAME, "")
+                default_precipitation_station_selection = station_selection(
+                    precipitation_stations,
+                    self._previously(CONF_PRECIPITATION_STATION, None),
+                    NO_PRECIPITATION_STATION,
+                )
+                default_precipitation_station_name = self._previously(
+                    CONF_REAL_TIME_PRECIPITATION_NAME, ""
+                )
             default_weather_station_name = default_weather_station_name or ""
             default_precipitation_station_name = (
                 default_precipitation_station_name or ""
@@ -540,6 +593,21 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             "step user three: finishing with %s",
             data,
         )
+        if self._previous is not None:
+            entry = self._get_reconfigure_entry()
+            # The notices about the previous place or stations no longer apply.
+            async_delete_issues(self.hass, entry.data)
+            return self.async_update_reload_and_abort(
+                entry,
+                title=title,
+                data=data,
+                # The setting is now in the data.
+                options={
+                    k: v
+                    for k, v in entry.options.items()
+                    if k != CONF_HOURLY_TEMPERATURE
+                },
+            )
         return self.async_create_entry(
             title=title,
             data=data,

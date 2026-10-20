@@ -6,11 +6,11 @@
         },
         "station_no_data": {
             "title": "MeteoSwiss weather station appears to be gone",
-            "description": "The real-time weather station MeteoSwiss is using ({station}) is no longer offering data.\n\nCurrently, the only repair possible involves removing and re-adding the MeteoSwiss integration, selecting a new real-time weather station.\n\nUntil this repair is made, all real-time weather sensors and reports coming from this station will show as unavailable."
+            "description": "The real-time weather station MeteoSwiss is using ({station}) is no longer offering data.\n\nTo choose another station, go to Settings → Devices & services → MeteoSwiss and select Reconfigure in the menu of this entry.\n\nUntil then, all real-time weather sensors and reports coming from this station will show as unavailable."
         },
         "postcode_no_data": {
             "title": "MeteoSwiss appears not to provide forecasts for postal code",
-            "description": "The postal code {postcode} does not appear to have any forecast available.\n\nCurrently, the only repair possible involves removing and re-adding the MeteoSwiss integration, selecting a new post code.\n\nUntil this repair is made, the forecast will show as unavailable."
+            "description": "The postal code {postcode} does not appear to have any forecast available.\n\nTo choose another postal code, go to Settings → Devices & services → MeteoSwiss and select Reconfigure in the menu of this entry.\n\nUntil then, the forecast will show as unavailable."
         },
         "improperly_configured": {
             "title": "MeteoSwiss integration improperly configured",
@@ -18,7 +18,7 @@
         },
         "point_no_data": {
             "title": "MeteoSwiss no longer provides a forecast for a place",
-            "description": "MeteoSwiss does not appear to offer a forecast for {name} any more.\n\nRemove and re-add the MeteoSwiss integration for this place, choosing another one.\n\nUntil then, its forecast will show as unavailable."
+            "description": "MeteoSwiss does not appear to offer a forecast for {name} any more.\n\nTo choose another place, go to Settings → Devices & services → MeteoSwiss and select Reconfigure in the menu of this entry.\n\nUntil then, its forecast will show as unavailable."
         }
     },
     "config": {

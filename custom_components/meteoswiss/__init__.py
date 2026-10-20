@@ -35,6 +35,11 @@ from custom_components.meteoswiss.const import (
     USER_AGENT,
 )
 from custom_components.meteoswiss.downloads import SharedDownloads
+from custom_components.meteoswiss.issues import (
+    async_delete_issues,
+    no_forecast_issue_id,
+    station_issue_id,
+)
 from custom_components.meteoswiss.ogd import (
     FREEZING_LEVEL,
     HOURLY_TEMPERATURE,
@@ -148,6 +153,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     return True
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Remove the notices of a removed entry, which would stay until a restart."""
+    async_delete_issues(hass, entry.data)
 
 
 async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -325,9 +335,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
     @property
     def _no_forecast_issue_id(self) -> str:
-        if self.is_mountain:
-            return f"point_{self.point_id}_provides_no_forecast_{DOMAIN}"
-        return f"{self.postcode}_provides_no_forecast_{DOMAIN}"
+        return no_forecast_issue_id(self.postcode, self.point_type, self.point_id)
 
     def _async_create_no_forecast_issue(self) -> None:
         if self.is_mountain:
@@ -410,7 +418,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                         ir.async_create_issue(
                             self.hass,
                             DOMAIN,
-                            f"{station}_{name}_provides_no_data_{DOMAIN}",
+                            station_issue_id(station, name),
                             is_fixable=False,
                             is_persistent=False,
                             severity=IssueSeverity.ERROR,
@@ -425,7 +433,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                         ir.async_delete_issue(
                             self.hass,
                             DOMAIN,
-                            f"{station}_{name}_provides_no_data_{DOMAIN}",
+                            station_issue_id(station, name),
                         )
                     self.first_error[name] = None
                     self.error_raised[name] = False

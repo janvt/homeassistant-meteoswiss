@@ -6,11 +6,11 @@
         },
         "station_no_data": {
             "title": "La stazione meteorologica di MeteoSvizzera sembra essere andata perduta",
-            "description": "La stazione meteorologica di MeteoSvizzera utilizzando ({station}) non offre più dati.\\n\\nAttualmente, l'unico riparazione possibile prevede la rimozione e la riacquisizione dell'integrazione di MeteoSvizzera, selezionando una nuova stazione meteorologica in tempo reale.\\n\\nFino a che questa riparazione non sia effettuata, tutti i sensori e le relazioni meteorologici in tempo reale provenienti da questa stazione mostreranno come indisponibili."
+            "description": "La stazione meteorologica in tempo reale usata da MeteoSvizzera ({station}) non fornisce più dati.\n\nPer scegliere un'altra stazione, andare in Impostazioni → Dispositivi e servizi → MeteoSwiss e selezionare «Riconfigura» nel menu di questa voce.\n\nFino ad allora, tutti i sensori e i rapporti meteo in tempo reale di questa stazione risulteranno non disponibili."
         },
         "postcode_no_data": {
             "title": "MeteoSvizzera sembra non fornire previsioni per il codice di avviamento",
-            "description": "Il codice di avviamento {postcode} sembra non avere alcuna previsione disponibile.\n\nAttualmente, l'unica correzione possibile consiste nell'eliminare e riacquisire l'integrazione MeteoSvizzera, selezionando un nuovo codice di avviamento.\n\nFinché questa correzione non è stata eseguita, la previsione mostrerà come indisponibile."
+            "description": "Per il codice postale {postcode} non sembra disponibile alcuna previsione.\n\nPer scegliere un altro codice postale, andare in Impostazioni → Dispositivi e servizi → MeteoSwiss e selezionare «Riconfigura» nel menu di questa voce.\n\nFino ad allora, le previsioni risulteranno non disponibili."
         },
         "improperly_configured": {
             "title": "L'integrazione di MeteoSvizzera non è configurata correttamente",
@@ -18,7 +18,7 @@
         },
         "point_no_data": {
             "title": "MeteoSvizzera non fornisce più previsioni per un luogo",
-            "description": "MeteoSvizzera non sembra più offrire previsioni per {name}.\n\nRimuovere l'integrazione MeteoSvizzera per questo luogo e aggiungerla di nuovo scegliendone un altro.\n\nFino ad allora, le previsioni risulteranno non disponibili."
+            "description": "MeteoSvizzera non sembra più offrire previsioni per {name}.\n\nPer scegliere un altro luogo, andare in Impostazioni → Dispositivi e servizi → MeteoSwiss e selezionare «Riconfigura» nel menu di questa voce.\n\nFino ad allora, le previsioni risulteranno non disponibili."
         }
     },
     "config": {

@@ -133,8 +133,9 @@ Now you are ready to add one or more instances of the integration.
 
 ![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/addedandworking.png)
 
-If you are not happy with the settings, in a future release you
-will be able to update them.
+To change the postal code, place or stations later, choose *Reconfigure* in
+the menu of the integration entry; its entities and their history are kept.
+Hourly temperatures can also be switched under *Configure*.
 
 ## How to create a sensor that has the weather forecast data
 
@@ -226,8 +227,8 @@ logger:
 
 * Version 2 uses MeteoSwiss open data.  A few stations from older versions no
   longer publish there (MRP and VSOXE): their sensors become unavailable, and
-  after an hour Home Assistant shows a repair notice.  Remove and re-add the
-  integration to pick another station.
+  after an hour Home Assistant shows a repair notice.  Choose *Reconfigure* in
+  the integration entry's menu to pick another station.
 
 * It used to be mandatory to select a real-time weather station during setup.
   This step (the last setup step) is now optional — you can select no weather
