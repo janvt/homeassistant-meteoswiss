@@ -30,7 +30,9 @@ def entry(uuid, polygon, onset, expires, event="Gale force wind", message="Alert
     <cap:severity>Severe</cap:severity>
     <cap:message_type>{message}</cap:message_type>
     <cap:identifier>id-{uuid}</cap:identifier>
+    <link title="Region {uuid}" href="https://meteoalarm.org?polygon={uuid},0,0,0"/>
     <link type="application/cap+xml" href="https://cap.test/{uuid}"/>
+    <link title="Switzerland" rel="related" href="https://meteoalarm.org?region=CH"/>
     <title>Warning {uuid}</title>
   </entry>"""
 
@@ -93,6 +95,16 @@ def test_parse_feed_leaves_out_cancellations():
     assert entries[0].polygons[0][0] == (46.85, 8.55)
 
 
+@pytest.mark.parametrize(
+    ("language", "site"), [("de", "de"), ("fr-CH", "fr"), ("en", "en"), ("nb", "en")]
+)
+def test_warning_page(language, site):
+    assert alerts.warning_page("Flüelen-Unterschächen", language) == (
+        f"https://meteoalarm.org/{site}/live/region/CH"
+        "?sa=Fl%C3%BCelen-Untersch%C3%A4chen"
+    )
+
+
 def test_parse_details():
     parsed = alerts.parse_details(details(level="3; orange; Severe", altitude=1800))
     assert (parsed.level, parsed.type, parsed.altitude, parsed.ceiling) == (
@@ -141,6 +153,9 @@ class TestGetWarnings:
         ]
         assert warnings[0]["event"] == "Stürmischer Wind"
         assert warnings[0]["region"] == "Region wind"
+        assert warnings[0]["url"] == (
+            "https://meteoalarm.org/de/live/region/CH?sa=Region%20wind"
+        )
         assert warnings[0]["onset"] == NOW - 5 * HOUR
 
     async def test_english_when_the_language_is_not_offered(self):

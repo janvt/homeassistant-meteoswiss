@@ -659,6 +659,7 @@ async def test_weather_warnings(hass, entry, fake_alerts):
             "region": "Flüelen-Unterschächen",
             "headline": "Yellow wind warning",
             "description": "Possible impacts.",
+            "url": "https://meteoalarm.org/en/live/region/CH?sa=Fl%C3%BCelen",
         }
     ]
     assert now.attributes["friendly_name"] == "Zurich Weather warning"

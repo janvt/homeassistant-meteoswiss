@@ -169,8 +169,9 @@ for its place: *Weather warning* (the most severe warning in force now) and
 *Weather warning next 24 hours*, each `none`, `yellow`, `orange` or `red`.
 Their `warnings` attribute lists the warnings with their type (such as
 `wind`, `rain` or `thunderstorm`), level, start, end, region, headline and
-text in Home Assistant's language, and `types` lists just the types, for
-templates such as a Föhn warning (`wind` in Altdorf).
+text in Home Assistant's language, and a `url` of MeteoAlarm's page of its
+region (one click from the warning itself, on a map); `types` lists just the
+types, for templates such as a Föhn warning (`wind` in Altdorf).
 
 Each warning covers a region between two altitudes, so a place gets the
 warnings of its region at its height: a ridge can be warned of wind while the

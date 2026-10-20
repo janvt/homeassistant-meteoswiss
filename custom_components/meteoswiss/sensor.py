@@ -273,6 +273,7 @@ class MeteoSwissWarningSensor(
                     "region": w["region"],
                     "headline": w["headline"],
                     "description": w["description"],
+                    "url": w["url"],
                 }
                 for w in current
             ],

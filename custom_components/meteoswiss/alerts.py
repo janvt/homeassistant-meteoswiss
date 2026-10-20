@@ -14,6 +14,7 @@ import logging
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from typing import TypedDict
+from urllib.parse import quote
 
 import aiohttp
 
@@ -33,6 +34,8 @@ NO_WARNING = "none"
 LEVELS = ("yellow", "orange", "red")
 # Used when a warning's details cannot be fetched.
 SEVERITY_LEVELS = {"Moderate": "yellow", "Severe": "orange", "Extreme": "red"}
+# MeteoAlarm's pages of Swiss regions are in these languages too.
+PAGE_LANGUAGES = ("de", "fr", "it")
 
 
 class AlertError(Exception):
@@ -49,6 +52,7 @@ class WeatherWarning(TypedDict):
     region: str
     headline: str
     description: str
+    url: str  # MeteoAlarm's page of the warning's region, with a map
 
 
 @dataclass
@@ -171,6 +175,16 @@ def parse_details(xml: bytes) -> _Details:
     return _Details(level, kind, altitude, ceiling, texts)
 
 
+def warning_page(region: str, language: str) -> str:
+    """MeteoAlarm's page of Switzerland, showing only a region's warnings.
+
+    The links in the feed lead to the page of all of Europe instead, and the
+    pages of single warnings need an ID that only MeteoAlarm's map has.
+    """
+    site = language[:2] if language[:2] in PAGE_LANGUAGES else "en"
+    return f"https://meteoalarm.org/{site}/live/region/CH?sa={quote(region)}"
+
+
 def level_between(
     warnings: list[WeatherWarning], start: datetime.datetime, end: datetime.datetime
 ) -> str:
@@ -281,6 +295,7 @@ class MeteoAlarm:
                     "region": entry.region,
                     "headline": headline,
                     "description": description,
+                    "url": warning_page(entry.region, language),
                 }
             )
         return sorted(warnings, key=lambda w: w["onset"])

@@ -327,6 +327,7 @@ def make_warning(type_, level, onset, expires, event=None):
         "region": "Flüelen-Unterschächen",
         "headline": f"{level.capitalize()} {type_} warning",
         "description": "Possible impacts.",
+        "url": "https://meteoalarm.org/en/live/region/CH?sa=Fl%C3%BCelen",
     }
 
 
