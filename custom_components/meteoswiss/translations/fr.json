@@ -105,12 +105,26 @@
                 "title": "Options MeteoSuisse",
                 "description": "Réglages de cette prévision.",
                 "data": {
-                    "hourly_temperature": "Températures horaires"
+                    "hourly_temperature": "Températures horaires",
+                    "foehn": "Indice de fœhn",
+                    "foehn_south_station": "Station au sud des Alpes",
+                    "foehn_north_station": "Station au nord des Alpes",
+                    "foehn_threshold": "Fœhn probable à partir de",
+                    "foehn_strong_threshold": "Fort fœhn à partir de"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois), partagé par toutes vos prévisions MeteoSuisse. Les prévisions de montagne téléchargent aussi l'isotherme zéro degré, un autre fichier de même taille. Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure."
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois), partagé par toutes vos prévisions MeteoSuisse. Les prévisions de montagne téléchargent aussi l'isotherme zéro degré, un autre fichier de même taille. Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure.",
+                    "foehn": "Capteurs pour le fœhn : l'indice de fœhn mesuré par MeteoSuisse à la station météo, et une tendance tirée de la différence de pression à travers les Alpes, qui augmente des heures avant que le fœhn ne perce.",
+                    "foehn_south_station": "Sa pression au niveau de la mer est comparée à celle de la station au nord des Alpes. Lugano est le choix classique.",
+                    "foehn_north_station": "Zurich/Kloten est le choix classique.",
+                    "foehn_threshold": "Différence de pression à partir de laquelle le fœhn est probable ; environ 4 hPa atteignent les vallées du nord, comme à Altdorf. De même dans l'autre sens pour le fœhn du nord.",
+                    "foehn_strong_threshold": "Différence de pression à partir de laquelle le fœhn souffle fort ; environ 8 hPa."
                 }
             }
+        },
+        "error": {
+            "same_foehn_station": "Choisissez deux stations différentes",
+            "foehn_thresholds": "Le seuil du fort fœhn doit être plus élevé que l'autre, et les deux supérieurs à 0"
         }
     },
     "entity": {
@@ -179,6 +193,27 @@
                     "yellow": "Jaune",
                     "orange": "Orange",
                     "red": "Rouge"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Différence de pression du fœhn"
+            },
+            "foehn_outlook": {
+                "name": "Tendance du fœhn",
+                "state": {
+                    "strong_north": "Fort fœhn du nord",
+                    "north": "Fœhn du nord probable",
+                    "none": "Aucun",
+                    "south": "Fœhn du sud probable",
+                    "strong_south": "Fort fœhn du sud"
+                }
+            },
+            "foehn": {
+                "name": "Fœhn",
+                "state": {
+                    "none": "Aucun",
+                    "mixed": "Mixte",
+                    "foehn": "Fœhn"
                 }
             }
         }

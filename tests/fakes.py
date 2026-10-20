@@ -196,6 +196,9 @@ def make_forecast(
     }
 
 
+# Sea-level pressures: 6 hPa more south of the Alps, so south Föhn is likely.
+FOEHN_PRESSURES = {"LUG": 1016.0, "KLO": 1010.0}
+
 STATION_MEASUREMENTS = {
     "tre200s0": 13.4,
     "ure200s0": 79.9,
@@ -204,6 +207,7 @@ STATION_MEASUREMENTS = {
     "dkl010z0": 31.0,
     "fu3010z1": 25.2,
     "tde200s0": 9.9,
+    "wcc006s0": 2.0,  # MeteoSwiss's Föhn index: Föhn
     "rre150z0": 0.0,
 }
 
@@ -287,6 +291,8 @@ class FakeOGD:
             raise self.station_error
         if station_type == StationType.PRECIPITATION:
             return {"rre150z0": 0.2}
+        if abbr in FOEHN_PRESSURES:
+            return {"pp0qffs0": FOEHN_PRESSURES[abbr]}
         return dict(STATION_MEASUREMENTS)
 
     async def latest_run(self, now=None):

@@ -29,7 +29,8 @@ def error_keys_raised() -> set[str]:
 def test_config_flow_errors_have_texts():
     raised = error_keys_raised()
     assert raised  # the parsing above found them
-    assert raised <= set(EN["config"]["error"])
+    # The options flow is in config_flow.py too.
+    assert raised <= set(EN["config"]["error"]) | set(EN["options"]["error"])
 
 
 @pytest.mark.parametrize("path", ["config", "options"])

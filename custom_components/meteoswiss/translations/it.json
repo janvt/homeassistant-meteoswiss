@@ -105,12 +105,26 @@
                 "title": "Opzioni MeteoSvizzera",
                 "description": "Impostazioni di questa previsione.",
                 "data": {
-                    "hourly_temperature": "Temperature orarie"
+                    "hourly_temperature": "Temperature orarie",
+                    "foehn": "Indice di favonio",
+                    "foehn_south_station": "Stazione a sud delle Alpi",
+                    "foehn_north_station": "Stazione a nord delle Alpi",
+                    "foehn_threshold": "Favonio probabile da",
+                    "foehn_strong_threshold": "Favonio forte da"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Le previsioni per le montagne scaricano anche lo zero termico, un altro file della stessa dimensione. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Le previsioni per le montagne scaricano anche lo zero termico, un altro file della stessa dimensione. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora.",
+                    "foehn": "Sensori per il favonio: l'indice di favonio misurato da MeteoSvizzera alla stazione meteo e una tendenza dalla differenza di pressione attraverso le Alpi, che sale ore prima che il favonio irrompa.",
+                    "foehn_south_station": "La sua pressione al livello del mare viene confrontata con la stazione a nord delle Alpi. Lugano è la scelta classica.",
+                    "foehn_north_station": "Zurigo/Kloten è la scelta classica.",
+                    "foehn_threshold": "Differenza di pressione da cui il favonio è probabile; circa 4 hPa raggiungono le valli del nord, come ad Altdorf. Lo stesso al contrario per il favonio da nord.",
+                    "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa."
                 }
             }
+        },
+        "error": {
+            "same_foehn_station": "Scegliere due stazioni diverse",
+            "foehn_thresholds": "La soglia del favonio forte deve essere più alta dell'altra, ed entrambe superiori a 0"
         }
     },
     "entity": {
@@ -179,6 +193,27 @@
                     "yellow": "Gialla",
                     "orange": "Arancione",
                     "red": "Rossa"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Differenza di pressione del favonio"
+            },
+            "foehn_outlook": {
+                "name": "Tendenza del favonio",
+                "state": {
+                    "strong_north": "Favonio da nord forte",
+                    "north": "Favonio da nord probabile",
+                    "none": "Nessuno",
+                    "south": "Favonio da sud probabile",
+                    "strong_south": "Favonio da sud forte"
+                }
+            },
+            "foehn": {
+                "name": "Favonio",
+                "state": {
+                    "none": "Nessuno",
+                    "mixed": "Misto",
+                    "foehn": "Favonio"
                 }
             }
         }

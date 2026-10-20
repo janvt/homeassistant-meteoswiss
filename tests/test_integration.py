@@ -17,7 +17,7 @@ from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
 
-from .fakes import NOW, STATION_MEASUREMENTS, make_warning
+from .fakes import FOEHN_PRESSURES, NOW, STATION_MEASUREMENTS, make_warning
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
@@ -34,6 +34,8 @@ SUMMARY_NAMES = (
     "lowest_temperature_tonight",
     "weather_warning",
     "weather_warning_next_24_hours",
+    "fohn_pressure_difference",
+    "fohn_outlook",
 )
 
 
@@ -744,3 +746,66 @@ async def test_a_failed_background_refresh_keeps_the_forecast(
     fake_ogd.run = "202610201600"
     await refresh_after(hass, frozen_now, 20)
     assert coordinator.data["forecast"]["run"] == "202610201600"
+
+
+def foehn_state(hass, entry, key):
+    return hass.states.get(entity_id(hass, "sensor", f"sensor.{entry.entry_id}-{key}"))
+
+
+async def test_foehn_sensors(hass, entry):
+    await setup(hass, entry)
+
+    difference = foehn_state(hass, entry, "foehn_pressure_difference")
+    assert difference.state == "6.0"
+    assert difference.attributes["unit_of_measurement"] == "hPa"
+    assert difference.attributes["friendly_name"] == "Zurich Föhn pressure difference"
+    assert difference.attributes["south_station"] == "LUG"
+    assert difference.attributes["south_pressure"] == 1016.0
+    assert difference.attributes["north_station"] == "KLO"
+    assert difference.attributes["threshold"] == 4.0
+    outlook = foehn_state(hass, entry, "foehn_outlook")
+    assert outlook.state == "south"
+    # MeteoSwiss's own index, under the weather station.
+    measured = foehn_state(hass, entry, "foehn")
+    assert measured.state == "foehn"
+    assert measured.attributes["friendly_name"] == "Fluntern Föhn"
+
+
+async def test_foehn_with_other_settings(hass, entry_data):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=entry_data,
+        options={
+            "foehn": True,
+            "foehn_south_station": "LUG",
+            "foehn_north_station": "KLO",
+            "foehn_threshold": 6.5,
+            "foehn_strong_threshold": 10.0,
+        },
+    )
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    assert foehn_state(hass, entry, "foehn_outlook").state == "none"
+
+
+async def test_foehn_turned_off(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, options={"foehn": False})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    keys = {
+        e.unique_id.rsplit("-", 1)[-1]
+        for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    }
+    assert not keys & {"foehn", "foehn_outlook", "foehn_pressure_difference"}
+
+
+async def test_foehn_without_recent_pressure(hass, entry_data, monkeypatch):
+    monkeypatch.setitem(FOEHN_PRESSURES, "LUG", None)
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data)
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    assert foehn_state(hass, entry, "foehn_pressure_difference").state == "unavailable"
+    assert foehn_state(hass, entry, "foehn_outlook").state == "unavailable"

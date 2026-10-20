@@ -105,12 +105,26 @@
                 "title": "MeteoSwiss-alternativer",
                 "description": "Innstillinger for dette varselet.",
                 "data": {
-                    "hourly_temperature": "Temperatur per time"
+                    "hourly_temperature": "Temperatur per time",
+                    "foehn": "Føhnindeks",
+                    "foehn_south_station": "Stasjon sør for Alpene",
+                    "foehn_north_station": "Stasjon nord for Alpene",
+                    "foehn_threshold": "Føhn sannsynlig fra",
+                    "foehn_strong_threshold": "Sterk føhn fra"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned), delt av alle MeteoSwiss-varslene dine. Fjellvarsler laster også ned nullgradersgrensen, en annen fil av samme størrelse. Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned), delt av alle MeteoSwiss-varslene dine. Fjellvarsler laster også ned nullgradersgrensen, en annen fil av samme størrelse. Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen.",
+                    "foehn": "Sensorer for føhn: MeteoSwiss' målte føhnindeks ved værstasjonen, og et utsyn fra trykkforskjellen over Alpene, som stiger timer før føhnen bryter gjennom.",
+                    "foehn_south_station": "Lufttrykket ved havnivå sammenlignes med stasjonen nord for Alpene. Lugano er det klassiske valget.",
+                    "foehn_north_station": "Zürich/Kloten er det klassiske valget.",
+                    "foehn_threshold": "Trykkforskjell fra der føhn er sannsynlig; omtrent 4 hPa når dalene i nord, som i Altdorf. Det samme omvendt for nordføhn.",
+                    "foehn_strong_threshold": "Trykkforskjell fra der føhnen blåser kraftig; omtrent 8 hPa."
                 }
             }
+        },
+        "error": {
+            "same_foehn_station": "Velg to forskjellige stasjoner",
+            "foehn_thresholds": "Terskelen for sterk føhn må være høyere enn den andre, og begge over 0"
         }
     },
     "entity": {
@@ -179,6 +193,27 @@
                     "yellow": "Gult",
                     "orange": "Oransje",
                     "red": "Rødt"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Føhn-trykkforskjell"
+            },
+            "foehn_outlook": {
+                "name": "Føhnutsikt",
+                "state": {
+                    "strong_north": "Sterk nordføhn",
+                    "north": "Nordføhn sannsynlig",
+                    "none": "Ingen",
+                    "south": "Sørføhn sannsynlig",
+                    "strong_south": "Sterk sørføhn"
+                }
+            },
+            "foehn": {
+                "name": "Føhn",
+                "state": {
+                    "none": "Ingen",
+                    "mixed": "Blandet",
+                    "foehn": "Føhn"
                 }
             }
         }

@@ -30,11 +30,32 @@ CONF_REAL_TIME_PRECIPITATION_NAME = "real_time_precipitation_name"
 CONF_FORECASTTYPE = "forecasttype"
 CONF_UPDATE_INTERVAL = "update_interval"
 CONF_HOURLY_TEMPERATURE = "hourly_temperature"
+CONF_FOEHN = "foehn"
+CONF_FOEHN_SOUTH = "foehn_south_station"
+CONF_FOEHN_NORTH = "foehn_north_station"
+CONF_FOEHN_THRESHOLD = "foehn_threshold"
+CONF_FOEHN_STRONG_THRESHOLD = "foehn_strong_threshold"
 CONF_LAT = "latitude"
 CONF_LON = "longitude"
 
 DEFAULT_UPDATE_INTERVAL = 5
 DEFAULT_HOURLY_TEMPERATURE = True
+# The Föhn outlook compares the sea-level pressure (QFF) south and north of the
+# Alps.  Lugano and Zürich-Kloten are the classic pair; from about 4 hPa more
+# in the south, Föhn reaches the northern valleys, and at about 8 hPa it blows
+# hard.  The same for north Föhn in Ticino, the other way round.
+DEFAULT_FOEHN = True
+DEFAULT_FOEHN_SOUTH = "LUG"
+DEFAULT_FOEHN_NORTH = "KLO"
+DEFAULT_FOEHN_THRESHOLD = 4.0
+DEFAULT_FOEHN_STRONG_THRESHOLD = 8.0
+FOEHN_DEFAULTS = {
+    CONF_FOEHN: DEFAULT_FOEHN,
+    CONF_FOEHN_SOUTH: DEFAULT_FOEHN_SOUTH,
+    CONF_FOEHN_NORTH: DEFAULT_FOEHN_NORTH,
+    CONF_FOEHN_THRESHOLD: DEFAULT_FOEHN_THRESHOLD,
+    CONF_FOEHN_STRONG_THRESHOLD: DEFAULT_FOEHN_STRONG_THRESHOLD,
+}
 
 USER_AGENT = "MeteoSwiss Home Assistant integration"
 

@@ -231,7 +231,7 @@ async def test_options_show_the_current_setting(hass, entry_data, data, options,
     result = await hass.config_entries.options.async_init(entry.entry_id)
 
     assert result["step_id"] == "init"
-    assert defaults(result) == {"hourly_temperature": shown}
+    assert defaults(result)["hourly_temperature"] is shown
 
 
 async def test_options_turn_hourly_temperatures_off(hass, entry, fake_ogd):
@@ -246,7 +246,7 @@ async def test_options_turn_hourly_temperatures_off(hass, entry, fake_ogd):
     await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options == {"hourly_temperature": False}
+    assert entry.options["hourly_temperature"] is False
     # The entry was reloaded with the new setting and did not download again.
     coordinator = hass.data[DOMAIN][entry.entry_id]
     assert coordinator.hourly_temperature is False
@@ -631,3 +631,50 @@ async def test_reconfigure_keeps_the_pollen_station(hass, entry_data):
     )
 
     assert defaults(result)["pollen_station"] == "Luzern (PLZ)"
+
+
+async def test_foehn_options_have_sane_defaults(hass, entry):
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert defaults(result) == {
+        "hourly_temperature": True,
+        "foehn": True,
+        "foehn_south_station": "LUG",
+        "foehn_north_station": "KLO",
+        "foehn_threshold": 4.0,
+        "foehn_strong_threshold": 8.0,
+    }
+
+
+@pytest.mark.parametrize(
+    ("changes", "error"),
+    [
+        ({"foehn_north_station": "LUG"}, {"foehn_north_station": "same_foehn_station"}),
+        (
+            {"foehn_strong_threshold": 3.0},
+            {"foehn_strong_threshold": "foehn_thresholds"},
+        ),
+    ],
+)
+async def test_foehn_options_are_checked(hass, entry, changes, error):
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {**defaults(result), **changes}
+    )
+
+    assert result["step_id"] == "init"
+    assert result["errors"] == error
+
+
+async def test_foehn_options_are_saved(hass, entry):
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {**defaults(result), "foehn_north_station": "SMA", "foehn_threshold": 5.0},
+    )
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.options["foehn_north_station"] == "SMA"
+    assert entry.options["foehn_threshold"] == 5.0

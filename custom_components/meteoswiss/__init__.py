@@ -21,6 +21,9 @@ from homeassistant.helpers.update_coordinator import (
 
 from custom_components.meteoswiss.alerts import AlertError, MeteoAlarm, WeatherWarning
 from custom_components.meteoswiss.const import (
+    CONF_FOEHN,
+    CONF_FOEHN_NORTH,
+    CONF_FOEHN_SOUTH,
     CONF_FORECAST_NAME,
     CONF_HOURLY_TEMPERATURE,
     CONF_POINT_ID,
@@ -35,6 +38,7 @@ from custom_components.meteoswiss.const import (
     DEFAULT_HOURLY_TEMPERATURE,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
+    FOEHN_DEFAULTS,
     STATION_URL,
     USER_AGENT,
 )
@@ -151,6 +155,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         real_time_weather_station_name=entry.data.get(CONF_REAL_TIME_NAME, None),
         precipitation_station=entry.data.get(CONF_PRECIPITATION_STATION, None),
         pollen_station=entry.data.get(CONF_POLLEN_STATION),
+        foehn={**FOEHN_DEFAULTS, **entry.options},
         real_time_precipitation_station_name=entry.data.get(
             CONF_REAL_TIME_PRECIPITATION_NAME, None
         ),
@@ -208,6 +213,8 @@ class MeteoSwissClientResult(TypedDict):
     pollen: dict[str, Any]
     # The weather warnings for the place that have not expired; None if unknown.
     warnings: list[WeatherWarning] | None
+    # Sea-level pressures for the Föhn outlook; None when it is turned off.
+    foehn: dict[str, Any] | None
     # Forecast attributes.
     postcode: int | None  # e.g. 8005, None for mountains
     point: Point | None  # where the forecast is for
@@ -243,6 +250,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         precipitation_station: str | None,
         real_time_precipitation_station_name: str | None,
         pollen_station: str | None = None,
+        foehn: dict[str, Any] | None = None,
     ) -> None:
         """Initialize."""
         self.first_error: dict[str, float | None] = {
@@ -282,6 +290,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
         self.precipitation_station = precipitation_station
         self.pollen_station = pollen_station
+        # The Föhn settings (see const.FOEHN_DEFAULTS), or None.
+        self.foehn = foehn if foehn and foehn[CONF_FOEHN] else None
         # Looked up with the first update, for the name of its device.
         self.pollen_station_name = pollen_station
         self.real_time_precipitation_station_name = real_time_precipitation_station_name
@@ -468,6 +478,25 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             _LOGGER.warning("Weather warnings: %s", exc)
             return None
 
+    async def _async_get_foehn(self) -> dict[str, Any] | None:
+        """The sea-level pressures south and north of the Alps, if wanted.
+
+        Missing values (a station without recent data) are None.
+        """
+        if not self.foehn:
+            return None
+        pressures: dict[str, Any] = {}
+        for side, key in (("south", CONF_FOEHN_SOUTH), ("north", CONF_FOEHN_NORTH)):
+            abbr = self.foehn[key]
+            try:
+                now = await self.client.get_station_now(abbr, StationType.WEATHER)
+            except OGDError as exc:
+                _LOGGER.warning("Föhn station %s: %s", abbr, exc)
+                now = {}
+            pressures[side] = now.get("pp0qffs0")
+            pressures[f"{side}_station"] = abbr
+        return pressures
+
     async def _async_get_pollen(self) -> dict[str, Any]:
         """The latest pollen measurements, empty without a station or data."""
         if not self.pollen_station:
@@ -505,6 +534,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                         _LOGGER.warning("Station %s: %s", station, exc)
                         condition_by_station[station] = {}
                 pollen = await self._async_get_pollen()
+                foehn = await self._async_get_foehn()
                 if first:
                     await self._async_get_forecast()
                 else:
@@ -525,6 +555,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             "condition": [c for c in condition_by_station.values() if c],
             "pollen": pollen,
             "warnings": warnings,
+            "foehn": foehn,
         }
 
         # _LOGGER.debug("Data obtained (%s):\n%s", type(data), pprint.pformat(data))

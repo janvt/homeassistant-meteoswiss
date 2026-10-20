@@ -12,6 +12,9 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity
 from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -19,6 +22,11 @@ from homeassistant.helpers.selector import (
 )
 
 from custom_components.meteoswiss.const import (
+    CONF_FOEHN,
+    CONF_FOEHN_NORTH,
+    CONF_FOEHN_SOUTH,
+    CONF_FOEHN_STRONG_THRESHOLD,
+    CONF_FOEHN_THRESHOLD,
     CONF_FORECAST_NAME,
     CONF_HOURLY_TEMPERATURE,
     CONF_LAT,
@@ -36,6 +44,7 @@ from custom_components.meteoswiss.const import (
     DEFAULT_HOURLY_TEMPERATURE,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
+    FOEHN_DEFAULTS,
     STATION_URL,
     USER_AGENT,
 )
@@ -697,22 +706,80 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
     """Change the options of a MeteoSwiss entry."""
 
     async def async_step_init(self, user_input=None):
-        if user_input is not None:
-            return self.async_create_entry(data=user_input)
-
         entry = self.config_entry
-        hourly_temperature = entry.options.get(
-            CONF_HOURLY_TEMPERATURE,
-            entry.data.get(CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE),
-        )
+        current = {
+            CONF_HOURLY_TEMPERATURE: entry.data.get(
+                CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE
+            ),
+            **FOEHN_DEFAULTS,
+            **entry.options,
+        }
+        ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
+        try:
+            stations = await ogd.get_stations(StationType.WEATHER)
+        except OGDError:
+            stations = []
+        # The configured stations stay choosable, even if not listed now.
+        choices = {s.abbr: f"{s.name} ({s.abbr})" for s in stations}
+        for key in (CONF_FOEHN_SOUTH, CONF_FOEHN_NORTH):
+            choices.setdefault(current[key], current[key])
+
+        errors = {}
+        if user_input is not None:
+            if user_input[CONF_FOEHN_SOUTH] == user_input[CONF_FOEHN_NORTH]:
+                errors[CONF_FOEHN_NORTH] = "same_foehn_station"
+            if not (
+                0
+                < user_input[CONF_FOEHN_THRESHOLD]
+                < user_input[CONF_FOEHN_STRONG_THRESHOLD]
+            ):
+                errors[CONF_FOEHN_STRONG_THRESHOLD] = "foehn_thresholds"
+            if not errors:
+                return self.async_create_entry(data=user_input)
+            current.update(user_input)
+
+        def required(key):
+            return vol.Required(key, default=current[key])
+
+        options = [
+            SelectOptionDict(value=abbr, label=label)
+            for abbr, label in sorted(choices.items(), key=lambda kv: kv[1])
+        ]
         return self.async_show_form(
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(
-                        CONF_HOURLY_TEMPERATURE,
-                        default=hourly_temperature,
-                    ): bool,
+                    required(CONF_HOURLY_TEMPERATURE): bool,
+                    required(CONF_FOEHN): bool,
+                    required(CONF_FOEHN_SOUTH): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options, mode=SelectSelectorMode.DROPDOWN
+                        )
+                    ),
+                    required(CONF_FOEHN_NORTH): SelectSelector(
+                        SelectSelectorConfig(
+                            options=options, mode=SelectSelectorMode.DROPDOWN
+                        )
+                    ),
+                    required(CONF_FOEHN_THRESHOLD): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0.5,
+                            max=20,
+                            step=0.5,
+                            unit_of_measurement="hPa",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
+                    required(CONF_FOEHN_STRONG_THRESHOLD): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0.5,
+                            max=30,
+                            step=0.5,
+                            unit_of_measurement="hPa",
+                            mode=NumberSelectorMode.BOX,
+                        )
+                    ),
                 }
             ),
+            errors=errors,
         )

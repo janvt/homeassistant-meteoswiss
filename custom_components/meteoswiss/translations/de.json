@@ -105,12 +105,26 @@
                 "title": "MeteoSwiss-Optionen",
                 "description": "Einstellungen für diese Prognose.",
                 "data": {
-                    "hourly_temperature": "Stündliche Temperaturen"
+                    "hourly_temperature": "Stündliche Temperaturen",
+                    "foehn": "Föhnindex",
+                    "foehn_south_station": "Station südlich der Alpen",
+                    "foehn_north_station": "Station nördlich der Alpen",
+                    "foehn_threshold": "Föhn wahrscheinlich ab",
+                    "foehn_strong_threshold": "Starker Föhn ab"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Prognosen für Berge laden zusätzlich die Nullgradgrenze herunter, eine weitere Datei derselben Grösse. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Prognosen für Berge laden zusätzlich die Nullgradgrenze herunter, eine weitere Datei derselben Grösse. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde.",
+                    "foehn": "Sensoren für Föhn: der von MeteoSchweiz an der Wetterstation gemessene Föhnindex und eine Aussicht aus der Druckdifferenz über die Alpen, die Stunden vor dem Föhndurchbruch steigt.",
+                    "foehn_south_station": "Ihr Luftdruck auf Meereshöhe wird mit der Station nördlich der Alpen verglichen. Lugano ist die klassische Wahl.",
+                    "foehn_north_station": "Zürich/Kloten ist die klassische Wahl.",
+                    "foehn_threshold": "Druckdifferenz, ab der Föhn wahrscheinlich ist; etwa 4 hPa erreichen die nördlichen Täler wie in Altdorf. Für Nordföhn gleich, umgekehrt.",
+                    "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa."
                 }
             }
+        },
+        "error": {
+            "same_foehn_station": "Bitte zwei verschiedene Stationen wählen",
+            "foehn_thresholds": "Die Schwelle für starken Föhn muss höher sein als die andere, und beide über 0"
         }
     },
     "entity": {
@@ -179,6 +193,27 @@
                     "yellow": "Gelb",
                     "orange": "Orange",
                     "red": "Rot"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Föhn-Druckdifferenz"
+            },
+            "foehn_outlook": {
+                "name": "Föhnaussicht",
+                "state": {
+                    "strong_north": "Starker Nordföhn",
+                    "north": "Nordföhn wahrscheinlich",
+                    "none": "Keiner",
+                    "south": "Südföhn wahrscheinlich",
+                    "strong_south": "Starker Südföhn"
+                }
+            },
+            "foehn": {
+                "name": "Föhn",
+                "state": {
+                    "none": "Kein Föhn",
+                    "mixed": "Gemischt",
+                    "foehn": "Föhn"
                 }
             }
         }

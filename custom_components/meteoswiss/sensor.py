@@ -17,6 +17,7 @@ from homeassistant.const import (
     PERCENTAGE,
     UnitOfLength,
     UnitOfPrecipitationDepth,
+    UnitOfPressure,
     UnitOfSpeed,
     UnitOfTemperature,
     UnitOfTime,
@@ -26,7 +27,11 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.meteoswiss import MeteoSwissDataUpdateCoordinator, summaries
+from custom_components.meteoswiss import (
+    MeteoSwissDataUpdateCoordinator,
+    foehn,
+    summaries,
+)
 from custom_components.meteoswiss.alerts import (
     LEVELS,
     NO_WARNING,
@@ -34,6 +39,10 @@ from custom_components.meteoswiss.alerts import (
     level_between,
 )
 from custom_components.meteoswiss.const import (
+    CONF_FOEHN_NORTH,
+    CONF_FOEHN_SOUTH,
+    CONF_FOEHN_STRONG_THRESHOLD,
+    CONF_FOEHN_THRESHOLD,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
@@ -202,6 +211,14 @@ async def async_setup_entry(
         ],
         True,
     )
+    if c.foehn:
+        foehn_sensors: list[SensorEntity] = [
+            MeteoSwissFoehnDifferenceSensor(entry.entry_id, c),
+            MeteoSwissFoehnOutlookSensor(entry.entry_id, c),
+        ]
+        if c.weather_station:
+            foehn_sensors.append(MeteoSwissStationFoehnSensor(entry.entry_id, c))
+        async_add_entities(foehn_sensors, True)
     if c.pollen_station:
         async_add_entities(
             [
@@ -210,6 +227,105 @@ async def async_setup_entry(
             ],
             True,
         )
+
+
+class _FoehnSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    _attr_has_entity_name = True
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-{self._attr_translation_key}"
+        self._attr_device_info = coordinator.device_info
+
+    @property
+    def _difference(self) -> float | None:
+        pressures = self.coordinator.data["foehn"] or {}
+        return foehn.difference(pressures.get("south"), pressures.get("north"))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, typing.Any]:
+        pressures = self.coordinator.data["foehn"] or {}
+        settings = self.coordinator.foehn or {}
+        return {
+            "south_station": settings.get(CONF_FOEHN_SOUTH),
+            "south_pressure": pressures.get("south"),
+            "north_station": settings.get(CONF_FOEHN_NORTH),
+            "north_pressure": pressures.get("north"),
+            "threshold": settings.get(CONF_FOEHN_THRESHOLD),
+            "strong_threshold": settings.get(CONF_FOEHN_STRONG_THRESHOLD),
+        }
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+
+class MeteoSwissFoehnDifferenceSensor(_FoehnSensor):
+    """Sea-level pressure south minus north of the Alps: positive for south Föhn."""
+
+    _attr_translation_key = "foehn_pressure_difference"
+    _attr_icon = "mdi:arrow-up-down"
+    _attr_native_unit_of_measurement = UnitOfPressure.HPA
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+
+    @property
+    def native_value(self) -> float | None:
+        return self._difference
+
+
+class MeteoSwissFoehnOutlookSensor(_FoehnSensor):
+    """Whether the pressure difference makes Föhn likely, and in which direction."""
+
+    _attr_translation_key = "foehn_outlook"
+    _attr_icon = "mdi:weather-windy-variant"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(foehn.OUTLOOKS)
+
+    @property
+    def native_value(self) -> str | None:
+        settings = self.coordinator.foehn or {}
+        return foehn.outlook(
+            self._difference,
+            settings.get(CONF_FOEHN_THRESHOLD, 0),
+            settings.get(CONF_FOEHN_STRONG_THRESHOLD, 0),
+        )
+
+
+class MeteoSwissStationFoehnSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """MeteoSwiss's Föhn index measured at the weather station, where it has one."""
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "foehn"
+    _attr_icon = "mdi:weather-windy-variant"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(dict.fromkeys(foehn.STATION_INDEX.values()))
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-foehn"
+        self._attr_device_info = coordinator.station_device_info(StationType.WEATHER)
+
+    @property
+    def native_value(self) -> str | None:
+        measured = self.coordinator.data["condition_by_station"].get(
+            self.coordinator.weather_station
+        )
+        return foehn.station_index((measured or {}).get("wcc006s0"))
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
 
 
 class MeteoSwissWarningSensor(

@@ -14,6 +14,7 @@ This is the MeteoSwiss integration for Home Assistant.
 * Supports hourly forecasts.
 * Forecasts for mountains, huts and passes, with a freezing level sensor.
 * MeteoSwiss weather warnings for the place, and pollen measurements.
+* A Föhn outlook from the pressure difference across the Alps.
 * Entities are grouped by forecast and by station, each as a device of its
   integration entry.
 * Supports two different real-time stations: a weather station
@@ -184,6 +185,23 @@ warnings of its region at its height: a ridge can be warned of wind while the
 village below is not.  MeteoSwiss's warnings currently stop at 3000 m, so
 summits above that get none.  The warnings come from the MeteoAlarm feed for
 Switzerland (about 800 kB), fetched at most every 30 minutes for all entries.
+
+## Föhn
+
+Every forecast has two Föhn sensors, and its weather station a third:
+
+* *Föhn pressure difference*: the sea-level pressure south of the Alps minus
+  north of them, in hPa.  It rises hours before the Föhn breaks through: on
+  20 October 2026 it passed 4 hPa at 06:30 UTC, and the Föhn reached Altdorf at
+  12:30, at about 6 hPa.
+* *Föhn outlook*: from that difference, `strong_south`, `south` (likely),
+  `none`, `north` or `strong_north` (north Föhn in Ticino, the other way round).
+* *Föhn* (at the weather station): MeteoSwiss's own Föhn index measured there,
+  `none`, `mixed` or `foehn`, for stations that have one.
+
+Under *Configure* they can be turned off, and the stations and thresholds
+changed.  The defaults are the classic pair Lugano and Zürich/Kloten, with
+Föhn likely from 4 hPa and strong from 8 hPa.
 
 ## Pollen
 

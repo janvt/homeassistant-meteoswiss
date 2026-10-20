@@ -105,12 +105,26 @@
                 "title": "MeteoSwiss options",
                 "description": "Settings for this forecast.",
                 "data": {
-                    "hourly_temperature": "Hourly temperatures"
+                    "hourly_temperature": "Hourly temperatures",
+                    "foehn": "Föhn index",
+                    "foehn_south_station": "Station south of the Alps",
+                    "foehn_north_station": "Station north of the Alps",
+                    "foehn_threshold": "Föhn likely from",
+                    "foehn_strong_threshold": "Strong Föhn from"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. Mountain forecasts also download the freezing level, another file of the same size. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. Mountain forecasts also download the freezing level, another file of the same size. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour.",
+                    "foehn": "Sensors for Föhn: MeteoSwiss's measured Föhn index at the weather station, and an outlook from the pressure difference across the Alps, which rises hours before the Föhn breaks through.",
+                    "foehn_south_station": "Its sea-level pressure is compared with the station north of the Alps. Lugano is the classic choice.",
+                    "foehn_north_station": "Zürich/Kloten is the classic choice.",
+                    "foehn_threshold": "Pressure difference from which Föhn is likely; about 4 hPa reaches the northern valleys, as in Altdorf. The same the other way round for north Föhn.",
+                    "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa."
                 }
             }
+        },
+        "error": {
+            "same_foehn_station": "Choose two different stations",
+            "foehn_thresholds": "The strong Föhn threshold must be higher than the other, and both above 0"
         }
     },
     "entity": {
@@ -179,6 +193,27 @@
                     "yellow": "Yellow",
                     "orange": "Orange",
                     "red": "Red"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Föhn pressure difference"
+            },
+            "foehn_outlook": {
+                "name": "Föhn outlook",
+                "state": {
+                    "strong_north": "Strong north Föhn",
+                    "north": "North Föhn likely",
+                    "none": "None",
+                    "south": "South Föhn likely",
+                    "strong_south": "Strong south Föhn"
+                }
+            },
+            "foehn": {
+                "name": "Föhn",
+                "state": {
+                    "none": "None",
+                    "mixed": "Mixed",
+                    "foehn": "Föhn"
                 }
             }
         }
