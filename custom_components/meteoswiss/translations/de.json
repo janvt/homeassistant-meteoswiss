@@ -19,6 +19,14 @@
         "point_no_data": {
             "title": "MeteoSwiss bietet für einen Ort keine Prognose mehr an",
             "description": "MeteoSwiss scheint für {name} keine Prognose mehr anzubieten.\n\nUm einen anderen Ort zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
+        },
+        "ranges_ignored": {
+            "title": "MeteoSchweiz-Prognose pausiert",
+            "description": "Die Server von MeteoSchweiz können derzeit nicht nur den Teil der Prognose für deinen Ort senden. Statt viel mehr als üblich herunterzuladen, wird die Prognose pausiert und jede Stunde neu versucht. Messwerte und Unwetterwarnungen funktionieren weiter, und dieser Hinweis verschwindet von selbst."
+        },
+        "whole_downloads": {
+            "title": "MeteoSchweiz-Prognose braucht mehr Daten als üblich",
+            "description": "MeteoSchweiz scheint geändert zu haben, wie die Prognose veröffentlicht wird, deshalb lädt die Integration mehr als üblich herunter, um sie aktuell zu halten. Alles funktioniert weiter. Ein Update der Integration senkt den Verbrauch wieder; bei einer volumenbegrenzten Verbindung kannst du bis dahin unter Konfigurieren die stündlichen Temperaturen ausschalten. Dieser Hinweis verschwindet von selbst."
         }
     },
     "config": {

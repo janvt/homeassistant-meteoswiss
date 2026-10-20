@@ -19,6 +19,14 @@
         "point_no_data": {
             "title": "MeteoSwiss gir ikke lenger varsel for et sted",
             "description": "MeteoSwiss ser ikke lenger ut til å tilby varsel for {name}.\n\nFor å velge et annet sted, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises varselet som utilgjengelig."
+        },
+        "ranges_ignored": {
+            "title": "MeteoSwiss-varselet er satt på pause",
+            "description": "MeteoSwiss sine servere kan for øyeblikket ikke sende bare den delen av varselet som gjelder stedet ditt. I stedet for å laste ned mye mer enn vanlig, settes varselet på pause og prøves på nytt hver time. Målinger og farevarsler fungerer fortsatt, og dette varselet forsvinner av seg selv."
+        },
+        "whole_downloads": {
+            "title": "MeteoSwiss-varselet bruker mer data enn vanlig",
+            "description": "MeteoSwiss ser ut til å ha endret hvordan varselet publiseres, så integrasjonen laster ned mer enn vanlig for å holde det oppdatert. Alt fungerer fortsatt. En oppdatering av integrasjonen vil få forbruket ned igjen; på en forbindelse med begrenset datamengde kan du i mellomtiden slå av temperatur per time under Konfigurer. Dette varselet forsvinner av seg selv."
         }
     },
     "config": {

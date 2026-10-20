@@ -23,6 +23,13 @@ from custom_components.meteoswiss.const import (
 )
 from custom_components.meteoswiss.ogd import POINT_TYPE_POI, POINT_TYPE_POSTCODE
 
+# Shared by all entries: about how MeteoSwiss's files are read.
+RANGES_IGNORED_ISSUE = f"ranges_ignored_{DOMAIN}"
+WHOLE_DOWNLOADS_ISSUE = f"whole_downloads_{DOMAIN}"
+# Files downloaded whole in a day, as they could not be searched, from which
+# the user is told.
+WHOLE_DOWNLOADS_NOTICE = 3
+
 
 def station_issue_id(station: str, name_key: str) -> str:
     """The notice that a station gives no data (name_key tells its role)."""

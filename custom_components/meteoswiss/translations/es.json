@@ -19,6 +19,14 @@
         "point_no_data": {
             "title": "MeteoSuiza ya no ofrece la previsión de un lugar",
             "description": "MeteoSuiza ya no parece ofrecer la previsión para {name}.\n\nPara elegir otro lugar, vaya a Ajustes → Dispositivos y servicios → MeteoSwiss y seleccione «Reconfigurar» en el menú de esta entrada.\n\nHasta entonces, su previsión aparecerá como no disponible."
+        },
+        "ranges_ignored": {
+            "title": "Previsión de MeteoSuiza en pausa",
+            "description": "Los servidores de MeteoSuiza no pueden enviar ahora solo la parte de la previsión para su lugar. En lugar de descargar mucho más de lo habitual, la previsión se pausa y se vuelve a intentar cada hora. Las mediciones y los avisos meteorológicos siguen funcionando, y este aviso desaparece solo."
+        },
+        "whole_downloads": {
+            "title": "La previsión de MeteoSuiza usa más datos de lo habitual",
+            "description": "Parece que MeteoSuiza ha cambiado la forma en que publica su previsión, así que la integración descarga más de lo habitual para mantenerla al día. Todo sigue funcionando. Una actualización de la integración volverá a reducir el consumo; con una conexión con datos limitados, mientras tanto puede desactivar las temperaturas por hora en Configurar. Este aviso desaparece solo."
         }
     },
     "config": {

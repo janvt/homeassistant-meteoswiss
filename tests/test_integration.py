@@ -912,3 +912,39 @@ async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_
 
     await refresh_after(hass, frozen_now, 35)
     assert fake_ogd.climate_calls == 2
+
+
+async def test_a_notice_while_the_files_are_downloaded_whole(
+    hass, entry, fake_ogd, frozen_now
+):
+    await setup(hass, entry)
+    assert issues(hass) == set()
+
+    fake_ogd.whole_downloads = 3
+    fake_ogd.run = "202610201300"
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == {"whole_downloads_meteoswiss"}
+
+    fake_ogd.whole_downloads = 0
+    fake_ogd.run = "202610201400"
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == set()
+
+
+async def test_a_notice_while_the_forecast_is_paused(hass, entry, fake_ogd, frozen_now):
+    await setup(hass, entry)
+
+    # The servers send whole files: no new forecast, rather than hundreds of MB.
+    fake_ogd.ranges_ignored = True
+    fake_ogd.forecast_error = OGDError("sent whole")
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == {"ranges_ignored_meteoswiss"}
+    # The previous forecast is kept meanwhile.
+    coordinator = hass.data[DOMAIN][entry.entry_id]
+    assert coordinator.data["forecast"]["run"] == "202610201200"
+    assert hass.states.get(weather_id(hass, entry)).state == "sunny"
+
+    fake_ogd.ranges_ignored = False
+    fake_ogd.forecast_error = None
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == set()

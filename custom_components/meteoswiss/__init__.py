@@ -46,6 +46,9 @@ from custom_components.meteoswiss.const import (
 )
 from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.issues import (
+    RANGES_IGNORED_ISSUE,
+    WHOLE_DOWNLOADS_ISSUE,
+    WHOLE_DOWNLOADS_NOTICE,
     async_delete_issues,
     freezing_level_setting,
     no_forecast_issue_id,
@@ -379,6 +382,14 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         if not self._forecast_due(now):
             return self._forecast
         try:
+            return await self._async_fetch_forecast(now)
+        finally:
+            self._async_update_download_issues()
+
+    async def _async_fetch_forecast(
+        self, now: datetime.datetime
+    ) -> LocalForecast | None:
+        try:
             if self._point is None:
                 self._point = await self.client.resolve_point(
                     self.postcode, self.point_id, self.point_type
@@ -407,6 +418,28 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 raise
             _LOGGER.warning("Keeping the previous forecast: %s", exc)
         return self._forecast
+
+    @callback
+    def _async_update_download_issues(self) -> None:
+        """Tell the user while MeteoSwiss's files cannot be read as usual."""
+        ignored = self.client.ranges_ignored
+        whole = not ignored and self.client.whole_downloads >= WHOLE_DOWNLOADS_NOTICE
+        for issue_id, key, active in (
+            (RANGES_IGNORED_ISSUE, "ranges_ignored", ignored),
+            (WHOLE_DOWNLOADS_ISSUE, "whole_downloads", whole),
+        ):
+            if active:
+                ir.async_create_issue(
+                    self.hass,
+                    DOMAIN,
+                    issue_id,
+                    is_fixable=False,
+                    is_persistent=False,
+                    severity=IssueSeverity.WARNING,
+                    translation_key=key,
+                )
+            else:
+                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
 
     @property
     def device_info(self) -> DeviceInfo:

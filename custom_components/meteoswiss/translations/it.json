@@ -19,6 +19,14 @@
         "point_no_data": {
             "title": "MeteoSvizzera non fornisce più previsioni per un luogo",
             "description": "MeteoSvizzera non sembra più offrire previsioni per {name}.\n\nPer scegliere un altro luogo, andare in Impostazioni → Dispositivi e servizi → MeteoSwiss e selezionare «Riconfigura» nel menu di questa voce.\n\nFino ad allora, le previsioni risulteranno non disponibili."
+        },
+        "ranges_ignored": {
+            "title": "Previsioni MeteoSvizzera in pausa",
+            "description": "I server di MeteoSvizzera al momento non possono inviare solo la parte delle previsioni per la tua località. Invece di scaricare molto più del solito, le previsioni vengono messe in pausa e riprovate ogni ora. Le misure e le allerte meteo continuano a funzionare, e questo avviso scompare da solo."
+        },
+        "whole_downloads": {
+            "title": "Le previsioni MeteoSvizzera usano più dati del solito",
+            "description": "Sembra che MeteoSvizzera abbia cambiato il modo in cui pubblica le previsioni, quindi l'integrazione scarica più del solito per tenerle aggiornate. Tutto continua a funzionare. Un aggiornamento dell'integrazione ridurrà di nuovo il consumo; con una connessione a consumo, nel frattempo puoi disattivare le temperature orarie in Configura. Questo avviso scompare da solo."
         }
     },
     "config": {

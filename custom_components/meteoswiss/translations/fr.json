@@ -19,6 +19,14 @@
         "point_no_data": {
             "title": "MeteoSuisse ne fournit plus de prévision pour un lieu",
             "description": "MeteoSuisse ne semble plus proposer de prévision pour {name}.\n\nPour choisir un autre lieu, allez dans Paramètres → Appareils et services → MeteoSwiss et sélectionnez « Reconfigurer » dans le menu de cette entrée.\n\nD'ici là, sa prévision sera affichée comme indisponible."
+        },
+        "ranges_ignored": {
+            "title": "Prévisions MeteoSuisse en pause",
+            "description": "Les serveurs de MeteoSuisse ne peuvent pas envoyer actuellement la seule partie des prévisions pour votre lieu. Plutôt que de télécharger bien plus que d'habitude, les prévisions sont mises en pause et réessayées toutes les heures. Les mesures et les alertes météo continuent de fonctionner, et cet avis disparaît de lui-même."
+        },
+        "whole_downloads": {
+            "title": "Les prévisions MeteoSuisse utilisent plus de données que d'habitude",
+            "description": "MeteoSuisse semble avoir changé la façon dont il publie ses prévisions : l'intégration télécharge donc plus que d'habitude pour les tenir à jour. Tout continue de fonctionner. Une mise à jour de l'intégration réduira à nouveau la consommation ; avec une connexion à volume limité, vous pouvez désactiver d'ici là les températures horaires sous Configurer. Cet avis disparaît de lui-même."
         }
     },
     "config": {
