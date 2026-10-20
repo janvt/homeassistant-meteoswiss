@@ -11,6 +11,7 @@ from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.issue_registry import IssueSeverity
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import (
@@ -32,6 +33,7 @@ from custom_components.meteoswiss.const import (
     DEFAULT_HOURLY_TEMPERATURE,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
+    STATION_URL,
     USER_AGENT,
 )
 from custom_components.meteoswiss.downloads import SharedDownloads
@@ -319,6 +321,41 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 raise
             _LOGGER.warning("Keeping the previous forecast: %s", exc)
         return self._forecast
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """The device that groups the entities of the entry."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.config_entry.entry_id)},
+            name=self.forecast_name,
+            manufacturer="MeteoSwiss",
+            model="Mountain forecast" if self.is_mountain else "Postal code forecast",
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url="https://www.meteoswiss.admin.ch/",
+        )
+
+    def station_device_info(self, station_type: StationType) -> DeviceInfo:
+        """The device of a station, named like its sensors.
+
+        Home Assistant puts the device name before the names of its entities,
+        so the sensors keep their names ("Fluntern temperature") under their
+        station rather than under the forecast.  It is identified by its role,
+        so choosing another station renames it.
+        """
+        if station_type == StationType.WEATHER:
+            name = self.real_time_weather_station_name
+            model = "Weather station"
+        else:
+            name = self.real_time_precipitation_station_name
+            model = "Precipitation station"
+        return DeviceInfo(
+            identifiers={(DOMAIN, f"{self.config_entry.entry_id}-{station_type}")},
+            name=name,
+            manufacturer="MeteoSwiss",
+            model=model,
+            entry_type=DeviceEntryType.SERVICE,
+            configuration_url=STATION_URL,
+        )
 
     @property
     def is_mountain(self) -> bool:

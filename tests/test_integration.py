@@ -4,6 +4,7 @@ import datetime
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import (
@@ -408,7 +409,7 @@ async def test_freezing_level_sensor(hass, fake_ogd):
     state = hass.states.get(sensor)
     assert state.state == "2900.0"
     assert state.attributes["unit_of_measurement"] == "m"
-    assert state.attributes["friendly_name"] == "Bristen freezing level"
+    assert state.attributes["friendly_name"] == "Bristen Freezing level"
     assert [len(d) for d in fake_ogd.large_downloads["zprfr0hs"]] == [1]
 
 
@@ -456,3 +457,42 @@ async def test_entries_share_the_large_downloads(hass, entry, fake_ogd, frozen_n
     fake_ogd.run = "202610202000"
     await refresh_after(hass, frozen_now, 4 * 60)
     assert fake_ogd.large_downloads["tre200h0"][-1] == {bristen}
+
+
+async def test_entities_are_grouped_by_forecast_and_station(hass, entry):
+    await setup(hass, entry)
+
+    devices = {
+        d.model: d
+        for d in dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+    }
+    assert {model: d.name for model, d in devices.items()} == {
+        "Postal code forecast": "Zurich",
+        "Weather station": "Fluntern",
+        "Precipitation station": "Aarberg",
+    }
+    assert {d.manufacturer for d in devices.values()} == {"MeteoSwiss"}
+    assert {d.entry_type for d in devices.values()} == {dr.DeviceEntryType.SERVICE}
+
+    def device_of(entity):
+        return er.async_get(hass).async_get(entity).device_id
+
+    temperature = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-temperature")
+    rain = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-10minrain-precipitation")
+    assert device_of(weather_id(hass, entry)) == devices["Postal code forecast"].id
+    assert device_of(temperature) == devices["Weather station"].id
+    assert device_of(rain) == devices["Precipitation station"].id
+    # The names stay, apart from Home Assistant capitalising after the device.
+    assert hass.states.get(weather_id(hass, entry)).name == "Zurich"
+    assert hass.states.get(temperature).name == "Fluntern Temperature"
+    assert hass.states.get(rain).name == "Aarberg 10 minute rain"
+
+
+async def test_each_entry_has_its_own_device(hass, entry):
+    await setup(hass, entry)
+    mountain = await add_mountain(hass)
+
+    device = dr.async_entries_for_config_entry(dr.async_get(hass), mountain.entry_id)
+    assert [(d.name, d.model) for d in device] == [("Bristen", "Mountain forecast")]
+    # Zurich has two stations too.
+    assert len(dr.async_get(hass).devices) == 4

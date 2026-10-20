@@ -13,6 +13,8 @@ This is the MeteoSwiss integration for Home Assistant.
   and offers suggestions on how to fix the issue.
 * Supports hourly forecasts.
 * Forecasts for mountains, huts and passes, with a freezing level sensor.
+* Entities are grouped by forecast and by station, each as a device of its
+  integration entry.
 * Supports two different real-time stations: a weather station
   that may not give you rain data, and a precipitation station
   that will give you rain data but may not give you other info.
@@ -129,7 +131,10 @@ Now you are ready to add one or more instances of the integration.
   a *freezing level* sensor shows the forecast height of the 0 °C line.  Add
   the integration once more for each place you want a forecast for.
 
-- Your task is done and your integration is working.
+- Your task is done and your integration is working.  The forecast and each
+  station show as devices of the entry, with their entities.  Home Assistant
+  names entities after their device, so a sensor shows as e.g.
+  *Fluntern Temperature*.
 
 ![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/addedandworking.png)
 

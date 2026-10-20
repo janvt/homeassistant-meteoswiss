@@ -37,7 +37,6 @@ from custom_components.meteoswiss import (
 )
 from custom_components.meteoswiss.const import (
     CODE_TO_CONDITION_MAP,
-    CONF_FORECAST_NAME,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
@@ -118,6 +117,7 @@ class MeteoSwissWeather(
         super().__init__(coordinator)
         self._invalid_legacy_icon_logged = False
         self._attr_unique_id = "weather.%s" % integration_id
+        self._attr_device_info = coordinator.device_info
         self._attr_postcode = coordinator.data[CONF_POSTCODE]
         self._attr_station = coordinator.data[CONF_STATION]
         self._attr_weather_station = self._attr_station
@@ -160,7 +160,8 @@ class MeteoSwissWeather(
             a += "  No real-time stations used by this weather entry."
         self._attr_attribution = a
 
-        self._attr_name = coordinator.data[CONF_FORECAST_NAME]
+        # Named after the device, which has the name of the forecast.
+        self._attr_name = None
         self.__set_data(coordinator.data)
 
     def __set_data(self, data: MeteoSwissClientResult) -> None:

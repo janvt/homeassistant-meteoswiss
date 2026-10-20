@@ -89,6 +89,9 @@ class MeteoSwissFreezingLevelSensor(
     _attr_native_unit_of_measurement = UnitOfLength.METERS
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:snowflake-thermometer"
+    # Shown after the name of the device, e.g. "Bristen Freezing level".
+    _attr_has_entity_name = True
+    _attr_name = "Freezing level"
     _attr_suggested_display_precision = 0
 
     def __init__(
@@ -96,7 +99,7 @@ class MeteoSwissFreezingLevelSensor(
     ) -> None:
         super().__init__(coordinator)
         self._attr_unique_id = f"sensor.{integration_id}-freezing_level"
-        self._attr_name = f"{coordinator.forecast_name} freezing level"
+        self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> float | None:
@@ -131,6 +134,7 @@ class MeteoSwissSensor(
             sensor_type,
             "-precipitation" if station_type == StationType.PRECIPITATION else "",
         )
+        self._attr_device_info = coordinator.station_device_info(station_type)
         self._state = None
         self._type = sensor_type
         self._attr_native_unit_of_measurement = SENSOR_TYPES[self._type][
