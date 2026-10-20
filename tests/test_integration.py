@@ -12,12 +12,15 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
+from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
 
+from .fakes import NOW, make_warning
+
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
-# The entity IDs of the summaries, after the device's name.
+# The entity IDs of the summaries and warnings, after the device's name.
 SUMMARY_NAMES = (
     "snow_tonight",
     "snow_next_24_hours",
@@ -28,6 +31,8 @@ SUMMARY_NAMES = (
     "precipitation_next_hour",
     "chance_of_rain_next_hour",
     "lowest_temperature_tonight",
+    "weather_warning",
+    "weather_warning_next_24_hours",
 )
 
 
@@ -593,3 +598,97 @@ async def test_summaries_needing_hourly_temperatures(hass, entry_data, fake_ogd)
         assert summary(hass, entry, key).state == "unavailable", key
     assert summary(hass, entry, "sunshine_tomorrow").state == "12.0"
     assert summary(hass, entry, "precipitation_next_hour").state == "0.4"
+
+
+async def test_pollen_sensors(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "pollen_station": "PZH"})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    def pollen(kind):
+        return hass.states.get(
+            entity_id(hass, "sensor", f"sensor.{entry.entry_id}-pollen_{kind}")
+        )
+
+    birch = pollen("birch")
+    assert birch.state == "42.0"
+    assert birch.attributes["unit_of_measurement"] == "pollen/m³"
+    assert birch.attributes["friendly_name"] == "Zürich pollen Birch"
+    assert birch.attributes["measured"] == "2026-10-20T12:00:00+00:00"
+    assert pollen("grasses").state == "7.0"
+    assert pollen("beech").state == "unavailable"  # no value for it
+    device = dr.async_get(hass).async_get(
+        er.async_get(hass).async_get(birch.entity_id).device_id
+    )
+    assert (device.name, device.model) == ("Zürich pollen", "Pollen station")
+
+
+async def test_pollen_station_without_recent_data(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "pollen_station": "PLZ"})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    birch = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-pollen_birch")
+    assert hass.states.get(birch).state == "unavailable"
+
+
+def warning_state(hass, entry, key):
+    return hass.states.get(entity_id(hass, "sensor", f"sensor.{entry.entry_id}-{key}"))
+
+
+async def test_weather_warnings(hass, entry, fake_alerts):
+    hour = datetime.timedelta(hours=1)
+    fake_alerts.warnings = [
+        make_warning("wind", "yellow", NOW - 5 * hour, NOW + 3 * hour, "Föhn"),
+        make_warning("rain", "orange", NOW + 16 * hour, NOW + 30 * hour),
+        make_warning("thunderstorm", "red", NOW + 30 * hour, NOW + 32 * hour),
+    ]
+
+    await setup(hass, entry)
+
+    now = warning_state(hass, entry, "weather_warning")
+    assert now.state == "yellow"
+    assert now.attributes["types"] == ["wind"]
+    assert now.attributes["warnings"] == [
+        {
+            "type": "wind",
+            "level": "yellow",
+            "event": "Föhn",
+            "onset": "2026-10-20T07:30:00+00:00",
+            "expires": "2026-10-20T15:30:00+00:00",
+            "region": "Flüelen-Unterschächen",
+            "headline": "Yellow wind warning",
+            "description": "Possible impacts.",
+        }
+    ]
+    assert now.attributes["friendly_name"] == "Zurich Weather warning"
+    later = warning_state(hass, entry, "weather_warning_next_24h")
+    assert later.state == "orange"  # not the red one, in 30 hours
+    assert later.attributes["types"] == ["rain", "wind"]
+    # Looked up at the forecast point, in Home Assistant's language.
+    assert fake_alerts.calls[0] == (47.3875, 8.521, None, "en")
+
+
+async def test_no_weather_warnings(hass, entry):
+    await setup(hass, entry)
+
+    state = warning_state(hass, entry, "weather_warning")
+    assert state.state == "none"
+    assert state.attributes["warnings"] == []
+
+
+async def test_weather_warnings_that_cannot_be_obtained(hass, entry, fake_alerts):
+    fake_alerts.error = AlertError("down")
+
+    await setup(hass, entry)
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert warning_state(hass, entry, "weather_warning").state == "unavailable"
+    assert hass.states.get(weather_id(hass, entry)).state == "sunny"
+
+
+async def test_a_mountain_is_warned_at_its_height(hass, fake_alerts):
+    await add_mountain(hass)
+
+    lat, lon, height, _ = fake_alerts.calls[0]
+    assert (lat, lon, height) == (46.7526, 8.7062, 3073.0)

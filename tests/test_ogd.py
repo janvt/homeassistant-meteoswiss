@@ -675,3 +675,64 @@ class TestFewerRequests:
         clock[0] += 61
         await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
         assert len(session.requests) == 2
+
+
+class TestPollen:
+    FILE = f"{ogd.POLLEN_URL}/pzh/ogd-pollen_pzh_h_now.csv"
+    HEADER = (
+        "station_abbr;reference_timestamp;kabetuh0;khpoach0;kaalnuh0;kacoryh0;"
+        "kafaguh0;kafraxh0;kaquerh0\n"
+    )
+
+    def client(self, rows):
+        return make_client({self.FILE: (self.HEADER + rows).encode("cp1252")})
+
+    async def test_the_newest_hour(self):
+        client, _ = self.client(
+            "PZH;20.10.2026 10:00;5;1;0;0;0;0;0\nPZH;20.10.2026 11:00;42;7;0;0;;1;3\n"
+        )
+
+        pollen = await client.get_pollen_now("PZH", now=STATIONS_NOW)
+
+        assert pollen == {
+            "alder": 0.0,
+            "ash": 1.0,
+            "beech": None,
+            "birch": 42.0,
+            "grasses": 7.0,
+            "hazel": 0.0,
+            "oak": 3.0,
+            # The end of the hour, like all station data.
+            "measured": datetime.datetime(2026, 10, 20, 11, tzinfo=UTC),
+        }
+
+    async def test_an_hour_without_values_is_skipped(self):
+        client, _ = self.client(
+            "PZH;20.10.2026 10:00;5;1;0;0;0;0;0\nPZH;20.10.2026 11:00;;;;;;;\n"
+        )
+        pollen = await client.get_pollen_now("PZH", now=STATIONS_NOW)
+        assert pollen["birch"] == 5.0
+
+    async def test_old_measurements_are_not_used(self):
+        # Luzern stopped reporting the day before.
+        client, _ = self.client("PZH;19.10.2026 16:00;5;1;0;0;0;0;0\n")
+        assert await client.get_pollen_now("PZH", now=STATIONS_NOW) == {}
+
+    async def test_pollen_stations(self):
+        header = (
+            "station_abbr;station_name;station_canton;station_wigos_id;station_type_de;"
+            "station_type_fr;station_type_it;station_type_en;station_dataowner;"
+            "station_data_since;station_height_masl;station_height_barometer_masl;"
+            "station_coordinates_lv95_east;station_coordinates_lv95_north;"
+            "station_coordinates_wgs84_lat;station_coordinates_wgs84_lon\n"
+        )
+        row = "PZH;Zürich;ZH;;a;b;c;d;e;f;1;;1;1;47.378;8.565\n"
+        client, _ = make_client(
+            {
+                f"{ogd.POLLEN_URL}/ogd-pollen_meta_stations.csv": (header + row).encode(
+                    "cp1252"
+                )
+            }
+        )
+        stations = await client.get_stations(StationType.POLLEN)
+        assert [(s.abbr, s.name) for s in stations] == [("PZH", "Zürich")]

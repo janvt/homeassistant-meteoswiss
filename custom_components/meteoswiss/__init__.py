@@ -4,7 +4,7 @@ import asyncio
 import datetime
 import logging
 import time
-from typing import Literal, TypedDict, cast
+from typing import Any, Literal, TypedDict, cast
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_NAME, Platform
@@ -19,11 +19,13 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
+from custom_components.meteoswiss.alerts import AlertError, MeteoAlarm, WeatherWarning
 from custom_components.meteoswiss.const import (
     CONF_FORECAST_NAME,
     CONF_HOURLY_TEMPERATURE,
     CONF_POINT_ID,
     CONF_POINT_TYPE,
+    CONF_POLLEN_STATION,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
@@ -65,6 +67,7 @@ FORECAST_CHECK_INTERVAL = datetime.timedelta(minutes=15)
 UPDATE_TIMEOUT = 300
 # Shared by all entries.
 DATA_CLIENT = f"{DOMAIN}_client"
+DATA_ALERTS = f"{DOMAIN}_alerts"
 DATA_DOWNLOADS = f"{DOMAIN}_downloads"
 
 
@@ -125,6 +128,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             async_get_clientsession(hass), USER_AGENT
         )
         hass.data[DATA_DOWNLOADS] = SharedDownloads(hass.data[DATA_CLIENT])
+        hass.data[DATA_ALERTS] = MeteoAlarm(async_get_clientsession(hass), USER_AGENT)
     coordinator = MeteoSwissDataUpdateCoordinator(
         hass,
         entry,
@@ -134,6 +138,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         point_type=entry.data.get(CONF_POINT_TYPE, POINT_TYPE_POSTCODE),
         client=hass.data[DATA_CLIENT],
         downloads=hass.data[DATA_DOWNLOADS],
+        alerts=hass.data[DATA_ALERTS],
         # Set up with the entry, then changeable in the options.
         hourly_temperature=entry.options.get(
             CONF_HOURLY_TEMPERATURE,
@@ -143,6 +148,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         weather_station=entry.data.get(CONF_STATION, None),
         real_time_weather_station_name=entry.data.get(CONF_REAL_TIME_NAME, None),
         precipitation_station=entry.data.get(CONF_PRECIPITATION_STATION, None),
+        pollen_station=entry.data.get(CONF_POLLEN_STATION),
         real_time_precipitation_station_name=entry.data.get(
             CONF_REAL_TIME_PRECIPITATION_NAME, None
         ),
@@ -185,6 +191,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data[DOMAIN]:
             hass.data.pop(DATA_DOWNLOADS)
             hass.data.pop(DATA_CLIENT)
+            hass.data.pop(DATA_ALERTS)
 
     return unload_ok
 
@@ -195,6 +202,10 @@ class MeteoSwissClientResult(TypedDict):
     condition_by_station: dict[str, dict[str, float | None]]
     # The same, in order of preference.
     condition: list[dict[str, float | None]]
+    # The latest pollen measurements by pollen type, and "measured".
+    pollen: dict[str, Any]
+    # The weather warnings for the place that have not expired; None if unknown.
+    warnings: list[WeatherWarning] | None
     # Forecast attributes.
     postcode: int | None  # e.g. 8005, None for mountains
     point: Point | None  # where the forecast is for
@@ -222,12 +233,14 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         point_type: int,
         client: MeteoSwissOGD,
         downloads: SharedDownloads,
+        alerts: MeteoAlarm,
         hourly_temperature: bool,
         forecast_name: str,
         weather_station: str | None,
         real_time_weather_station_name: str | None,
         precipitation_station: str | None,
         real_time_precipitation_station_name: str | None,
+        pollen_station: str | None = None,
     ) -> None:
         """Initialize."""
         self.first_error: dict[str, float | None] = {
@@ -266,6 +279,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             )
 
         self.precipitation_station = precipitation_station
+        self.pollen_station = pollen_station
+        # Looked up with the first update, for the name of its device.
+        self.pollen_station_name = pollen_station
         self.real_time_precipitation_station_name = real_time_precipitation_station_name
         if precipitation_station:
             _LOGGER.debug(
@@ -276,6 +292,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             )
 
         self.client = client
+        self.alerts = alerts
         self._point: Point | None = None
         self._forecast: LocalForecast | None = None
         self._forecast_checked: datetime.datetime | None = None
@@ -351,6 +368,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         if station_type == StationType.WEATHER:
             name = self.real_time_weather_station_name
             model = "Weather station"
+        elif station_type == StationType.POLLEN:
+            # The sensors are named after the pollen, e.g. "Zürich pollen Birch".
+            name = f"{self.pollen_station_name} pollen"
+            model = "Pollen station"
         else:
             name = self.real_time_precipitation_station_name
             model = "Precipitation station"
@@ -399,6 +420,38 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         )
         self.error_raised[CONF_POSTCODE] = True
 
+    async def _async_get_warnings(self) -> list[WeatherWarning] | None:
+        """The warnings for the forecast's place, None if they are unknown."""
+        if self._point is None:
+            return None
+        try:
+            return await self.alerts.get_warnings(
+                self._point.lat,
+                self._point.lon,
+                self._point.height,
+                self.hass.config.language,
+                datetime.datetime.now(datetime.timezone.utc),
+            )
+        except AlertError as exc:
+            _LOGGER.warning("Weather warnings: %s", exc)
+            return None
+
+    async def _async_get_pollen(self) -> dict[str, Any]:
+        """The latest pollen measurements, empty without a station or data."""
+        if not self.pollen_station:
+            return {}
+        try:
+            if self.pollen_station_name == self.pollen_station:
+                stations = await self.client.get_stations(StationType.POLLEN)
+                self.pollen_station_name = next(
+                    (s.name for s in stations if s.abbr == self.pollen_station),
+                    self.pollen_station,
+                )
+            return await self.client.get_pollen_now(self.pollen_station)
+        except OGDError as exc:
+            _LOGGER.warning("Pollen station %s: %s", self.pollen_station, exc)
+            return {}
+
     async def _async_update_data(self) -> MeteoSwissClientResult:
         """Update data from MeteoSwiss open data."""
         condition_by_station: dict[str, dict[str, float | None]] = {}
@@ -417,7 +470,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                     except OGDError as exc:
                         _LOGGER.warning("Station %s: %s", station, exc)
                         condition_by_station[station] = {}
+                pollen = await self._async_get_pollen()
                 forecast = await self._async_get_forecast()
+                warnings = await self._async_get_warnings()
         except UnknownPointError as exc:
             # This will not fix itself, so tell the user straight away.
             self._async_create_no_forecast_issue()
@@ -430,6 +485,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             "forecast": forecast,
             "condition_by_station": condition_by_station,
             "condition": [c for c in condition_by_station.values() if c],
+            "pollen": pollen,
+            "warnings": warnings,
         }
 
         # _LOGGER.debug("Data obtained (%s):\n%s", type(data), pprint.pformat(data))

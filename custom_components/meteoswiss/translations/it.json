@@ -88,10 +88,14 @@
                     "station": "Stazione meteo in tempo reale",
                     "real_time_name": "Nomi di entità meteo in tempo reale",
                     "precipitation_station": "Stazione di precipitazioni in tempo reale",
-                    "real_time_precipitation_name": "Nomi di entità di precipitazioni in tempo reale"
+                    "real_time_precipitation_name": "Nomi di entità di precipitazioni in tempo reale",
+                    "pollen_station": "Stazione pollinica"
                 },
                 "description": "La stazione meteorologica in tempo reale viene utilizzata per cercare il meteo attuale alla stazione e fornire loro come sensori. Selezionando la prima opzione della lista, si disattiva i sensori di meteo in tempo reale.\\n\\nSe una stazione meteorologica è selezionata, il campo dei nomi delle entità in tempo reale viene utilizzato per denominare le entità in tempo reale (sensori). Se nessuna stazione è scelta, si ignora il campo dei nomi delle entità in tempo reale.\\n\\n{station_url} elenca le stazioni meteorologiche in tempo reale disponibili.",
-                "title": "Meteo in tempo reale"
+                "title": "Meteo in tempo reale",
+                "data_description": {
+                    "pollen_station": "Misure polliniche della più vicina delle 15 stazioni polliniche di MeteoSvizzera, con un sensore per tipo di polline. Scegliere la prima opzione per nessuna."
+                }
             }
         }
     },
@@ -137,6 +141,45 @@
             },
             "min_temperature_tonight": {
                 "name": "Temperatura minima stanotte"
+            },
+            "pollen_alder": {
+                "name": "Ontano"
+            },
+            "pollen_ash": {
+                "name": "Frassino"
+            },
+            "pollen_beech": {
+                "name": "Faggio"
+            },
+            "pollen_birch": {
+                "name": "Betulla"
+            },
+            "pollen_grasses": {
+                "name": "Graminacee"
+            },
+            "pollen_hazel": {
+                "name": "Nocciolo"
+            },
+            "pollen_oak": {
+                "name": "Quercia"
+            },
+            "weather_warning": {
+                "name": "Allerta meteo",
+                "state": {
+                    "none": "Nessuna",
+                    "yellow": "Gialla",
+                    "orange": "Arancione",
+                    "red": "Rossa"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Allerta meteo prossime 24 ore",
+                "state": {
+                    "none": "Nessuna",
+                    "yellow": "Gialla",
+                    "orange": "Arancione",
+                    "red": "Rossa"
+                }
             }
         }
     }

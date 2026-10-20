@@ -13,6 +13,7 @@ This is the MeteoSwiss integration for Home Assistant.
   and offers suggestions on how to fix the issue.
 * Supports hourly forecasts.
 * Forecasts for mountains, huts and passes, with a freezing level sensor.
+* MeteoSwiss weather warnings for the place, and pollen measurements.
 * Entities are grouped by forecast and by station, each as a device of its
   integration entry.
 * Supports two different real-time stations: a weather station
@@ -161,6 +162,30 @@ The snow and temperature sensors need *Hourly temperatures*.  A sensor is
 unavailable when any hour of its window, or a value it needs, is missing,
 rather than showing a partial result.
 
+## Weather warnings
+
+Every forecast has two sensors with MeteoSwiss's official weather warnings
+for its place: *Weather warning* (the most severe warning in force now) and
+*Weather warning next 24 hours*, each `none`, `yellow`, `orange` or `red`.
+Their `warnings` attribute lists the warnings with their type (such as
+`wind`, `rain` or `thunderstorm`), level, start, end, region, headline and
+text in Home Assistant's language, and `types` lists just the types, for
+templates such as a Föhn warning (`wind` in Altdorf).
+
+Each warning covers a region between two altitudes, so a place gets the
+warnings of its region at its height: a ridge can be warned of wind while the
+village below is not.  MeteoSwiss's warnings currently stop at 3000 m, so
+summits above that get none.  The warnings come from the MeteoAlarm feed for
+Switzerland (about 800 kB), fetched at most every 30 minutes for all entries.
+
+## Pollen
+
+Choose a pollen station when setting up (the closest of MeteoSwiss's 15 is
+suggested for postal codes) to get one sensor per type of pollen: alder, ash,
+beech, birch, grasses, hazel and oak, as the latest hourly concentration in
+pollen per m³.  They are measurements, not forecasts, and are unavailable when
+the station has reported nothing for six hours.
+
 ## How to create a sensor that has the weather forecast data
 
 Here is a sample of a YAML-based trigger-powered template sensor that creates
@@ -308,6 +333,7 @@ Information on the provided values is available in the
 
 This integration uses:
 
+* https://feeds.meteoalarm.org/ for the weather warnings
 * https://data.geo.admin.ch/ for the forecast, the current weather conditions and
   the list of postal codes and stations (your postal code is guessed from your
   Home Assistant location using that list, so no location is sent anywhere)

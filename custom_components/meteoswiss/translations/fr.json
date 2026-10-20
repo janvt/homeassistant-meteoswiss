@@ -88,10 +88,14 @@
                     "station": "Station météo en temps réel",
                     "real_time_name": "Noms des entités météo",
                     "precipitation_station": "Station météo en temps réel pour la précipitation",
-                    "real_time_precipitation_name": "Noms des entités pour la précipitation"
+                    "real_time_precipitation_name": "Noms des entités pour la précipitation",
+                    "pollen_station": "Station pollinique"
                 },
                 "description": "La station météorologique en temps réel est utilisée pour consulter les conditions météorologiques actuelles de la station et les fournir en tant que capteur. La sélection de la première option de la liste désactive les capteurs en temps réel. \n- Si une station météorologique est sélectionnée, le champ des noms d'entités en temps réel est utilisé pour nommer les entités en temps réel (capteurs). Si aucune station n'est choisie, le champ des noms des entités en temps réel est ignoré.\n- {station_url} dresse la liste des stations météorologiques en temps réel disponibles.",
-                "title": "Météo en temps réel"
+                "title": "Météo en temps réel",
+                "data_description": {
+                    "pollen_station": "Mesures polliniques de la plus proche des 15 stations polliniques de MeteoSuisse, avec un capteur par type de pollen. Choisissez la première option pour aucune."
+                }
             }
         }
     },
@@ -137,6 +141,45 @@
             },
             "min_temperature_tonight": {
                 "name": "Température minimale cette nuit"
+            },
+            "pollen_alder": {
+                "name": "Aulne"
+            },
+            "pollen_ash": {
+                "name": "Frêne"
+            },
+            "pollen_beech": {
+                "name": "Hêtre"
+            },
+            "pollen_birch": {
+                "name": "Bouleau"
+            },
+            "pollen_grasses": {
+                "name": "Graminées"
+            },
+            "pollen_hazel": {
+                "name": "Noisetier"
+            },
+            "pollen_oak": {
+                "name": "Chêne"
+            },
+            "weather_warning": {
+                "name": "Alerte météo",
+                "state": {
+                    "none": "Aucune",
+                    "yellow": "Jaune",
+                    "orange": "Orange",
+                    "red": "Rouge"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Alerte météo prochaines 24 heures",
+                "state": {
+                    "none": "Aucune",
+                    "yellow": "Jaune",
+                    "orange": "Orange",
+                    "red": "Rouge"
+                }
             }
         }
     }

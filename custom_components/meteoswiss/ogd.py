@@ -18,7 +18,7 @@ import time
 import zoneinfo
 from dataclasses import dataclass
 from enum import Enum
-from typing import TypedDict
+from typing import Any, TypedDict
 
 import aiohttp
 
@@ -29,6 +29,7 @@ FORECAST_URL = BASE_URL + "/ch.meteoschweiz.ogd-local-forecasting"
 POINTS_URL = FORECAST_URL + "/ogd-local-forecasting_meta_point.csv"
 SMN_URL = BASE_URL + "/ch.meteoschweiz.ogd-smn"
 SMN_PRECIP_URL = BASE_URL + "/ch.meteoschweiz.ogd-smn-precip"
+POLLEN_URL = BASE_URL + "/ch.meteoschweiz.ogd-pollen"
 
 # Forecast point types (point_type_id in the metadata).
 POINT_TYPE_POSTCODE = 2
@@ -64,6 +65,19 @@ STATION_ROWS_LOOKBACK = 3
 # Rows appear 20-40 minutes late; anything much older means the station has
 # stopped reporting.
 STATION_MAX_AGE = datetime.timedelta(minutes=90)
+# Pollen stations report hourly means, also about half an hour late.
+POLLEN_MAX_AGE = datetime.timedelta(hours=6)
+POLLEN_CACHE_SECONDS = 10 * 60
+# Hourly mean concentrations (pollen per m³) by pollen type.
+POLLEN_PARAMETERS = {
+    "alder": "kaalnuh0",
+    "ash": "kafraxh0",
+    "beech": "kafaguh0",
+    "birch": "kabetuh0",
+    "grasses": "khpoach0",
+    "hazel": "kacoryh0",
+    "oak": "kaquerh0",
+}
 
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)
 # Streaming a whole file may take a while on a slow connection.
@@ -117,6 +131,15 @@ class StationType(str, Enum):
 
     WEATHER = "weather"
     PRECIPITATION = "precipitation"
+    POLLEN = "pollen"
+
+
+# Where the files of each type of station are, and how they are named.
+STATION_FILES = {
+    StationType.WEATHER: (SMN_URL, "ogd-smn"),
+    StationType.PRECIPITATION: (SMN_PRECIP_URL, "ogd-smn-precip"),
+    StationType.POLLEN: (POLLEN_URL, "ogd-pollen"),
+}
 
 
 @dataclass(frozen=True)
@@ -431,10 +454,7 @@ class MeteoSwissOGD:
     async def get_stations(self, station_type: StationType) -> list[Station]:
         """All stations of a type with real-time data."""
         if station_type not in self._stations:
-            base = SMN_URL if station_type == StationType.WEATHER else SMN_PRECIP_URL
-            prefix = (
-                "ogd-smn" if station_type == StationType.WEATHER else "ogd-smn-precip"
-            )
+            base, prefix = STATION_FILES[station_type]
             body, _ = await self._get(f"{base}/{prefix}_meta_stations.csv")
             reader = csv.DictReader(
                 io.StringIO(body.decode("windows-1252")), delimiter=";"
@@ -497,10 +517,41 @@ class MeteoSwissOGD:
                     latest[key] = _number(value)
         return latest
 
-    async def _get_station_file(self, url: str) -> bytes:
+    async def get_pollen_now(
+        self, abbr: str, now: datetime.datetime | None = None
+    ) -> dict[str, Any]:
+        """The latest hourly pollen concentrations of a station, by pollen type.
+
+        Empty if the station has reported nothing recently.  Also has the time
+        of the measurement as "measured": like all station data, timestamps
+        mark the end of the interval.
+        """
+        low = abbr.lower()
+        body = await self._get_station_file(
+            f"{POLLEN_URL}/{low}/ogd-pollen_{low}_h_now.csv", POLLEN_CACHE_SECONDS
+        )
+        rows = list(
+            csv.DictReader(io.StringIO(body.decode("windows-1252")), delimiter=";")
+        )
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+        for row in reversed(rows):
+            measured = _station_time(row.get("reference_timestamp"))
+            if measured is None or now - measured > POLLEN_MAX_AGE:
+                break
+            values = {
+                kind: _number(row.get(parameter))
+                for kind, parameter in POLLEN_PARAMETERS.items()
+            }
+            if any(v is not None for v in values.values()):
+                return {**values, "measured": measured}
+        return {}
+
+    async def _get_station_file(
+        self, url: str, cache_seconds: float = STATION_CACHE_SECONDS
+    ) -> bytes:
         """A station file, shared by entries that use the same station."""
         cached = self._station_files.get(url)
-        if cached and time.monotonic() - cached[0] < STATION_CACHE_SECONDS:
+        if cached and time.monotonic() - cached[0] < cache_seconds:
             return cached[1]
         body, _ = await self._get(url)
         self._station_files[url] = (time.monotonic(), body)

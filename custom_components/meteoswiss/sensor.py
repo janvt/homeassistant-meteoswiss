@@ -3,7 +3,7 @@ import pprint
 import typing
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from homeassistant.components.sensor import (
@@ -27,6 +27,12 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.meteoswiss import MeteoSwissDataUpdateCoordinator, summaries
+from custom_components.meteoswiss.alerts import (
+    LEVELS,
+    NO_WARNING,
+    in_force,
+    level_between,
+)
 from custom_components.meteoswiss.const import (
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
@@ -41,7 +47,12 @@ from custom_components.meteoswiss.const import (
     SENSOR_TYPE_UNIT,
     SENSOR_TYPES,
 )
-from custom_components.meteoswiss.ogd import HourlyForecast, StationType, current_hour
+from custom_components.meteoswiss.ogd import (
+    POLLEN_PARAMETERS,
+    HourlyForecast,
+    StationType,
+    current_hour,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -186,6 +197,128 @@ async def async_setup_entry(
     async_add_entities(
         [MeteoSwissSummarySensor(entry.entry_id, c, d) for d in SUMMARIES], True
     )
+    async_add_entities(
+        [
+            MeteoSwissWarningSensor(entry.entry_id, c, key, hours)
+            for key, hours in (("weather_warning", 0), ("weather_warning_next_24h", 24))
+        ],
+        True,
+    )
+    if c.pollen_station:
+        async_add_entities(
+            [
+                MeteoSwissPollenSensor(entry.entry_id, c, kind)
+                for kind in POLLEN_PARAMETERS
+            ],
+            True,
+        )
+
+
+class MeteoSwissWarningSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """The most severe weather warning for the place, now or in coming hours.
+
+    The warnings themselves are attributes, with a type (e.g. "wind") to tell
+    them apart in templates.
+    """
+
+    _attr_has_entity_name = True
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = [NO_WARNING, *LEVELS]
+    _attr_icon = "mdi:alert-outline"
+    _attr_attribution = "MeteoSwiss, via MeteoAlarm"
+
+    def __init__(
+        self,
+        integration_id: str,
+        coordinator: MeteoSwissDataUpdateCoordinator,
+        key: str,
+        hours: int,
+    ) -> None:
+        super().__init__(coordinator)
+        self._hours = hours
+        self._attr_translation_key = key
+        self._attr_unique_id = f"sensor.{integration_id}-{key}"
+        self._attr_device_info = coordinator.device_info
+
+    def _window(self) -> tuple[datetime, datetime]:
+        now = datetime.now(timezone.utc)
+        # "Now" is the coming second, so that a warning starting now counts.
+        return now, now + (timedelta(hours=self._hours) or timedelta(seconds=1))
+
+    @property
+    def native_value(self) -> str | None:
+        warnings = self.coordinator.data["warnings"]
+        if warnings is None:
+            return None
+        return level_between(warnings, *self._window())
+
+    @property
+    def extra_state_attributes(self) -> dict[str, typing.Any] | None:
+        warnings = self.coordinator.data["warnings"]
+        if warnings is None:
+            return None
+        current = in_force(warnings, *self._window())
+        return {
+            "types": sorted({w["type"] for w in current if w["type"]}),
+            "warnings": [
+                {
+                    "type": w["type"],
+                    "level": w["level"],
+                    "event": w["event"],
+                    "onset": w["onset"].isoformat(),
+                    "expires": w["expires"].isoformat(),
+                    "region": w["region"],
+                    "headline": w["headline"],
+                    "description": w["description"],
+                }
+                for w in current
+            ],
+        }
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+
+class MeteoSwissPollenSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """The latest hourly concentration of a type of pollen at a pollen station."""
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:flower-pollen"
+    _attr_native_unit_of_measurement = "pollen/m³"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 0
+
+    def __init__(
+        self,
+        integration_id: str,
+        coordinator: MeteoSwissDataUpdateCoordinator,
+        kind: str,
+    ) -> None:
+        super().__init__(coordinator)
+        self._kind = kind
+        self._attr_translation_key = f"pollen_{kind}"
+        self._attr_unique_id = f"sensor.{integration_id}-pollen_{kind}"
+        self._attr_device_info = coordinator.station_device_info(StationType.POLLEN)
+
+    @property
+    def native_value(self) -> float | None:
+        return self.coordinator.data["pollen"].get(self._kind)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str] | None:
+        measured = self.coordinator.data["pollen"].get("measured")
+        return {"measured": measured.isoformat()} if measured else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
 
 
 class MeteoSwissSummarySensor(

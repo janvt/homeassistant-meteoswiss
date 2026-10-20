@@ -139,6 +139,20 @@ WEATHER_STATIONS = [
     Station("ARO", "Arosa", 46.7927, 9.6790),
 ]
 PRECIPITATION_STATIONS = [Station("ABE", "Aarberg", 47.0580, 7.2854)]
+POLLEN_STATIONS = [
+    Station("PZH", "Zürich", 47.3781, 8.5654),
+    Station("PLZ", "Luzern", 47.0577, 8.2964),
+]
+POLLEN_NOW = {
+    "alder": 0.0,
+    "ash": 1.0,
+    "beech": None,
+    "birch": 42.0,
+    "grasses": 7.0,
+    "hazel": 0.0,
+    "oak": 3.0,
+    "measured": datetime.datetime(2026, 10, 20, 12, tzinfo=UTC),
+}
 
 NOW = datetime.datetime(2026, 10, 20, 12, 30, tzinfo=UTC)
 
@@ -255,7 +269,14 @@ class FakeOGD:
     async def get_stations(self, station_type):
         if station_type == StationType.WEATHER:
             return WEATHER_STATIONS
+        if station_type == StationType.POLLEN:
+            return POLLEN_STATIONS
         return PRECIPITATION_STATIONS
+
+    async def get_pollen_now(self, abbr, now=None):
+        if self.station_error:
+            raise self.station_error
+        return dict(POLLEN_NOW) if abbr == "PZH" else {}
 
     async def get_station_now(self, abbr, station_type):
         if self.station_error:
@@ -293,3 +314,40 @@ class FakeOGD:
         forecast["temperature_run"] = (hourly_temperature or {}).get("run")
         forecast["freezing_level_run"] = (freezing_level or {}).get("run")
         return forecast
+
+
+def make_warning(type_, level, onset, expires, event=None):
+    return {
+        "identifier": f"{type_}-{level}-{onset.isoformat()}",
+        "event": event or type_.capitalize(),
+        "type": type_,
+        "level": level,
+        "onset": onset,
+        "expires": expires,
+        "region": "Flüelen-Unterschächen",
+        "headline": f"{level.capitalize()} {type_} warning",
+        "description": "Possible impacts.",
+    }
+
+
+class FakeMeteoAlarm:
+    """Replacement for MeteoAlarm with fixed warnings."""
+
+    warnings: list = []
+    error: Exception | None = None
+    calls: list = []
+
+    def __init__(self, session, user_agent) -> None:
+        pass
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.warnings = []
+        cls.error = None
+        cls.calls = []
+
+    async def get_warnings(self, lat, lon, height, language, now):
+        FakeMeteoAlarm.calls.append((lat, lon, height, language))
+        if self.error:
+            raise self.error
+        return [w for w in self.warnings if w["expires"] > now]

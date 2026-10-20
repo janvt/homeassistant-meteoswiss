@@ -88,10 +88,14 @@
                     "station": "Real-time weather station",
                     "real_time_name": "Real-time weather entity names",
                     "precipitation_station": "Real-time precipitation station",
-                    "real_time_precipitation_name": "Real-time precipitation entity names"
+                    "real_time_precipitation_name": "Real-time precipitation entity names",
+                    "pollen_station": "Pollen station"
                 },
                 "description": "The real-time weather and precipitation stations are used to look up the current weather and precipitation at the station and provide them as sensors.  Selecting the first option of the list disables real-time weather sensors.\n\nIf a weather station is selected, the real-time entity names field is used to name the real-time (sensor) entities.  If no station is chosen, the real-time entity names field is ignored.\n\n{station_url} lists the available real-time stations.",
-                "title": "Real-time weather and precipitation stations"
+                "title": "Real-time weather and precipitation stations",
+                "data_description": {
+                    "pollen_station": "Pollen measurements from the closest of MeteoSwiss's 15 pollen stations, as one sensor per type of pollen. Choose the first option for none."
+                }
             }
         }
     },
@@ -137,6 +141,45 @@
             },
             "min_temperature_tonight": {
                 "name": "Lowest temperature tonight"
+            },
+            "pollen_alder": {
+                "name": "Alder"
+            },
+            "pollen_ash": {
+                "name": "Ash"
+            },
+            "pollen_beech": {
+                "name": "Beech"
+            },
+            "pollen_birch": {
+                "name": "Birch"
+            },
+            "pollen_grasses": {
+                "name": "Grasses"
+            },
+            "pollen_hazel": {
+                "name": "Hazel"
+            },
+            "pollen_oak": {
+                "name": "Oak"
+            },
+            "weather_warning": {
+                "name": "Weather warning",
+                "state": {
+                    "none": "None",
+                    "yellow": "Yellow",
+                    "orange": "Orange",
+                    "red": "Red"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Weather warning next 24 hours",
+                "state": {
+                    "none": "None",
+                    "yellow": "Yellow",
+                    "orange": "Orange",
+                    "red": "Red"
+                }
             }
         }
     }

@@ -88,10 +88,14 @@
                     "station": "Echtzeit-Wetterstation",
                     "real_time_name": "Echtzeit-Wetter-Entity-Namen",
                     "precipitation_station": "Echtzeit-Niederschlagsstation",
-                    "real_time_precipitation_name": "Echtzeit-Niederschlags-Entity-Namen"
+                    "real_time_precipitation_name": "Echtzeit-Niederschlags-Entity-Namen",
+                    "pollen_station": "Pollenstation"
                 },
                 "description": "Die Echtzeit-Wetter- und Niederschlagsstationen werden verwendet, um das aktuelle Wetter und den Niederschlag der Station abzurufen und als Sensoren bereitzustellen. Die Auswahl der ersten Option in der Liste deaktiviert die Echtzeit-Wettersensoren.\n\nWenn eine Wetterstation ausgewählt ist, wird das Feld für die Echtzeit-Entity-Namen verwendet, um die Echtzeit-(Sensor)-Entities zu benennen. Wenn keine Station ausgewählt ist, wird das Feld ignoriert.\n\nUnter {station_url} findest du die verfügbaren Echtzeitstationen.",
-                "title": "Echtzeit-Wetter- und Niederschlagsstationen"
+                "title": "Echtzeit-Wetter- und Niederschlagsstationen",
+                "data_description": {
+                    "pollen_station": "Pollenmessungen der nächsten der 15 Pollenstationen von MeteoSchweiz, als ein Sensor pro Pollenart. Die erste Option wählen, um keine zu verwenden."
+                }
             }
         }
     },
@@ -137,6 +141,45 @@
             },
             "min_temperature_tonight": {
                 "name": "Tiefsttemperatur heute Nacht"
+            },
+            "pollen_alder": {
+                "name": "Erle"
+            },
+            "pollen_ash": {
+                "name": "Esche"
+            },
+            "pollen_beech": {
+                "name": "Buche"
+            },
+            "pollen_birch": {
+                "name": "Birke"
+            },
+            "pollen_grasses": {
+                "name": "Gräser"
+            },
+            "pollen_hazel": {
+                "name": "Hasel"
+            },
+            "pollen_oak": {
+                "name": "Eiche"
+            },
+            "weather_warning": {
+                "name": "Wetterwarnung",
+                "state": {
+                    "none": "Keine",
+                    "yellow": "Gelb",
+                    "orange": "Orange",
+                    "red": "Rot"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Wetterwarnung nächste 24 Stunden",
+                "state": {
+                    "none": "Keine",
+                    "yellow": "Gelb",
+                    "orange": "Orange",
+                    "red": "Rot"
+                }
             }
         }
     }

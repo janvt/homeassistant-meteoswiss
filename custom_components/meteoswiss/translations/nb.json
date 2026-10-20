@@ -88,10 +88,14 @@
                     "station": "Sanntidsværstasjon",
                     "real_time_name": "Navn på sanntids- og vær-entiteter",
                     "precipitation_station": "Sanntids-nedbørstasjon",
-                    "real_time_precipitation_name": "Navn på sanntids- og nedbørs-entiteter"
+                    "real_time_precipitation_name": "Navn på sanntids- og nedbørs-entiteter",
+                    "pollen_station": "Pollenstasjon"
                 },
                 "description": "Sanntids værstatonen brukes til å lete opp aktuell været ved stasjonen og å gi disse som sensorer. Hvis du velger første alternativ i listen, deaktiverer dette sanntids- og sensorenheter.\\n\\nHvis en værstasjon blir valgt, brukes feltet for navn på sanntids- og sensorenheter til å navngi sanntids- (sensore) enheter. Hvis ingen stasjon blir valgt, ignoreres feltet for navn på sanntids- og sensorenheter.\\n\\n{station_url} viser listen over tillgjengelige sanntids værstationer.",
-                "title": "Sanntidsvær"
+                "title": "Sanntidsvær",
+                "data_description": {
+                    "pollen_station": "Pollenmålinger fra den nærmeste av MeteoSwiss' 15 pollenstasjoner, som én sensor per pollentype. Velg det første alternativet for ingen."
+                }
             }
         }
     },
@@ -137,6 +141,45 @@
             },
             "min_temperature_tonight": {
                 "name": "Laveste temperatur i natt"
+            },
+            "pollen_alder": {
+                "name": "Or"
+            },
+            "pollen_ash": {
+                "name": "Ask"
+            },
+            "pollen_beech": {
+                "name": "Bøk"
+            },
+            "pollen_birch": {
+                "name": "Bjørk"
+            },
+            "pollen_grasses": {
+                "name": "Gress"
+            },
+            "pollen_hazel": {
+                "name": "Hassel"
+            },
+            "pollen_oak": {
+                "name": "Eik"
+            },
+            "weather_warning": {
+                "name": "Farevarsel",
+                "state": {
+                    "none": "Ingen",
+                    "yellow": "Gult",
+                    "orange": "Oransje",
+                    "red": "Rødt"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Farevarsel neste 24 timer",
+                "state": {
+                    "none": "Ingen",
+                    "yellow": "Gult",
+                    "orange": "Oransje",
+                    "red": "Rødt"
+                }
             }
         }
     }

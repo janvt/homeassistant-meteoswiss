@@ -25,6 +25,7 @@ from custom_components.meteoswiss.const import (
     CONF_LON,
     CONF_POINT_ID,
     CONF_POINT_TYPE,
+    CONF_POLLEN_STATION,
     CONF_POSTCODE,
     CONF_PRECIPITATION_NAME,
     CONF_PRECIPITATION_STATION,
@@ -55,6 +56,7 @@ _LOGGER = logging.getLogger(__name__)
 
 NO_STATION = "No real-time weather station"
 NO_PRECIPITATION_STATION = "No real-time precipitation station"
+NO_POLLEN_STATION = "No pollen station"
 # The dropdown cannot be searched, so only the closest places are offered.
 MAX_MOUNTAINS = 100
 
@@ -388,11 +390,12 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         closest = nearest(stations, lat, lon)
         default_station = closest.abbr if closest else ""
         default_station_name = closest.name if closest else ""
-        all_stations = {
-            NO_STATION
-            if station_type == StationType.WEATHER
-            else NO_PRECIPITATION_STATION: ""
-        }
+        none = {
+            StationType.WEATHER: NO_STATION,
+            StationType.PRECIPITATION: NO_PRECIPITATION_STATION,
+            StationType.POLLEN: NO_POLLEN_STATION,
+        }[station_type]
+        all_stations = {none: ""}
         all_stations.update({"%s (%s)" % (s.name, s.abbr): s.abbr for s in stations})
         return default_station, default_station_name, all_stations
 
@@ -412,6 +415,8 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             precipitation_name,
             precipitation_station,
             precipitation_stations,
+            pollen_station,
+            pollen_stations,
         ):
             return vol.Schema(
                 {
@@ -431,6 +436,10 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                         CONF_REAL_TIME_PRECIPITATION_NAME,
                         default=precipitation_name,
                     ): str,
+                    vol.Required(
+                        CONF_POLLEN_STATION,
+                        default=pollen_station,
+                    ): vol.In(list(pollen_stations)),
                 }
             )
 
@@ -454,6 +463,13 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             ogd,
             self._lat,
             self._lon,
+        )
+        (
+            default_pollen_station,
+            default_pollen_station_name,
+            pollen_stations,
+        ) = await self._get_all_stations_and_closest_one(
+            ogd, self._lat, self._lon, StationType.POLLEN
         )
 
         errors: dict[str, str] = {}
@@ -489,6 +505,11 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             else:
                 precipitation_station = None
                 real_time_precipitation_name = None
+            # The form fills in the default (the closest station) if left out.
+            pollen_selection = user_input.get(CONF_POLLEN_STATION, NO_POLLEN_STATION)
+            if pollen_selection not in pollen_stations:
+                errors[CONF_POLLEN_STATION] = "invalid_station_name"
+            pollen_station = pollen_stations.get(pollen_selection) or None
 
             schema = data_schema(
                 user_input[CONF_REAL_TIME_NAME],
@@ -497,6 +518,8 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 user_input[CONF_REAL_TIME_PRECIPITATION_NAME],
                 user_input[CONF_PRECIPITATION_STATION],
                 precipitation_stations,
+                pollen_selection,
+                pollen_stations,
             )
         else:
             if default_weather_station:
@@ -519,6 +542,13 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 )
             else:
                 default_precipitation_station_selection = NO_PRECIPITATION_STATION
+            if default_pollen_station and self._point_type != POINT_TYPE_POI:
+                default_pollen_selection = "%s (%s)" % (
+                    default_pollen_station_name,
+                    default_pollen_station,
+                )
+            else:
+                default_pollen_selection = NO_POLLEN_STATION
             if self._previous is not None:
                 # Keep the stations, as long as they are still listed.
                 default_station_selection = station_selection(
@@ -533,6 +563,11 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 default_precipitation_station_name = self._previously(
                     CONF_REAL_TIME_PRECIPITATION_NAME, ""
                 )
+                default_pollen_selection = station_selection(
+                    pollen_stations,
+                    self._previously(CONF_POLLEN_STATION, None),
+                    NO_POLLEN_STATION,
+                )
             default_weather_station_name = default_weather_station_name or ""
             default_precipitation_station_name = (
                 default_precipitation_station_name or ""
@@ -545,6 +580,8 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 default_precipitation_station_name,
                 default_precipitation_station_selection,
                 precipitation_stations,
+                default_pollen_selection,
+                pollen_stations,
             )
 
         if errors or user_input is None:
@@ -582,6 +619,8 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                     CONF_REAL_TIME_PRECIPITATION_NAME: real_time_precipitation_name,
                 }
             )
+        if pollen_station:
+            data[CONF_POLLEN_STATION] = pollen_station
 
         title = self._forecast_name
         if real_time_weather_name:

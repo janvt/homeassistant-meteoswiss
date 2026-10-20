@@ -132,6 +132,7 @@ async def test_full_flow_with_stations(hass):
         "real_time_name": "Zürich / Fluntern",
         "precipitation_station": "Aarberg (ABE)",
         "real_time_precipitation_name": "Aarberg",
+        "pollen_station": "Zürich (PZH)",
     }
 
     result = await hass.config_entries.flow.async_configure(
@@ -156,6 +157,7 @@ async def test_full_flow_with_stations(hass):
         "real_time_name": "Fluntern",
         "precipitation_station": "ABE",
         "real_time_precipitation_name": "Aarberg",
+        "pollen_station": "PZH",
     }
 
 
@@ -178,6 +180,7 @@ async def test_flow_without_stations(hass):
             "real_time_name": "",
             "precipitation_station": "No real-time precipitation station",
             "real_time_precipitation_name": "",
+            "pollen_station": "No pollen station",
         },
     )
 
@@ -430,7 +433,8 @@ async def test_reconfigure_starts_from_the_current_settings(hass, entry):
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {**defaults(result), "update_interval": 10}
     )
-    assert defaults(result) == STATIONS
+    # The entry has no pollen station, so none is suggested.
+    assert defaults(result) == {**STATIONS, "pollen_station": "No pollen station"}
 
 
 async def test_reconfigure_a_postcode(hass, entry):
@@ -592,3 +596,38 @@ async def test_removing_an_entry_clears_its_notices(hass, entry):
     await hass.config_entries.async_remove(entry.entry_id)
 
     assert not [i for (d, i) in ir.async_get(hass).issues if d == DOMAIN]
+
+
+async def test_the_closest_pollen_station_is_suggested(hass):
+    result = await start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 5},
+    )
+
+    assert defaults(result)["pollen_station"] == "Zürich (PZH)"
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**STATIONS, "pollen_station": "Luzern (PLZ)"}
+    )
+    assert result["data"]["pollen_station"] == "PLZ"
+
+
+async def test_no_pollen_station_is_suggested_for_a_mountain(hass):
+    result = await start(hass, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 5, "hourly_temperature": True},
+    )
+    assert defaults(result)["pollen_station"] == "No pollen station"
+
+
+async def test_reconfigure_keeps_the_pollen_station(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "pollen_station": "PLZ"})
+    entry.add_to_hass(hass)
+
+    result = await reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], defaults(result)
+    )
+
+    assert defaults(result)["pollen_station"] == "Luzern (PLZ)"
