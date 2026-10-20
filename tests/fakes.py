@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import hashlib
 import re
 from unittest.mock import MagicMock
 
@@ -67,15 +68,23 @@ class FakeSession:
         self.headers: list[dict[str, str]] = []
 
     def _respond(self, method: str, url: str, headers) -> FakeResponse:
-        byte_range = (headers or {}).get("Range")
+        headers = headers or {}
+        byte_range = headers.get("Range")
         self.requests.append((method, url, byte_range))
-        self.headers.append(dict(headers or {}))
+        self.headers.append(dict(headers))
         body = self.files.get(url)
         if body is None:
             return FakeResponse(403)
         if byte_range is None:
+            # Like S3: the ETag is a hash of the content.
+            etag = f'"{hashlib.md5(body).hexdigest()}"'
+            if headers.get("If-None-Match") == etag:
+                return FakeResponse(304)
             return FakeResponse(
-                200, b"" if method == "HEAD" else body, chunk_size=self.chunk_size
+                200,
+                b"" if method == "HEAD" else body,
+                {"Content-Length": str(len(body)), "ETag": etag},
+                chunk_size=self.chunk_size,
             )
         match = re.fullmatch(r"bytes=(\d+)-(\d+)", byte_range)
         assert match, byte_range
@@ -91,6 +100,9 @@ class FakeSession:
 
     def head(self, url, headers=None, timeout=None) -> FakeResponse:
         return self._respond("HEAD", url, headers)
+
+    def count(self, method: str = "GET", url: str | None = None) -> int:
+        return sum(1 for m, u, _ in self.requests if m == method and url in (None, u))
 
     @property
     def ranged_bytes(self) -> int:

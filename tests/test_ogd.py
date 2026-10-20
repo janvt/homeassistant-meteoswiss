@@ -180,7 +180,7 @@ class TestPointValues:
         client, _ = make_client({url("p"): body})
         assert await client._point_values(url("p"), Point(5, 2, "x", "", 0, 0)) == {}
 
-    async def test_time_major_file_is_downloaded_whole(self):
+    async def test_a_small_time_major_file_is_read_at_once(self):
         body = time_major_csv("p", BIG_POINTS, HOURS[:50], value)
         client, session = make_client({url("p"): body})
         point = Point(BIG_POINTS[3][0], 2, "x", "", 0, 0)
@@ -189,7 +189,9 @@ class TestPointValues:
 
         assert len(result) == 50
         assert result[HOURS[0]] == value(point.point_id, HOURS[0])
-        assert ("GET", url("p"), None) in session.requests
+        # The probe of the order, then the file in the first range read.
+        assert len(session.requests) == 2
+        assert all(r is not None for _, _, r in session.requests)
 
     @pytest.mark.parametrize("chunk_size", [7, 1000, 1 << 16])
     @pytest.mark.parametrize("target", [BIG_POINTS[0], BIG_POINTS[-1]])
@@ -199,18 +201,19 @@ class TestPointValues:
         files = {url("p"): body, url("q"): body.rstrip(b"\n")}
         client, _ = make_client(files)
         client._session.chunk_size = chunk_size
-        point = Point(target[0], target[1], "x", "", 0, 0)
         expected = ogd._rows_with_prefix(body.decode(), f"{target[0]};{target[1]};")
 
-        assert await client._point_values(url("p"), point) == expected
-        assert await client._point_values(url("q"), point) == expected
+        prefix = f"{target[0]};{target[1]};"
+        for file in ("p", "q"):
+            rows = await client._streamed_point_values(url(file), [prefix])
+            assert rows[prefix] == expected
         assert len(expected) == 50
 
     async def test_streaming_does_not_match_inside_a_row(self):
         # Point 1;2 must not match the row of point 11;2 or 21;2.
         body = time_major_csv("p", [(1, 2), (11, 2), (21, 2)] * 1, HOURS[:200], value)
         client, _ = make_client({url("p"): body})
-        result = await client._point_values(url("p"), Point(1, 2, "x", "", 0, 0))
+        result = (await client._streamed_point_values(url("p"), ["1;2;"]))["1;2;"]
         assert set(result.values()) == {value(1, ts) for ts in HOURS[:200]}
 
     async def test_small_file_needs_one_request(self):
@@ -302,8 +305,6 @@ class TestGetForecast:
         rows = await client.get_hourly_rows([point], RUN, "tre200h0")
         forecast = await client.get_forecast(point, RUN, rows[point.key])
 
-        # The whole file was streamed, as it is ordered by time.
-        assert ("GET", url("tre200h0"), None) in session.requests
         assert len(rows[point.key]) == 218
         hours = {h["time"]: h for h in forecast["hourly"]}
         # The earlier hours from the temperature file are kept too.
@@ -324,9 +325,9 @@ class TestGetForecast:
 
         rows = await client.get_hourly_rows(points, RUN, "tre200h0")
 
-        # A single plain download for all three points.
+        # One read for all three points, as the file is small.
         assert [r for r in session.requests if r[1] == url("tre200h0")] == [
-            ("GET", url("tre200h0"), None)
+            ("GET", url("tre200h0"), f"bytes=0-{ogd.BLOCK_HEAD - 1}")
         ]
         assert {k: len(v) for k, v in rows.items()} == {
             (100025, 2): 218,
@@ -575,7 +576,7 @@ class TestFewerRequests:
         assert all(h["Accept-Encoding"] == "identity" for h in ranged)
 
     @pytest.mark.parametrize("target", [BIG_POINTS[0], BIG_POINTS[37], BIG_POINTS[-1]])
-    async def test_the_next_run_needs_one_request(self, target):
+    async def test_the_next_run_needs_its_size_and_one_range(self, target):
         point = Point(*target, "x", "", 0, 0)
         # The next run has other values, some longer, so rows shift a little.
         files = {
@@ -590,9 +591,62 @@ class TestFewerRequests:
 
         rows = await client._point_values(url("p"), point)
 
-        assert len(session.requests) == 1
+        assert [m for m, _, _ in session.requests] == ["HEAD", "GET"]
         prefix = f"{target[0]};{target[1]};"
         assert rows == ogd._rows_with_prefix(files[url("p")].decode(), prefix)
+        # Just the point's rows and a little either side.
+        span = len("".join(f"{prefix}{ts};{v}\n" for ts, v in rows.items()))
+        shift = abs(len(files[url("p")]) - len(files[url("p", "202610201100")]))
+        assert session.ranged_bytes <= span + 2 * (
+            ogd.HINT_MARGIN + ogd.HINT_SCALED_SHARE * shift
+        )
+
+    @pytest.mark.parametrize("target", [BIG_POINTS[0], BIG_POINTS[-1]])
+    async def test_a_file_that_keeps_its_size_needs_one_small_range(self, target):
+        point = Point(*target, "x", "", 0, 0)
+        runs = ["202610201000", "202610201100", RUN]
+        # Values of the same length, as in the cloud cover files.
+        files = {
+            url("p", run): point_major_csv(
+                "p", BIG_POINTS, HOURS, lambda i, ts, n=n: f"{(i + n) % 10}.{ts[-4:]}"
+            )
+            for n, run in enumerate(runs)
+        }
+        client, session = make_client(files)
+        for run in runs[:2]:
+            await client._point_values(url("p", run), point)
+        session.requests.clear()
+
+        rows = await client._point_values(url("p"), point)
+
+        assert len(session.requests) == 1
+        assert len(rows) == 217
+        span = len(
+            "".join(f"{target[0]};{target[1]};{t};{v}\n" for t, v in rows.items())
+        )
+        assert session.ranged_bytes <= span + 2 * ogd.HINT_MARGIN
+
+    async def test_a_file_that_suddenly_grew_is_read_where_scaled(self):
+        point = Point(*BIG_POINTS[60], "x", "", 0, 0)
+        runs = ["202610201000", "202610201100", RUN]
+        # The same size twice, then every value longer: rows move in proportion.
+        files = {
+            url("p", run): point_major_csv(
+                "p", BIG_POINTS, HOURS, lambda i, ts, w=w: f"{i % 10}.{ts[-4:]}" + w
+            )
+            for run, w in zip(runs, ["", "", "xyz"])
+        }
+        client, session = make_client(files)
+        for run in runs[:2]:
+            await client._point_values(url("p", run), point)
+        session.requests.clear()
+
+        rows = await client._point_values(url("p"), point)
+
+        prefix = f"{point.point_id};{point.point_type};"
+        assert rows == ogd._rows_with_prefix(files[url("p")].decode(), prefix)
+        # The window where it was, then where it moved to: no search.
+        assert [m for m, _, _ in session.requests] == ["GET", "GET"]
 
     async def test_a_point_that_moved_is_searched_again(self):
         point = Point(*BIG_POINTS[37], "x", "", 0, 0)
@@ -615,9 +669,9 @@ class TestFewerRequests:
         "shift",
         [
             # The window around the position begins in the middle of the rows,
-            ogd.HINT_BEFORE + 3000,
+            ogd.HINT_MARGIN + 3000,
             # or it ends in the middle of them.
-            -ogd.HINT_AFTER + 2000,
+            -ogd.ROW_SPAN + 2000,
         ],
     )
     async def test_a_window_holding_only_part_of_a_point_is_not_trusted(self, shift):
@@ -631,26 +685,6 @@ class TestFewerRequests:
 
         assert len(rows) == 217
         assert client._offsets[("p", point.key)] == start
-
-    async def test_small_files_ordered_by_time_are_downloaded_once_per_run(self):
-        files = {
-            url("p"): time_major_csv("p", BIG_POINTS, HOURS[:60], value),
-            url("p", "202610201300"): time_major_csv(
-                "p", BIG_POINTS, HOURS[:60], value
-            ),
-        }
-        client, session = make_client(files)
-
-        for target in BIG_POINTS[:5]:
-            rows = await client._point_values(url("p"), Point(*target, "", "", 0, 0))
-            assert len(rows) == 60
-        full = [r for r in session.requests if r[2] is None]
-        assert full == [("GET", url("p"), None)]
-
-        await client._point_values(url("p", "202610201300"), Point(1, 2, "", "", 0, 0))
-        assert [r for r in session.requests if r[2] is None][-1][1] == url(
-            "p", "202610201300"
-        )
 
     async def test_the_latest_run_is_shared_for_a_few_minutes(self):
         client, session = make_client({url("jp2000d0"): b"x"})
@@ -675,6 +709,155 @@ class TestFewerRequests:
         clock[0] += 61
         await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
         assert len(session.requests) == 2
+
+    async def test_station_files_without_a_new_row_are_not_fetched_again(
+        self, monkeypatch
+    ):
+        file = f"{ogd.SMN_URL}/sma/ogd-smn_sma_t_now.csv"
+        body = "station_abbr;reference_timestamp;tre200s0\nSMA;20.10.2026 11:40;5\n"
+        client, session = make_client({file: body.encode()})
+        clock = [1000.0]
+        monkeypatch.setattr(ogd.time, "monotonic", lambda: clock[0])
+        await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+
+        clock[0] += 300
+        now = await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+
+        # Asked whether it changed, and answered that it did not.
+        assert "If-None-Match" in session.headers[1]
+        assert now == {"tre200s0": 5.0}
+
+        session.files[file] = (body + "SMA;20.10.2026 11:50;6\n").encode()
+        clock[0] += 300
+        now = await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+        assert now == {"tre200s0": 6.0}
+
+
+class TestBlocks:
+    """Files ordered by time are read a row per block, near where it is expected."""
+
+    # Enough points that a block is far larger than the margins.
+    POINTS = [(i, 1) for i in range(1, 400)] + [(i * 100, 2) for i in range(1, 400)]
+
+    @staticmethod
+    def temperature(run: int):
+        """Values of varying length, a little different in each run."""
+
+        def value(point_id: int, ts: str) -> str:
+            hour = int(ts[8:10]) + int(ts[6:8]) * 24
+            degrees = ((point_id * 37 + hour * 11 + run * 3) % 400 - 150) / 10
+            return f"{degrees:.1f}"
+
+        return value
+
+    def files(self, runs, stamps=HOURS):
+        return {
+            url("tre200h0", run): time_major_csv(
+                "tre200h0", self.POINTS, stamps, self.temperature(n)
+            )
+            for n, run in enumerate(runs)
+        }
+
+    @pytest.fixture(autouse=True)
+    def small_head(self, monkeypatch):
+        # A head that holds the first block and a little more, as in real files.
+        block = len(self.files([RUN], HOURS[:1])[url("tre200h0")])
+        monkeypatch.setattr(ogd, "BLOCK_HEAD", block + 2000)
+
+    def expected(self, body: bytes, key) -> dict[str, str]:
+        return ogd._rows_with_prefix(body.decode(), f"{key[0]};{key[1]};")
+
+    @pytest.mark.parametrize("target", [POINTS[0], POINTS[200], POINTS[-1]])
+    async def test_the_rows_match_the_whole_file(self, target):
+        files = self.files([RUN])
+        client, session = make_client(files)
+        point = Point(*target, "x", "", 0, 0)
+
+        rows = await client.get_hourly_rows([point], RUN, "tre200h0")
+
+        body = files[url("tre200h0")]
+        assert rows[point.key] == self.expected(body, target)
+        assert len(rows[point.key]) == 217
+        assert all(r is not None for _, _, r in session.requests)
+        # The head, then a window around the row in each block.
+        window = 2 * ogd.BLOCK_MARGIN + ogd.BLOCK_ROW
+        assert session.ranged_bytes < ogd.BLOCK_HEAD + 220 * window
+
+    async def test_the_next_run_needs_a_small_range_per_block(self):
+        runs = ["202610201100", RUN]
+        files = self.files(runs)
+        client, session = make_client(files)
+        point = Point(*self.POINTS[300], "x", "", 0, 0)
+        await client.get_hourly_rows([point], runs[0], "tre200h0")
+        session.requests.clear()
+
+        rows = await client.get_hourly_rows([point], RUN, "tre200h0")
+
+        assert rows[point.key] == self.expected(files[url("tre200h0")], point.key)
+        # No head again, and about one request per block.
+        assert f"bytes=0-{ogd.BLOCK_HEAD - 1}" not in [
+            r for _, _, r in session.requests
+        ]
+        assert len(session.requests) <= 217 + 5
+        assert session.ranged_bytes < 217 * (2 * ogd.BLOCK_MARGIN + ogd.BLOCK_ROW)
+
+    async def test_a_new_day_reads_the_layout_again(self):
+        tomorrow = "202610210000"
+        files = self.files(["202610202300", tomorrow])
+        client, session = make_client(files)
+        point = Point(*self.POINTS[5], "x", "", 0, 0)
+        await client.get_hourly_rows([point], "202610202300", "tre200h0")
+        session.requests.clear()
+
+        rows = await client.get_hourly_rows([point], tomorrow, "tre200h0")
+
+        assert session.requests[0][2] == f"bytes=0-{ogd.BLOCK_HEAD - 1}"
+        assert rows[point.key] == self.expected(
+            files[url("tre200h0", tomorrow)], point.key
+        )
+
+    async def test_several_points_and_one_not_in_the_file(self):
+        files = self.files([RUN])
+        client, _ = make_client(files)
+        points = [Point(*k, "x", "", 0, 0) for k in (self.POINTS[3], self.POINTS[-3])]
+
+        rows = await client.get_hourly_rows(
+            [*points, Point(864, 3, "Bristen", "", 0, 0)], RUN, "tre200h0"
+        )
+
+        body = files[url("tre200h0")]
+        for point in points:
+            assert rows[point.key] == self.expected(body, point.key)
+        assert rows[(864, 3)] == {}
+
+    async def test_a_point_that_cannot_be_followed_is_read_from_the_whole_file(self):
+        files = self.files([RUN])
+        body = files[url("tre200h0")]
+        # A block in the middle lists the points in another order.
+        lines = body.decode().split("\n")
+        per_block = len(self.POINTS)
+        start = 1 + 100 * per_block
+        lines[start : start + per_block] = reversed(lines[start : start + per_block])
+        files[url("tre200h0")] = body = "\n".join(lines).encode()
+        client, session = make_client(files)
+        point = Point(*self.POINTS[10], "x", "", 0, 0)
+
+        rows = await client.get_hourly_rows([point], RUN, "tre200h0")
+
+        assert rows[point.key] == self.expected(body, point.key)
+        assert ("GET", url("tre200h0"), None) in session.requests
+
+    async def test_daily_files_too(self):
+        body = time_major_csv("tre200pn", self.POINTS, DAYS, self.temperature(0))
+        client, session = make_client({url("tre200pn"): body})
+        point = Point(*self.POINTS[123], "x", "", 0, 0)
+
+        rows = await client._point_values(url("tre200pn"), point)
+
+        assert rows == self.expected(body, point.key)
+        assert len(rows) == 9
+        window = 2 * ogd.BLOCK_MARGIN + ogd.BLOCK_ROW
+        assert session.ranged_bytes < ogd.HEAD_BYTES + ogd.BLOCK_HEAD + 9 * window
 
 
 class TestPollen:
@@ -779,3 +962,33 @@ class TestClimate:
         assert [r[1] for r in session.requests][2:] == [self.RECENT]
         await client.get_climate("ALT", now=STATIONS_NOW + 8 * 24 * hour)
         assert [r[1] for r in session.requests][3:] == [self.HISTORY, self.RECENT]
+
+    async def test_unchanged_files_are_not_fetched_again(self, monkeypatch):
+        history = self.HEADER + "ALT;20.10.2001 00:00;15;24.8;7;0;300\n"
+        recent = self.HEADER + "ALT;19.10.2026 00:00;14;19;9;0.7;230\n"
+        files = {self.HISTORY: history.encode(), self.RECENT: recent.encode()}
+        client, session = make_client(files)
+        computed = []
+        compute = ogd.climate.compute
+        monkeypatch.setattr(
+            ogd.climate, "compute", lambda days: computed.append(1) or compute(days)
+        )
+        await client.get_climate("ALT", now=STATIONS_NOW)
+
+        # A week later the history is the same, and today's file too.
+        later = STATIONS_NOW + datetime.timedelta(days=8)
+        normals, days = await client.get_climate("ALT", now=later)
+
+        assert normals.record_high[(10, 20)] == (24.8, 2001)
+        assert len(days) == 1
+        asked = session.headers[2:]
+        assert all("If-None-Match" in h for h in asked) and len(asked) == 2
+        # Nothing new to compute the normals from.
+        assert computed == [1]
+
+        files[self.RECENT] = (recent + "ALT;20.10.2026 00:00;15;20;8;0;100\n").encode()
+        _, days = await client.get_climate(
+            "ALT", now=later + datetime.timedelta(days=1)
+        )
+        assert len(days) == 2
+        assert computed == [1, 1]
