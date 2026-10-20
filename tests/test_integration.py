@@ -5,6 +5,7 @@ import datetime
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -211,6 +212,11 @@ async def test_entry_without_stations_only_has_the_forecast(hass, entry_data):
     assert "No real-time stations" in state.attributes["attribution"]
 
 
+async def test_the_coordinator_belongs_to_the_entry(hass, entry):
+    await setup(hass, entry)
+    assert hass.data[DOMAIN][entry.entry_id].config_entry is entry
+
+
 async def test_unload(hass, entry):
     await setup(hass, entry)
 
@@ -298,3 +304,48 @@ async def test_hourly_temperatures_can_be_turned_off(
     hours = response[weather_id(hass, entry)]["forecast"]
     assert hours[0]["temperature"] is None
     assert hours[0]["precipitation_probability"] is not None
+
+
+def issues(hass):
+    return {
+        issue_id for (domain, issue_id) in ir.async_get(hass).issues if domain == DOMAIN
+    }
+
+
+async def test_a_station_without_data_is_reported_after_an_hour(
+    hass, entry, fake_ogd, frozen_now
+):
+    await setup(hass, entry)
+    fake_ogd.station_error = OGDError("gone")
+
+    await refresh_after(hass, frozen_now, 5)
+    await refresh_after(hass, frozen_now, 50)
+    assert not issues(hass)
+
+    await refresh_after(hass, frozen_now, 15)
+    assert issues(hass) == {
+        "SMA_real_time_name_provides_no_data_meteoswiss",
+        "ABE_real_time_precipitation_name_provides_no_data_meteoswiss",
+    }
+
+    # The issues go away when the stations are back.
+    fake_ogd.station_error = None
+    await refresh_after(hass, frozen_now, 5)
+    assert not issues(hass)
+
+
+async def test_an_unknown_postcode_is_reported_straight_away(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "postcode": 9999})
+    entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert issues(hass) == {"9999_provides_no_forecast_meteoswiss"}
+
+
+async def test_attribution_links_to_meteoswiss(hass, entry):
+    await setup(hass, entry)
+    attribution = hass.states.get(weather_id(hass, entry)).attributes["attribution"]
+    assert "https://www.meteoswiss.admin.ch/" in attribution
+    assert "rudd-o.com" not in attribution

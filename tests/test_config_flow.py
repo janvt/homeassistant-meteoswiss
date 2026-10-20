@@ -239,3 +239,40 @@ async def test_options_turn_hourly_temperatures_off(hass, entry, fake_ogd):
     assert coordinator.hourly_temperature is False
     assert coordinator.data["forecast"]["temperature_run"] is None
     assert fake_ogd.temperature_calls == 1
+
+
+async def test_yaml_import(hass):
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={"source": "import"},
+        data={
+            "name": "Zurich",
+            "postcode": 8005,
+            "station": "SMA",
+            "precipitation_station": "ABE",
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["title"] == "Zurich"
+    assert result["data"] == {
+        "postcode": 8005,
+        "update_interval": 5,
+        "forecast_name": "Zurich",
+        "station": "SMA",
+        "real_time_name": "Zurich",
+        "precipitation_station": "ABE",
+        "real_time_precipitation_name": "Zurich",
+    }
+
+
+async def test_yaml_is_imported_only_once(hass):
+    config = {"name": "Zurich", "postcode": 8005}
+    for _ in range(2):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": "import"}, data=config
+        )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert len(hass.config_entries.async_entries(DOMAIN)) == 1

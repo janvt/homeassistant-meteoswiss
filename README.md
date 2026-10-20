@@ -212,6 +212,11 @@ logger:
 
 ## Upgrade notes / known issues
 
+* Version 2 uses MeteoSwiss open data.  A few stations from older versions no
+  longer publish there (MRP and VSOXE): their sensors become unavailable, and
+  after an hour Home Assistant shows a repair notice.  Remove and re-add the
+  integration to pick another station.
+
 * It used to be mandatory to select a real-time weather station during setup.
   This step (the last setup step) is now optional — you can select no weather
   station if you so desire (tracked in

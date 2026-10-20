@@ -10,10 +10,10 @@ import aiohttp
 
 from custom_components.meteoswiss.ogd import (
     LocalForecast,
-    OGDError,
     Point,
     Station,
     StationType,
+    UnknownPostcodeError,
     distance_km,
 )
 
@@ -211,7 +211,7 @@ class FakeOGD:
     async def resolve_point(self, postcode, point_id=None):
         points = await self.get_postcode_points(postcode)
         if not points:
-            raise OGDError(f"No forecast point for postal code {postcode}")
+            raise UnknownPostcodeError(f"No forecast point for postal code {postcode}")
         return points[0]
 
     async def get_stations(self, station_type):

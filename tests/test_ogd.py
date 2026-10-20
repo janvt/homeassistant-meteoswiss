@@ -337,6 +337,10 @@ class TestMetadata:
         assert [(s.abbr, s.name) for s in precipitation] == [("ABE", "Aarberg")]
 
 
+# Stations publish 20-40 minutes late, so 11:40 is the newest row at 12:05.
+STATIONS_NOW = datetime.datetime(2026, 10, 20, 12, 5, tzinfo=UTC)
+
+
 class TestStationNow:
     HEADER = "station_abbr;reference_timestamp;tre200s0;ure200s0;rre150z0\n"
     FILE = f"{ogd.SMN_URL}/sma/ogd-smn_sma_t_now.csv"
@@ -349,30 +353,89 @@ class TestStationNow:
             + "SMA;20.10.2026 11:40;;80;\n"
         )
         client, _ = make_client({self.FILE: body.encode("cp1252")})
-        assert await client.get_station_now("SMA", StationType.WEATHER) == {
+        assert await client.get_station_now(
+            "SMA", StationType.WEATHER, now=STATIONS_NOW
+        ) == {
             "tre200s0": 10.0,
             "ure200s0": 80.0,
             "rre150z0": 0.2,
         }
 
     async def test_old_rows_are_not_used(self):
-        body = self.HEADER + "SMA;t;1.0;50;0\n" + "SMA;t;;;\n" * 3
+        body = (
+            self.HEADER
+            + "SMA;20.10.2026 11:10;1.0;50;0\n"
+            + "SMA;20.10.2026 11:20;;;\n" * 3
+        )
         client, _ = make_client({self.FILE: body.encode("cp1252")})
-        result = await client.get_station_now("SMA", StationType.WEATHER)
+        result = await client.get_station_now(
+            "SMA", StationType.WEATHER, now=STATIONS_NOW
+        )
         assert result["tre200s0"] is None
+
+    @pytest.mark.parametrize(
+        ("measured", "fresh"),
+        [("20.10.2026 10:40", True), ("20.10.2026 10:30", False)],
+    )
+    async def test_measurements_older_than_90_minutes_are_ignored(
+        self, measured, fresh
+    ):
+        body = self.HEADER + f"SMA;{measured};10.0;75;0.2\n"
+        client, _ = make_client({self.FILE: body.encode()})
+        result = await client.get_station_now(
+            "SMA", StationType.WEATHER, now=STATIONS_NOW
+        )
+        assert result == (
+            {"tre200s0": 10.0, "ure200s0": 75.0, "rre150z0": 0.2} if fresh else {}
+        )
+
+    async def test_rows_without_a_time_are_ignored(self):
+        body = self.HEADER + "SMA;soon;10.0;75;0.2\n"
+        client, _ = make_client({self.FILE: body.encode()})
+        assert (
+            await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+            == {}
+        )
 
     async def test_no_rows_yet(self):
         client, _ = make_client({self.FILE: self.HEADER.encode()})
-        assert await client.get_station_now("SMA", StationType.WEATHER) == {}
+        assert (
+            await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+            == {}
+        )
 
     async def test_precipitation_station_url(self):
         file = f"{ogd.SMN_PRECIP_URL}/abe/ogd-smn-precip_abe_t_now.csv"
         body = "station_abbr;reference_timestamp;rre150z0\nABE;20.10.2026 11:40;0.4\n"
         client, _ = make_client({file: body.encode()})
-        result = await client.get_station_now("ABE", StationType.PRECIPITATION)
+        result = await client.get_station_now(
+            "ABE", StationType.PRECIPITATION, now=STATIONS_NOW
+        )
         assert result == {"rre150z0": 0.4}
 
     async def test_unknown_station(self):
         client, _ = make_client({})
         with pytest.raises(OGDError):
-            await client.get_station_now("XXX", StationType.WEATHER)
+            await client.get_station_now("XXX", StationType.WEATHER, now=STATIONS_NOW)
+
+
+async def test_precipitation_station_in_the_weather_network():
+    weather_file = f"{ogd.SMN_URL}/bia/ogd-smn_bia_t_now.csv"
+    body = (
+        "station_abbr;reference_timestamp;tre200s0;rre150z0\n"
+        "BIA;20.10.2026 11:40;5.0;0.3\n"
+    )
+    client, session = make_client({weather_file: body.encode()})
+
+    result = await client.get_station_now(
+        "BIA", StationType.PRECIPITATION, now=STATIONS_NOW
+    )
+
+    assert result["rre150z0"] == 0.3
+    assert session.requests[0][1].endswith("ogd-smn-precip_bia_t_now.csv")
+
+
+async def test_missing_precipitation_station_reports_its_own_file():
+    client, _ = make_client({})
+    with pytest.raises(OGDError, match="ogd-smn-precip_xyz"):
+        await client.get_station_now("XYZ", StationType.PRECIPITATION, now=STATIONS_NOW)

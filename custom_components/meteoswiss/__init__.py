@@ -39,6 +39,7 @@ from custom_components.meteoswiss.ogd import (
     OGDError,
     Point,
     StationType,
+    UnknownPostcodeError,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,6 +108,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     coordinator = MeteoSwissDataUpdateCoordinator(
         hass,
+        entry,
         interval,
         entry.data[CONF_POSTCODE],
         point_id=entry.data.get(CONF_POINT_ID),
@@ -180,6 +182,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
     def __init__(
         self,
         hass: HomeAssistant,
+        config_entry: ConfigEntry,
         update_interval: datetime.timedelta,
         postcode: int,
         point_id: int | None,
@@ -244,6 +247,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=config_entry,
             name=DOMAIN,
             update_interval=update_interval,
         )
@@ -301,6 +305,21 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         except OGDError as exc:
             _LOGGER.warning("Cannot update the hourly temperatures: %s", exc)
 
+    def _async_create_postcode_issue(self) -> None:
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            f"{self.postcode}_provides_no_forecast_{DOMAIN}",
+            is_fixable=False,
+            is_persistent=False,
+            severity=IssueSeverity.ERROR,
+            translation_key="postcode_no_data",
+            translation_placeholders={
+                "postcode": str(self.postcode),
+            },
+        )
+        self.error_raised[CONF_POSTCODE] = True
+
     async def _async_update_data(self) -> MeteoSwissClientResult:
         """Update data from MeteoSwiss open data."""
         condition_by_station: dict[str, dict[str, float | None]] = {}
@@ -320,6 +339,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                         _LOGGER.warning("Station %s: %s", station, exc)
                         condition_by_station[station] = {}
                 forecast = await self._async_get_forecast()
+        except UnknownPostcodeError as exc:
+            # This will not fix itself, so tell the user straight away.
+            self._async_create_postcode_issue()
+            raise UpdateFailed(exc) from exc
         except Exception as exc:
             _LOGGER.exception("Failed getting data")
             raise UpdateFailed(exc) from exc
@@ -355,7 +378,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                     last_error: float = time.time() - cast(
                         float, self.first_error[name]
                     )
-                    if not self.error_raised and last_error > m:
+                    if not self.error_raised[name] and last_error > m:
                         ir.async_create_issue(
                             self.hass,
                             DOMAIN,
@@ -392,20 +415,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             last_error: float = time.time() - cast(
                 float, self.first_error[CONF_POSTCODE]
             )
-            if not self.error_raised and last_error > m:
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    f"{self.postcode}_provides_no_forecast_{DOMAIN}",
-                    is_fixable=False,
-                    is_persistent=False,
-                    severity=IssueSeverity.ERROR,
-                    translation_key="postcode_no_data",
-                    translation_placeholders={
-                        "postcode": str(self.postcode),
-                    },
-                )
-                self.error_raised[CONF_POSTCODE] = True
+            if not self.error_raised[CONF_POSTCODE] and last_error > m:
+                self._async_create_postcode_issue()
         else:
             if self.error_raised[CONF_POSTCODE]:
                 ir.async_delete_issue(

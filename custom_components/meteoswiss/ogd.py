@@ -48,6 +48,9 @@ ROW_SPAN = 16384
 
 # Station files have a row every 10 minutes.
 STATION_ROWS_LOOKBACK = 3
+# Rows appear 20-40 minutes late; anything much older means the station has
+# stopped reporting.
+STATION_MAX_AGE = datetime.timedelta(minutes=90)
 
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)
 # Streaming a whole file may take a while on a slow connection.
@@ -77,6 +80,10 @@ HOURLY_TEMPERATURE = "tre200h0"
 
 class OGDError(Exception):
     """Data could not be obtained from MeteoSwiss."""
+
+
+class UnknownPostcodeError(OGDError):
+    """MeteoSwiss has no forecast for a postal code."""
 
 
 class StationType(str, Enum):
@@ -201,6 +208,16 @@ def _rows_with_needle(rows: list[bytes], data: bytes, needle: bytes) -> None:
         start = data.find(needle, end)
 
 
+def _station_time(timestamp: str | None) -> datetime.datetime | None:
+    """The time of a station row, e.g. 20.10.2026 11:40 (UTC)."""
+    try:
+        return datetime.datetime.strptime(timestamp or "", "%d.%m.%Y %H:%M").replace(
+            tzinfo=datetime.timezone.utc
+        )
+    except ValueError:
+        return None
+
+
 def _utc(timestamp: str) -> datetime.datetime:
     return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M").replace(
         tzinfo=datetime.timezone.utc
@@ -285,7 +302,7 @@ class MeteoSwissOGD:
         if point_id is not None:
             points = [p for p in points if p.point_id == point_id] or points
         if not points:
-            raise OGDError(f"No forecast point for postal code {postcode}")
+            raise UnknownPostcodeError(f"No forecast point for postal code {postcode}")
         return min(points, key=lambda p: p.point_id)
 
     async def get_stations(self, station_type: StationType) -> list[Station]:
@@ -314,18 +331,38 @@ class MeteoSwissOGD:
     # Measurements
 
     async def get_station_now(
-        self, abbr: str, station_type: StationType
+        self,
+        abbr: str,
+        station_type: StationType,
+        now: datetime.datetime | None = None,
     ) -> dict[str, float | None]:
-        """The latest measurements of a station, empty if it has none today."""
+        """The latest measurements of a station, empty if it has none recently."""
         low = abbr.lower()
+        weather_url = f"{SMN_URL}/{low}/ogd-smn_{low}_t_now.csv"
         if station_type == StationType.WEATHER:
-            url = f"{SMN_URL}/{low}/ogd-smn_{low}_t_now.csv"
+            body, _ = await self._get(weather_url)
         else:
-            url = f"{SMN_PRECIP_URL}/{low}/ogd-smn-precip_{low}_t_now.csv"
-        body, _ = await self._get(url)
+            try:
+                body, _ = await self._get(
+                    f"{SMN_PRECIP_URL}/{low}/ogd-smn-precip_{low}_t_now.csv"
+                )
+            except OGDError as exc:
+                # Some stations (such as BIA) moved from the precipitation
+                # network to the weather network, which also measures rain.
+                try:
+                    body, _ = await self._get(weather_url)
+                except OGDError:
+                    raise exc from None
         rows = list(
             csv.DictReader(io.StringIO(body.decode("windows-1252")), delimiter=";")
         )
+        now = now or datetime.datetime.now(datetime.timezone.utc)
+        rows = [
+            row
+            for row in rows
+            if (measured := _station_time(row.get("reference_timestamp")))
+            and now - measured <= STATION_MAX_AGE
+        ]
         # The newest row is often incomplete, so every parameter comes from the
         # most recent of the last few rows that has a value for it.
         latest: dict[str, float | None] = {}

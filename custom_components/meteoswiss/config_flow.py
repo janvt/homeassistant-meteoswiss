@@ -463,12 +463,19 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             data[CONF_REAL_TIME_NAME] = import_config[CONF_NAME]
         if import_config.get(CONF_PRECIPITATION_STATION):
             data[CONF_PRECIPITATION_STATION] = import_config[CONF_PRECIPITATION_STATION]
-            data[CONF_REAL_TIME_PRECIPITATION_NAME] = import_config[
-                CONF_PRECIPITATION_NAME
-            ]
+            data[CONF_REAL_TIME_PRECIPITATION_NAME] = import_config.get(
+                CONF_PRECIPITATION_NAME, import_config[CONF_NAME]
+            )
 
+        # The YAML stays until removed, so it is imported on every start.
+        self._async_abort_entries_match(
+            {
+                CONF_POSTCODE: data[CONF_POSTCODE],
+                CONF_FORECAST_NAME: data[CONF_FORECAST_NAME],
+            }
+        )
         return self.async_create_entry(
-            title=data[CONF_NAME],
+            title=data[CONF_FORECAST_NAME],
             data=data,
         )
 

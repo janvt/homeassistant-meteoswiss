@@ -36,7 +36,11 @@ DEFAULT_HOURLY_TEMPERATURE = True
 
 USER_AGENT = "MeteoSwiss Home Assistant integration"
 
-STATION_URL = "https://rudd-o.com/meteostations"
+# Map and list of the stations with their current measurements.
+STATION_URL = (
+    "https://www.meteoswiss.admin.ch/services-and-publications/applications/"
+    "measurement-values.html"
+)
 
 
 class Condition(StrEnum):
