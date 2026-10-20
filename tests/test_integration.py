@@ -496,3 +496,10 @@ async def test_each_entry_has_its_own_device(hass, entry):
     assert [(d.name, d.model) for d in device] == [("Bristen", "Mountain forecast")]
     # Zurich has two stations too.
     assert len(dr.async_get(hass).devices) == 4
+
+
+async def test_entries_share_one_client(hass, entry, fake_ogd):
+    await setup(hass, entry)
+    await add_mountain(hass)
+
+    assert len(fake_ogd.instances) == 1

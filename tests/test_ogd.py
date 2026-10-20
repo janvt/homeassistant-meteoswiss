@@ -558,3 +558,120 @@ async def test_missing_precipitation_station_reports_its_own_file():
     client, _ = make_client({})
     with pytest.raises(OGDError, match="ogd-smn-precip_xyz"):
         await client.get_station_now("XYZ", StationType.PRECIPITATION, now=STATIONS_NOW)
+
+
+class TestFewerRequests:
+    """Lookups reuse what they learnt, as each run's files are laid out alike."""
+
+    async def test_range_requests_ask_for_uncompressed_data(self):
+        body = point_major_csv("p", BIG_POINTS, HOURS, value)
+        client, session = make_client({url("p"): body})
+
+        await client._point_values(url("p"), Point(*BIG_POINTS[5], "x", "", 0, 0))
+
+        # Otherwise the server sends small files whole, compressed.
+        ranged = [h for h in session.headers if "Range" in h]
+        assert ranged
+        assert all(h["Accept-Encoding"] == "identity" for h in ranged)
+
+    @pytest.mark.parametrize("target", [BIG_POINTS[0], BIG_POINTS[37], BIG_POINTS[-1]])
+    async def test_the_next_run_needs_one_request(self, target):
+        point = Point(*target, "x", "", 0, 0)
+        # The next run has other values, some longer, so rows shift a little.
+        files = {
+            url("p", "202610201100"): point_major_csv("p", BIG_POINTS, HOURS, value),
+            url("p"): point_major_csv(
+                "p", BIG_POINTS, HOURS, lambda i, ts: f"{i}.{ts[-4:]}x{i % 3}"
+            ),
+        }
+        client, session = make_client(files)
+        await client._point_values(url("p", "202610201100"), point)
+        session.requests.clear()
+
+        rows = await client._point_values(url("p"), point)
+
+        assert len(session.requests) == 1
+        prefix = f"{target[0]};{target[1]};"
+        assert rows == ogd._rows_with_prefix(files[url("p")].decode(), prefix)
+
+    async def test_a_point_that_moved_is_searched_again(self):
+        point = Point(*BIG_POINTS[37], "x", "", 0, 0)
+        # Many more points before it in the next run.
+        more = BIG_POINTS + [(i * 7 + 3, 2) for i in range(40)]
+        files = {
+            url("p", "202610201100"): point_major_csv("p", BIG_POINTS, HOURS, value),
+            url("p"): point_major_csv("p", more, HOURS, value),
+        }
+        client, session = make_client(files)
+        await client._point_values(url("p", "202610201100"), point)
+        session.requests.clear()
+
+        rows = await client._point_values(url("p"), point)
+
+        assert len(session.requests) > 1  # the remembered position did not fit
+        assert len(rows) == 217
+
+    @pytest.mark.parametrize(
+        "shift",
+        [
+            # The window around the position begins in the middle of the rows,
+            ogd.HINT_BEFORE + 3000,
+            # or it ends in the middle of them.
+            -ogd.HINT_AFTER + 2000,
+        ],
+    )
+    async def test_a_window_holding_only_part_of_a_point_is_not_trusted(self, shift):
+        point = Point(*BIG_POINTS[37], "x", "", 0, 0)
+        body = point_major_csv("p", BIG_POINTS, HOURS, value)
+        client, _ = make_client({url("p"): body})
+        start = body.index(b"\n%d;%d;" % point.key) + 1
+        client._offsets[("p", point.key)] = start + shift
+
+        rows = await client._point_values(url("p"), point)
+
+        assert len(rows) == 217
+        assert client._offsets[("p", point.key)] == start
+
+    async def test_small_files_ordered_by_time_are_downloaded_once_per_run(self):
+        files = {
+            url("p"): time_major_csv("p", BIG_POINTS, HOURS[:60], value),
+            url("p", "202610201300"): time_major_csv(
+                "p", BIG_POINTS, HOURS[:60], value
+            ),
+        }
+        client, session = make_client(files)
+
+        for target in BIG_POINTS[:5]:
+            rows = await client._point_values(url("p"), Point(*target, "", "", 0, 0))
+            assert len(rows) == 60
+        full = [r for r in session.requests if r[2] is None]
+        assert full == [("GET", url("p"), None)]
+
+        await client._point_values(url("p", "202610201300"), Point(1, 2, "", "", 0, 0))
+        assert [r for r in session.requests if r[2] is None][-1][1] == url(
+            "p", "202610201300"
+        )
+
+    async def test_the_latest_run_is_shared_for_a_few_minutes(self):
+        client, session = make_client({url("jp2000d0"): b"x"})
+        now = datetime.datetime(2026, 10, 20, 12, 40, tzinfo=UTC)
+
+        assert await client.latest_run(now) == RUN
+        assert await client.latest_run(now + datetime.timedelta(minutes=4)) == RUN
+        assert len(session.requests) == 1
+        await client.latest_run(now + datetime.timedelta(minutes=6))
+        assert len(session.requests) == 2
+
+    async def test_station_files_are_shared_for_a_minute(self, monkeypatch):
+        file = f"{ogd.SMN_URL}/sma/ogd-smn_sma_t_now.csv"
+        body = "station_abbr;reference_timestamp;tre200s0\nSMA;20.10.2026 11:40;5\n"
+        client, session = make_client({file: body.encode()})
+        clock = [1000.0]
+        monkeypatch.setattr(ogd.time, "monotonic", lambda: clock[0])
+
+        for _ in range(3):
+            await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+        assert len(session.requests) == 1
+        clock[0] += 61
+        await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+        assert len(session.requests) == 2

@@ -33,10 +33,6 @@ class SharedDownloads:
     def unregister(self, owner: str) -> None:
         self._wanted.pop(owner, None)
 
-    @property
-    def unused(self) -> bool:
-        return not self._wanted
-
     async def get(
         self, point: Point, parameter: str, run: str, now: datetime.datetime
     ) -> dict[str, str] | None:

@@ -64,6 +64,7 @@ FORECAST_CHECK_INTERVAL = datetime.timedelta(minutes=15)
 # Leaves time for the large downloads (see downloads.py) on a slow connection.
 UPDATE_TIMEOUT = 300
 # Shared by all entries.
+DATA_CLIENT = f"{DOMAIN}_client"
 DATA_DOWNLOADS = f"{DOMAIN}_downloads"
 
 
@@ -118,10 +119,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         * 60
     )
-    if DATA_DOWNLOADS not in hass.data:
-        hass.data[DATA_DOWNLOADS] = SharedDownloads(
-            MeteoSwissOGD(async_get_clientsession(hass), USER_AGENT)
+    if DATA_CLIENT not in hass.data:
+        # One client for all entries, so that they share what they download.
+        hass.data[DATA_CLIENT] = MeteoSwissOGD(
+            async_get_clientsession(hass), USER_AGENT
         )
+        hass.data[DATA_DOWNLOADS] = SharedDownloads(hass.data[DATA_CLIENT])
     coordinator = MeteoSwissDataUpdateCoordinator(
         hass,
         entry,
@@ -129,6 +132,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data.get(CONF_POSTCODE),
         point_id=entry.data.get(CONF_POINT_ID),
         point_type=entry.data.get(CONF_POINT_TYPE, POINT_TYPE_POSTCODE),
+        client=hass.data[DATA_CLIENT],
         downloads=hass.data[DATA_DOWNLOADS],
         # Set up with the entry, then changeable in the options.
         hourly_temperature=entry.options.get(
@@ -178,8 +182,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id)
         downloads: SharedDownloads = hass.data[DATA_DOWNLOADS]
         downloads.unregister(entry.entry_id)
-        if downloads.unused:
+        if not hass.data[DOMAIN]:
             hass.data.pop(DATA_DOWNLOADS)
+            hass.data.pop(DATA_CLIENT)
 
     return unload_ok
 
@@ -215,6 +220,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         postcode: int | None,
         point_id: int | None,
         point_type: int,
+        client: MeteoSwissOGD,
         downloads: SharedDownloads,
         hourly_temperature: bool,
         forecast_name: str,
@@ -269,7 +275,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 update_interval,
             )
 
-        self.client = MeteoSwissOGD(async_get_clientsession(hass), USER_AGENT)
+        self.client = client
         self._point: Point | None = None
         self._forecast: LocalForecast | None = None
         self._forecast_checked: datetime.datetime | None = None

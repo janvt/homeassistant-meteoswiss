@@ -62,10 +62,12 @@ class FakeSession:
         self.files = files
         self.chunk_size = chunk_size
         self.requests: list[tuple[str, str, str | None]] = []
+        self.headers: list[dict[str, str]] = []
 
     def _respond(self, method: str, url: str, headers) -> FakeResponse:
         byte_range = (headers or {}).get("Range")
         self.requests.append((method, url, byte_range))
+        self.headers.append(dict(headers or {}))
         body = self.files.get(url)
         if body is None:
             return FakeResponse(403)

@@ -14,6 +14,7 @@ import datetime
 import io
 import logging
 import math
+import time
 import zoneinfo
 from dataclasses import dataclass
 from enum import Enum
@@ -47,6 +48,16 @@ PROBE_BYTES = 512
 SEARCH_WINDOW = 4096
 # The rows of one point (9 days, hourly) fit comfortably in this many bytes.
 ROW_SPAN = 16384
+# A point is first looked for where it was in the previous run's file, which
+# is laid out almost the same: this far before and after that position.
+HINT_BEFORE = 4096
+HINT_AFTER = 16384
+# Files ordered by time up to this size are downloaded whole, compressed, once
+# for all entries; larger ones are streamed (see get_hourly_rows).
+SMALL_FILE = 8 * 1024 * 1024
+# Station measurements and the latest run are shared by entries this long.
+STATION_CACHE_SECONDS = 60
+RUN_CACHE = datetime.timedelta(minutes=5)
 
 # Station files have a row every 10 minutes.
 STATION_ROWS_LOOKBACK = 3
@@ -288,6 +299,11 @@ def current_hour(
     return current
 
 
+def _parameter(url: str) -> str:
+    """The parameter of a forecast file, e.g. jww003i0."""
+    return url.rsplit(".", 2)[-2]
+
+
 def _utc(timestamp: str) -> datetime.datetime:
     return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M").replace(
         tzinfo=datetime.timezone.utc
@@ -304,6 +320,16 @@ class MeteoSwissOGD:
         self._stations: dict[StationType, list[Station]] = {}
         # The index in POINT_ORDERS that worked last, by parameter.
         self._orders: dict[str, int] = {}
+        # Parameters whose files are ordered by time rather than by point.
+        self._by_time: set[str] = set()
+        # Where each point's rows started in the last file, by (parameter, point).
+        self._offsets: dict[tuple[str, tuple[int, int]], int] = {}
+        # The last small file ordered by time, by parameter: its URL and text.
+        self._small_files: dict[str, tuple[str, str]] = {}
+        self._small_file_lock = asyncio.Lock()
+        # Recently fetched station files: URL to (monotonic time, body).
+        self._station_files: dict[str, tuple[float, bytes]] = {}
+        self._latest_run: tuple[datetime.datetime, str] | None = None
 
     async def _get(
         self, url: str, byte_range: tuple[int, int] | None = None
@@ -312,6 +338,9 @@ class MeteoSwissOGD:
         headers = dict(self._headers)
         if byte_range:
             headers["Range"] = f"bytes={byte_range[0]}-{byte_range[1]}"
+            # The server ignores ranges of files it would compress and sends
+            # them whole instead.
+            headers["Accept-Encoding"] = "identity"
         try:
             async with self._session.get(
                 url, headers=headers, timeout=REQUEST_TIMEOUT
@@ -430,17 +459,17 @@ class MeteoSwissOGD:
         low = abbr.lower()
         weather_url = f"{SMN_URL}/{low}/ogd-smn_{low}_t_now.csv"
         if station_type == StationType.WEATHER:
-            body, _ = await self._get(weather_url)
+            body = await self._get_station_file(weather_url)
         else:
             try:
-                body, _ = await self._get(
+                body = await self._get_station_file(
                     f"{SMN_PRECIP_URL}/{low}/ogd-smn-precip_{low}_t_now.csv"
                 )
             except OGDError as exc:
                 # Some stations (such as BIA) moved from the precipitation
                 # network to the weather network, which also measures rain.
                 try:
-                    body, _ = await self._get(weather_url)
+                    body = await self._get_station_file(weather_url)
                 except OGDError:
                     raise exc from None
         rows = list(
@@ -464,6 +493,15 @@ class MeteoSwissOGD:
                     latest[key] = _number(value)
         return latest
 
+    async def _get_station_file(self, url: str) -> bytes:
+        """A station file, shared by entries that use the same station."""
+        cached = self._station_files.get(url)
+        if cached and time.monotonic() - cached[0] < STATION_CACHE_SECONDS:
+            return cached[1]
+        body, _ = await self._get(url)
+        self._station_files[url] = (time.monotonic(), body)
+        return body
+
     # Forecasts
 
     @staticmethod
@@ -473,6 +511,14 @@ class MeteoSwissOGD:
     async def latest_run(self, now: datetime.datetime | None = None) -> str:
         """The most recent published model run, e.g. 202610201100."""
         now = now or datetime.datetime.now(datetime.timezone.utc)
+        # abs(): the clock may have been set back.
+        if self._latest_run and abs(now - self._latest_run[0]) < RUN_CACHE:
+            return self._latest_run[1]
+        run = await self._find_latest_run(now)
+        self._latest_run = (now, run)
+        return run
+
+    async def _find_latest_run(self, now: datetime.datetime) -> str:
         for back in range(MAX_RUN_LOOKBACK_HOURS):
             run = (now - datetime.timedelta(hours=back)).strftime("%Y%m%d%H00")
             url = self._run_url(run, DAILY_PARAMETERS["symbol"])
@@ -492,14 +538,76 @@ class MeteoSwissOGD:
     async def _point_values(self, url: str, point: Point) -> dict[str, str]:
         """Timestamp to value of one point in a forecast file."""
         prefix = f"{point.point_id};{point.point_type};"
+        parameter = _parameter(url)
+        if parameter in self._by_time:
+            return await self._time_ordered_point_values(url, prefix, None)
+        if (hint := self._offsets.get((parameter, point.key))) is not None:
+            rows = await self._hinted_point_values(url, point, prefix, hint)
+            if rows:
+                return rows
         head, total = await self._get(url, (0, HEAD_BYTES - 1))
         if total > len(head):
             lines = head.decode("latin-1").splitlines()[1:3]
             keys = [_key(line) for line in lines]
             if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
                 return await self._ordered_point_values(url, total, point, prefix)
-            return (await self._streamed_point_values(url, [prefix]))[prefix]
+            self._by_time.add(parameter)
+            return await self._time_ordered_point_values(url, prefix, total)
         return _rows_with_prefix(head.decode("latin-1"), prefix)
+
+    async def _time_ordered_point_values(
+        self, url: str, prefix: str, total: int | None
+    ) -> dict[str, str]:
+        """The rows of a point in a file ordered by time.
+
+        Small files are downloaded whole (compressed) once for all entries;
+        large ones are streamed.
+        """
+        parameter = _parameter(url)
+        if total is not None and total > SMALL_FILE:
+            self._by_time.discard(parameter)
+            return (await self._streamed_point_values(url, [prefix]))[prefix]
+        async with self._small_file_lock:
+            cached = self._small_files.get(parameter)
+            if cached is None or cached[0] != url:
+                body, _ = await self._get(url)
+                cached = (url, body.decode("latin-1"))
+                self._small_files[parameter] = cached
+        return _rows_with_prefix(cached[1], prefix)
+
+    async def _hinted_point_values(
+        self, url: str, point: Point, prefix: str, offset: int
+    ) -> dict[str, str]:
+        """The rows of a point near where they were before, if all are there."""
+        start = max(0, offset - HINT_BEFORE)
+        end = offset + HINT_AFTER
+        try:
+            chunk, total = await self._get(url, (start, end - 1))
+        except OGDError:
+            return {}
+        lines = chunk.split(b"\n")
+        if start > 0:
+            lines = lines[1:]  # starts mid-line
+        if start + len(chunk) < total:
+            lines = lines[:-1]  # ends mid-line
+        keys = [_key(line) for line in lines]
+        found = [i for i, key in enumerate(keys) if key == point.key]
+        # Only if the rows before and after the point's are in the window too.
+        if (
+            not found
+            or found[0] == 0
+            or (found[-1] == len(keys) - 1 and start + len(chunk) < total)
+        ):
+            return {}
+        self._remember_offset(url, point, chunk, start, prefix)
+        return _rows_with_prefix(b"\n".join(lines).decode("latin-1"), prefix)
+
+    def _remember_offset(
+        self, url: str, point: Point, chunk: bytes, start: int, prefix: str
+    ) -> None:
+        position = chunk.find(b"\n" + prefix.encode("latin-1"))
+        if position >= 0:
+            self._offsets[(_parameter(url), point.key)] = start + position + 1
 
     async def _streamed_point_values(
         self, url: str, prefixes: list[str]
@@ -536,7 +644,7 @@ class MeteoSwissOGD:
         self, url: str, total: int, point: Point, prefix: str
     ) -> dict[str, str]:
         """Find a point in a file ordered by point, trying the known orders."""
-        parameter = url.rsplit(".", 2)[-2]
+        parameter = _parameter(url)
         last = self._orders.get(parameter, 0)
         for index in (last, *(i for i in range(len(POINT_ORDERS)) if i != last)):
             rows = await self._ranged_point_values(
@@ -567,6 +675,7 @@ class MeteoSwissOGD:
                 hi = mid
         end = min(hi + ROW_SPAN, total)
         chunk, _ = await self._get(url, (lo, end - 1))
+        self._remember_offset(url, point, chunk, lo, prefix)
         lines = chunk.split(b"\n")
         if lo > 0:
             lines = lines[1:]  # starts mid-line
