@@ -4,16 +4,15 @@ from __future__ import annotations
 
 import datetime
 import logging
-import pprint
-from typing import Any, cast
 
-from hamsclientfork.client import CurrentCondition
 from homeassistant.components.weather import (
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
+    ATTR_FORECAST_NATIVE_WIND_SPEED,
     ATTR_FORECAST_TIME,
+    ATTR_FORECAST_WIND_BEARING,
     Forecast,
     WeatherEntity,
     WeatherEntityFeature,
@@ -44,10 +43,9 @@ from custom_components.meteoswiss.const import (
     DOMAIN,
     STATION_URL,
 )
+from custom_components.meteoswiss.ogd import HourlyForecast
 
 _LOGGER = logging.getLogger(__name__)
-
-INVALID_FORECAST_VALUE = 32767
 
 
 async def async_setup_entry(
@@ -61,7 +59,7 @@ async def async_setup_entry(
 
 
 def condition_name_to_first_value(
-    condition: None | list[CurrentCondition], name: str
+    condition: None | list[dict[str, float | None]], name: str
 ) -> float | None:
     if not condition:
         # Real-time weather station provides no data.
@@ -189,73 +187,50 @@ class MeteoSwissWeather(
             self._condition_for_all_stations, "dkl010z0"
         )
 
+    def _current_hour(self) -> HourlyForecast | None:
+        """The forecast of the hour we are in."""
+        if not self._forecastData:
+            return None
+        now = datetime.datetime.now(datetime.timezone.utc)
+        current = None
+        for forecast in self._forecastData["hourly"]:
+            if forecast["time"] > now:
+                break
+            current = forecast
+        return current
+
     @property
     def condition(self) -> str | None:
-        current_weather = self._forecastData["currentWeather"]
-        symbolId = current_weather.get("icon")
-        if symbolId in (None, INVALID_FORECAST_VALUE):
-            replacement = current_weather.get("iconV2")
-            if not self._invalid_legacy_icon_logged:
-                _LOGGER.warning(
-                    "MeteoSwiss returned invalid legacy current-weather icon %r; "
-                    "using iconV2 %r",
-                    symbolId,
-                    replacement,
-                )
-                self._invalid_legacy_icon_logged = True
-            symbolId = replacement
-        else:
-            self._invalid_legacy_icon_logged = False
-        try:
-            cond: str | None = (
-                str(CODE_TO_CONDITION_MAP.get(symbolId, ("", None))[0]) or None
-            )
-            if cond is None:
-                _LOGGER.error(
-                    "MeteoSwiss returned no recognized current-weather icon: %r",
-                    symbolId,
-                )
-                return STATE_UNAVAILABLE
-            _LOGGER.debug(
-                "Current symbol is %s, condition is: %s",
-                symbolId,
-                cond,
-            )
-            return cond
-        except TypeError as exc:
+        current = self._current_hour()
+        symbolId = current["symbol"] if current else None
+        cond = CODE_TO_CONDITION_MAP.get(symbolId, ("", None))[0] if symbolId else ""
+        if not cond:
             _LOGGER.error(
-                "Expected an int, not %r, to decide on the forecast icon: %s",
+                "MeteoSwiss returned no recognized current-weather symbol: %r",
                 symbolId,
-                exc,
             )
-            _LOGGER.error("Forecast data: %r", self._forecastData)
             return STATE_UNAVAILABLE
+        _LOGGER.debug("Current symbol is %s, condition is: %s", symbolId, cond)
+        return str(cond)
 
     def _daily_forecast(self) -> list[Forecast] | None:
         if not self._forecastData:
             return None
         fcdata_out: list[Forecast] = []
-        # Skip the first element - it's the forecast for the current day
-        try:
-            for forecast in self._forecastData["regionForecast"]:
-                data_out: Forecast = {
-                    ATTR_FORECAST_TIME: forecast["dayDate"],
-                    ATTR_FORECAST_NATIVE_TEMP_LOW: forecast["temperatureMin"],
-                    ATTR_FORECAST_NATIVE_TEMP: forecast["temperatureMax"],
-                    ATTR_FORECAST_CONDITION: str(
-                        CODE_TO_CONDITION_MAP.get(forecast["iconDay"], ("", None))[0]
-                    )
-                    or None,
-                    ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
-                }
-                fcdata_out.append(data_out)
-        except Exception as e:
-            _LOGGER.exception(
-                "Error while converting daily forecast: %s\nForecast data: %s",
-                e,
-                pprint.pformat(self._forecastData["regionForecast"]),
-            )
-            raise
+        for forecast in self._forecastData["daily"]:
+            symbol = forecast["symbol"]
+            data_out: Forecast = {
+                ATTR_FORECAST_TIME: forecast["date"],
+                ATTR_FORECAST_NATIVE_TEMP_LOW: forecast["temperature_min"],
+                ATTR_FORECAST_NATIVE_TEMP: forecast["temperature_max"],
+                ATTR_FORECAST_CONDITION: (
+                    str(CODE_TO_CONDITION_MAP.get(symbol, ("", None))[0]) or None
+                    if symbol
+                    else None
+                ),
+                ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
+            }
+            fcdata_out.append(data_out)
         _LOGGER.debug("Daily forecast has %d items", len(fcdata_out))
         return fcdata_out
 
@@ -263,33 +238,24 @@ class MeteoSwissWeather(
         if not self._forecastData:
             return None
         fcdata_out: list[Forecast] = []
-        # Skip the first element - it's the forecast for the current day
         now = datetime.datetime.now(datetime.timezone.utc)
-        forecast_data = self._forecastData["regionHourlyForecast"]
-        biggers = [f["time"] > now for f in forecast_data]
-        try:
-            idx = biggers.index(True)
-        except IndexError:
-            return fcdata_out
-        try:
-            for forecast in forecast_data[idx - 1 :]:
-                data_out: Forecast = {
-                    ATTR_FORECAST_TIME: forecast["time"]
-                    .isoformat("T")
-                    .partition("+")[0]
-                    + "Z",
-                    ATTR_FORECAST_NATIVE_TEMP_LOW: forecast["temperatureMin"],
-                    ATTR_FORECAST_NATIVE_TEMP: forecast["temperatureMax"],
-                    ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitationMax"],
-                }
-                fcdata_out.append(data_out)
-        except Exception as e:
-            _LOGGER.exception(
-                "Error while converting hourly forecast: %s\nForecast data: %s",
-                e,
-                pprint.pformat(self._forecastData["regionHourlyForecast"]),
-            )
-            raise
+        one_hour = datetime.timedelta(hours=1)
+        for forecast in self._forecastData["hourly"]:
+            if forecast["time"] + one_hour <= now:
+                continue
+            symbol = forecast["symbol"]
+            data_out: Forecast = {
+                ATTR_FORECAST_TIME: forecast["time"].isoformat(),
+                ATTR_FORECAST_CONDITION: (
+                    str(CODE_TO_CONDITION_MAP.get(symbol, ("", None))[0]) or None
+                    if symbol
+                    else None
+                ),
+                ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
+                ATTR_FORECAST_NATIVE_WIND_SPEED: forecast["wind_speed"],
+                ATTR_FORECAST_WIND_BEARING: forecast["wind_bearing"],
+            }
+            fcdata_out.append(data_out)
         _LOGGER.debug("Hourly forecast has %d items", len(fcdata_out))
         return fcdata_out
 

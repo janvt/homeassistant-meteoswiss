@@ -1,17 +1,16 @@
 """Lifecycle of MeteoSwiss."""
 
+import asyncio
 import datetime
 import logging
 import time
-from typing import Literal, cast
+from typing import Literal, TypedDict, cast
 
-from async_timeout import timeout
-from hamsclientfork import meteoSwissClient
-from hamsclientfork.client import ClientResult
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_NAME, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import (
@@ -21,6 +20,7 @@ from homeassistant.helpers.update_coordinator import (
 
 from custom_components.meteoswiss.const import (
     CONF_FORECAST_NAME,
+    CONF_POINT_ID,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
@@ -29,11 +29,22 @@ from custom_components.meteoswiss.const import (
     CONF_UPDATE_INTERVAL,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
+    USER_AGENT,
+)
+from custom_components.meteoswiss.ogd import (
+    LocalForecast,
+    MeteoSwissOGD,
+    OGDError,
+    Point,
+    StationType,
 )
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR, Platform.WEATHER]
 MAX_CONTINUOUS_ERROR_TIME = 60 * 60
+# MeteoSwiss publishes a new forecast run every hour.  Look for one this often
+# rather than on every (much more frequent) station update.
+FORECAST_CHECK_INTERVAL = datetime.timedelta(minutes=15)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
@@ -91,6 +102,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         interval,
         entry.data[CONF_POSTCODE],
+        point_id=entry.data.get(CONF_POINT_ID),
         forecast_name=entry.data.get(CONF_FORECAST_NAME, name),
         weather_station=entry.data.get(CONF_STATION, None),
         real_time_weather_station_name=entry.data.get(CONF_REAL_TIME_NAME, None),
@@ -131,7 +143,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-class MeteoSwissClientResult(ClientResult):
+class MeteoSwissClientResult(TypedDict):
+    forecast: LocalForecast | None
+    # Latest measurements of each configured station, by station.
+    condition_by_station: dict[str, dict[str, float | None]]
+    # The same, in order of preference.
+    condition: list[dict[str, float | None]]
     # Forecast attributes.
     postcode: int  # e.g. 8005
     forecast_name: str
@@ -153,6 +170,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         hass: HomeAssistant,
         update_interval: datetime.timedelta,
         postcode: int,
+        point_id: int | None,
         forecast_name: str,
         weather_station: str | None,
         real_time_weather_station_name: str | None,
@@ -172,6 +190,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         }
         self.hass = hass
         self.postcode = postcode
+        self.point_id = point_id
         self.forecast_name = forecast_name
         _LOGGER.debug(
             "Forecast %s will be provided for post code %s every %s",
@@ -200,17 +219,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 update_interval,
             )
 
-        self.client = meteoSwissClient(  # type:ignore[no-untyped-call]
-            "%s / %s / %s"
-            % (
-                forecast_name,
-                real_time_weather_station_name,
-                real_time_precipitation_station_name,
-            ),
-            postcode,
-            weather_station if weather_station else "NO STATION",
-            precipitation_station if precipitation_station else "NO STATION",
-        )
+        self.client = MeteoSwissOGD(async_get_clientsession(hass), USER_AGENT)
+        self._point: Point | None = None
+        self._forecast: LocalForecast | None = None
+        self._forecast_checked: datetime.datetime | None = None
         _LOGGER.debug("Client obtained")
 
         super().__init__(
@@ -220,16 +232,59 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             update_interval=update_interval,
         )
 
-    async def _async_update_data(self) -> MeteoSwissClientResult:
-        """Update data via library."""
+    async def _async_get_forecast(self) -> LocalForecast | None:
+        """The forecast of the latest model run, kept if none can be obtained."""
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if (
+            self._forecast is not None
+            and self._forecast_checked is not None
+            and now - self._forecast_checked < FORECAST_CHECK_INTERVAL
+        ):
+            return self._forecast
         try:
-            async with timeout(15):
-                data = await self.hass.async_add_executor_job(
-                    self.client.get_typed_data,
+            if self._point is None:
+                self._point = await self.client.resolve_point(
+                    self.postcode, self.point_id
                 )
+            run = await self.client.latest_run(now)
+            if self._forecast is None or self._forecast["run"] != run:
+                self._forecast = await self.client.get_forecast(self._point, run)
+                _LOGGER.debug("Forecast for run %s obtained", run)
+            self._forecast_checked = now
+        except OGDError as exc:
+            if self._forecast is None:
+                raise
+            _LOGGER.warning("Keeping the previous forecast: %s", exc)
+        return self._forecast
+
+    async def _async_update_data(self) -> MeteoSwissClientResult:
+        """Update data from MeteoSwiss open data."""
+        condition_by_station: dict[str, dict[str, float | None]] = {}
+        try:
+            async with asyncio.timeout(60):
+                for station, station_type in (
+                    (self.weather_station, StationType.WEATHER),
+                    (self.precipitation_station, StationType.PRECIPITATION),
+                ):
+                    if not station:
+                        continue
+                    try:
+                        condition_by_station[
+                            station
+                        ] = await self.client.get_station_now(station, station_type)
+                    except OGDError as exc:
+                        _LOGGER.warning("Station %s: %s", station, exc)
+                        condition_by_station[station] = {}
+                forecast = await self._async_get_forecast()
         except Exception as exc:
             _LOGGER.exception("Failed getting data")
             raise UpdateFailed(exc) from exc
+
+        data = {
+            "forecast": forecast,
+            "condition_by_station": condition_by_station,
+            "condition": [c for c in condition_by_station.values() if c],
+        }
 
         # _LOGGER.debug("Data obtained (%s):\n%s", type(data), pprint.pformat(data))
         for station, name in (

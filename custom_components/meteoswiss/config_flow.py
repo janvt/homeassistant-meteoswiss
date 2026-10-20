@@ -5,16 +5,17 @@ import re
 from typing import Any
 
 import voluptuous as vol
-from hamsclientfork import StationType, meteoSwissClient
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity
 
 from custom_components.meteoswiss.const import (
     CONF_FORECAST_NAME,
     CONF_LAT,
     CONF_LON,
+    CONF_POINT_ID,
     CONF_POSTCODE,
     CONF_PRECIPITATION_NAME,
     CONF_PRECIPITATION_STATION,
@@ -26,6 +27,12 @@ from custom_components.meteoswiss.const import (
     DOMAIN,
     STATION_URL,
     USER_AGENT,
+)
+from custom_components.meteoswiss.ogd import (
+    MeteoSwissOGD,
+    OGDError,
+    StationType,
+    nearest,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -45,6 +52,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         self._lat = None
         self._lon = None
         self._postcode = None
+        self._point_id = None
         self._forecast_name = None
         self._update_interval = None
 
@@ -135,16 +143,25 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 }
             )
 
-        client = await self.hass.async_add_executor_job(
-            meteoSwissClient,
-            "No display name",
-            user_input.get(CONF_POSTCODE) if user_input else None,
-        )
+        ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
 
         errors = {}
+        point_id = None
         if user_input is not None:
             if not re.match(r"^\d{4}$", str(user_input[CONF_POSTCODE])):
                 errors[CONF_POSTCODE] = "invalid_postcode"
+            else:
+                try:
+                    points = await ogd.get_postcode_points(user_input[CONF_POSTCODE])
+                except OGDError:
+                    errors[CONF_POSTCODE] = "cannot_query_postcode"
+                else:
+                    # Some postal codes have several forecast points.
+                    point = nearest(points, self._lat, self._lon)
+                    if point is None:
+                        errors[CONF_POSTCODE] = "invalid_postcode"
+                    else:
+                        point_id = point.point_id
             if not str(user_input[CONF_FORECAST_NAME]).strip():
                 errors[CONF_FORECAST_NAME] = "real_time_name_empty"
             # check if the station name is 3 character
@@ -158,28 +175,13 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             )
         else:
             try:
-                geodata = await self.hass.async_add_executor_job(
-                    client.getGeoData,
-                    self._lat,
-                    self._lon,
-                    USER_AGENT,
-                )
-                guessed_postal_code = str(
-                    geodata.get("address", {}).get(
-                        "postcode",
-                        "",
-                    )
-                )
-                guessed_address = " ".join(
-                    x.strip()
-                    for x in str(
-                        geodata.get(
-                            "display_name",
-                            "",
-                        )
-                    ).split(",")[:3]
-                )
-            except Exception:
+                guess = await ogd.get_nearest_postcode_point(self._lat, self._lon)
+            except OGDError:
+                guess = None
+            if guess:
+                guessed_postal_code = guess.postcode
+                guessed_address = guess.name
+            else:
                 errors[CONF_POSTCODE] = "cannot_query_postcode"
                 errors[CONF_FORECAST_NAME] = "cannot_query_address"
                 guessed_postal_code = ""
@@ -197,6 +199,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             )
 
         self._postcode = int(user_input[CONF_POSTCODE])
+        self._point_id = point_id
         self._forecast_name = user_input[CONF_FORECAST_NAME].strip()
         self._update_interval = int(user_input[CONF_UPDATE_INTERVAL])
         _LOGGER.debug(
@@ -209,49 +212,35 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         return await self.async_step_user_three()
 
     async def _get_all_weather_stations_and_closest_one(
-        self, client, lat, lon
+        self, ogd, lat, lon
     ) -> tuple[str, str, str]:
         return await self._get_all_stations_and_closest_one(
-            client, lat, lon, station_type=StationType.WEATHER
+            ogd, lat, lon, station_type=StationType.WEATHER
         )
 
     async def _get_all_precipitation_stations_and_closest_one(
-        self, client, lat, lon
+        self, ogd, lat, lon
     ) -> tuple[str, str, str]:
         return await self._get_all_stations_and_closest_one(
-            client, lat, lon, station_type=StationType.PRECIPITATION
+            ogd, lat, lon, station_type=StationType.PRECIPITATION
         )
 
     async def _get_all_stations_and_closest_one(
-        self, client, lat, lon, station_type
+        self, ogd, lat, lon, station_type
     ) -> tuple[str, str, str]:
-        default_station = await self.hass.async_add_executor_job(
-            client.get_closest_station,
-            lat,
-            lon,
-            station_type,
-        )
-        if default_station:
-            default_station_name = await self.hass.async_add_executor_job(
-                client.get_station_name, default_station
-            )
-        else:
-            default_station_name = ""
-        stations = await self.hass.async_add_executor_job(
-            client.get_all_stations,
-            station_type,
-        )
-        all_stations = {NO_STATION: ""}
-        all_stations.update(
-            {
-                "%s (%s)"
-                % (
-                    value["name"],
-                    key,
-                ): key
-                for key, value in stations.items()
-            }
-        )
+        try:
+            stations = await ogd.get_stations(station_type)
+        except OGDError:
+            stations = []
+        closest = nearest(stations, lat, lon)
+        default_station = closest.abbr if closest else ""
+        default_station_name = closest.name if closest else ""
+        all_stations = {
+            NO_STATION
+            if station_type == StationType.WEATHER
+            else NO_PRECIPITATION_STATION: ""
+        }
+        all_stations.update({"%s (%s)" % (s.name, s.abbr): s.abbr for s in stations})
         return default_station, default_station_name, all_stations
 
     async def async_step_user_three(self, user_input=None):
@@ -292,18 +281,14 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 }
             )
 
-        client = await self.hass.async_add_executor_job(
-            meteoSwissClient,
-            "No display name",
-            self._postcode,
-        )
+        ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
 
         (
             default_weather_station,
             default_weather_station_name,
             weather_stations,
         ) = await self._get_all_weather_stations_and_closest_one(
-            client,
+            ogd,
             self._lat,
             self._lon,
         )
@@ -313,7 +298,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             default_precipitation_station_name,
             precipitation_stations,
         ) = await self._get_all_precipitation_stations_and_closest_one(
-            client,
+            ogd,
             self._lat,
             self._lon,
         )
@@ -346,7 +331,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 if len(real_time_precipitation_name) < 1:
                     errors[CONF_REAL_TIME_PRECIPITATION_NAME] = "empty_name"
                 # check if the station name is 3 character
-                if not re.match(r"^\w{3}$", weather_station):
+                if not re.match(r"^\w{3}$", precipitation_station):
                     errors[CONF_PRECIPITATION_STATION] = "invalid_station_name"
             else:
                 precipitation_station = None
@@ -367,7 +352,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                     default_weather_station,
                 )
             else:
-                default_weather_station = NO_PRECIPITATION_STATION
+                default_station_selection = NO_STATION
             if default_precipitation_station:
                 default_precipitation_station_selection = "%s (%s)" % (
                     default_precipitation_station_name,
@@ -404,6 +389,8 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             CONF_FORECAST_NAME: self._forecast_name,
             CONF_UPDATE_INTERVAL: self._update_interval,
         }
+        if self._point_id is not None:
+            data[CONF_POINT_ID] = self._point_id
         if weather_station and real_time_weather_name:
             data.update(
                 {

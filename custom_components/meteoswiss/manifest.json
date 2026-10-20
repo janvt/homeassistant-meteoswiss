@@ -10,9 +10,6 @@
     "iot_class": "cloud_polling",
     "issue_tracker": "https://github.com/Rudd-O/homeassistant-meteoswiss/issues",
     "quality_scale": "silver",
-    "requirements": [
-        "hamsclientfork>=0.2.20",
-        "geopy>=2.0"
-    ],
+    "requirements": [],
     "version": "1.4.0"
 }

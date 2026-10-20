@@ -4,7 +4,6 @@ import typing
 from datetime import date, datetime
 from decimal import Decimal
 
-from hamsclientfork.client import StationType
 from homeassistant.components.sensor import SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -27,6 +26,7 @@ from custom_components.meteoswiss.const import (
     SENSOR_TYPE_UNIT,
     SENSOR_TYPES,
 )
+from custom_components.meteoswiss.ogd import StationType
 
 _LOGGER = logging.getLogger(__name__)
 

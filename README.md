@@ -206,8 +206,7 @@ logger:
   default: warning
   logs:
     # maybe more stuff here[...]
-    hamsclient.client: debug
-    hamsclientfork.client: debug
+    custom_components.meteoswiss.ogd: debug
     custom_components.meteoswiss: debug
 ```
 
@@ -241,21 +240,26 @@ logger:
 
 ## Information sources
 
-Data comes from the MeteoSwiss official data sources.
-Forecasts are extracted from the MeteoSwiss API.
-Current conditions are from official data files.
+Data comes from the MeteoSwiss official open data (Source: MeteoSwiss).
+Forecasts are the
+[local forecast](https://opendatadocs.meteoswiss.ch/e-forecast-data/e4-local-forecast-data)
+of the postal code (updated hourly), and current conditions are the
+10-minute measurements of the
+[automatic weather and precipitation stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased).
+The hourly forecast has no temperature, because MeteoSwiss only publishes it in a
+file of over 30 MB that covers all of Switzerland.
 
 A primer on Swiss weather stations can be found at https://rudd-o.com/meteostations .
-Information on the provided values is available at
-[https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/info/VQHA80_en.txt](https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/info/VQHA80_en.txt).
+Information on the provided values is available in the
+[parameter list](https://data.geo.admin.ch/ch.meteoschweiz.ogd-smn/ogd-smn_meta_parameters.csv).
 
 ### Privacy
 
 This integration uses:
 
-* https://nominatim.openstreetmap.org to guess your post code
-* https://data.geo.admin.ch/ for current weather conditions
-* https://www.meteosuisse.admin.ch for forecast
+* https://data.geo.admin.ch/ for the forecast, the current weather conditions and
+  the list of postal codes and stations (your postal code is guessed from your
+  Home Assistant location using that list, so no location is sent anywhere)
 
 ## Origins of this work
 
