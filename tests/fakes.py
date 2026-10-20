@@ -66,6 +66,8 @@ class FakeSession:
         self.chunk_size = chunk_size
         self.requests: list[tuple[str, str, str | None]] = []
         self.headers: list[dict[str, str]] = []
+        # The size of each response's body.
+        self.served: list[int] = []
 
     def _respond(self, method: str, url: str, headers) -> FakeResponse:
         headers = headers or {}
@@ -96,10 +98,23 @@ class FakeSession:
         )
 
     def get(self, url, headers=None, timeout=None) -> FakeResponse:
-        return self._respond("GET", url, headers)
+        response = self._respond("GET", url, headers)
+        self.served.append(len(response.body))
+        return response
 
     def head(self, url, headers=None, timeout=None) -> FakeResponse:
+        self.served.append(0)
         return self._respond("HEAD", url, headers)
+
+    def transferred(self, overhead: int = 650) -> int:
+        """Bytes received, with about as much for each response's headers as
+        the real server sends (whole files are counted uncompressed)."""
+        return sum(self.served) + overhead * len(self.served)
+
+    def clear(self) -> None:
+        self.requests.clear()
+        self.headers.clear()
+        self.served.clear()
 
     def count(self, method: str = "GET", url: str | None = None) -> int:
         return sum(1 for m, u, _ in self.requests if m == method and url in (None, u))

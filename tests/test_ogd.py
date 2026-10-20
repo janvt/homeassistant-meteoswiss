@@ -679,12 +679,12 @@ class TestFewerRequests:
         body = point_major_csv("p", BIG_POINTS, HOURS, value)
         client, _ = make_client({url("p"): body})
         start = body.index(b"\n%d;%d;" % point.key) + 1
-        client._offsets[("p", point.key)] = start + shift
+        client._offsets[("p", point.key)] = (start + shift, len(body))
 
         rows = await client._point_values(url("p"), point)
 
         assert len(rows) == 217
-        assert client._offsets[("p", point.key)] == start
+        assert client._offsets[("p", point.key)] == (start, len(body))
 
     async def test_the_latest_run_is_shared_for_a_few_minutes(self):
         client, session = make_client({url("jp2000d0"): b"x"})

@@ -81,6 +81,12 @@ BLOCK_LIMIT = 1000  # more blocks than any file has
 # Files ordered by time that cannot be read by block are downloaded whole:
 # compressed if up to this size, otherwise streamed (see get_hourly_rows).
 SMALL_FILE = 8 * 1024 * 1024
+# Searching a file stops, and it is downloaded whole, as soon as the search has
+# cost as much as that would; and it does not start if it is expected to.
+# Each request costs about this many bytes of headers, and whole files up to
+# SMALL_FILE are sent compressed, to about this share of their size.
+REQUEST_OVERHEAD = 650
+COMPRESSED_SHARE = 0.2
 # Station measurements and the latest run are shared by entries this long.
 STATION_CACHE_SECONDS = 60
 RUN_CACHE = datetime.timedelta(minutes=5)
@@ -320,8 +326,11 @@ class _Blocks:
     order: dict[tuple[int, int], int]  # the place of each point in a block
     first: datetime.datetime  # the time of the first block
     step: datetime.timedelta
+    start: int  # where the first block starts
     length: int  # bytes of the first block
     margin: int = BLOCK_MARGIN
+    # What following a point through the blocks cost the last time, in bytes.
+    cost: int | None = None
 
     def time(self, block: int) -> str:
         return (self.first + block * self.step).strftime("%Y%m%d%H%M")
@@ -333,6 +342,30 @@ class _Blocks:
 
 class _Lost(Exception):
     """A point's row could not be found in a block."""
+
+
+class _OverBudget(_Lost):
+    """Searching has cost as much as downloading the whole file."""
+
+
+def _whole_cost(size: int) -> int:
+    """About how many bytes downloading a whole file costs."""
+    return size if size > SMALL_FILE else int(size * COMPRESSED_SHARE)
+
+
+class _Budget:
+    """The bytes a search may cost before the whole file is the cheaper way."""
+
+    def __init__(self, size: int | None) -> None:
+        self.limit = None if size is None else _whole_cost(size)
+        self.spent = 0
+
+    def spend(self, received: int, size: int) -> None:
+        if self.limit is None:
+            self.limit = _whole_cost(size)
+        self.spent += received + REQUEST_OVERHEAD
+        if self.spent > self.limit:
+            raise _OverBudget
 
 
 def _parse_blocks(
@@ -364,7 +397,9 @@ def _parse_blocks(
         return None
     if step <= datetime.timedelta(0):
         return None
-    blocks = _Blocks(date, order, _utc(first_time), step, after[0] - block[0][0])
+    blocks = _Blocks(
+        date, order, _utc(first_time), step, block[0][0], after[0] - block[0][0]
+    )
     known: dict[tuple[int, int], dict[str, tuple[int, str]]] = {}
     for position, key, timestamp, value in rows:
         known.setdefault(key, {})[timestamp] = (position, value)
@@ -372,7 +407,11 @@ def _parse_blocks(
 
 
 def _guess_position(
-    blocks: _Blocks, positions: dict[str, int], old: dict[str, int], block: int
+    blocks: _Blocks,
+    key: tuple[int, int],
+    positions: dict[str, int],
+    old: dict[str, int],
+    block: int,
 ) -> int | None:
     """Where a point's row in a block probably is, from the rows found already.
 
@@ -383,7 +422,11 @@ def _guess_position(
     """
     timestamp = blocks.time(block)
     if block == 0:
-        return old.get(timestamp)
+        if timestamp in old:
+            return old[timestamp]
+        # A point not read before: as far into the block as it is in the order.
+        share = blocks.order[key] / len(blocks.order)
+        return blocks.start + round(share * blocks.length)
     before = blocks.time(block - 1)
     if before not in positions:
         return None
@@ -410,15 +453,23 @@ def _rows_with_prefix(text: str, prefix: str) -> dict[str, str]:
     return rows
 
 
-def _rows_with_needle(rows: list[bytes], data: bytes, needle: bytes) -> None:
-    """Collect the lines of data that start right after a match of the needle."""
+def _rows_with_needle(
+    rows: list[bytes], data: bytes, needle: bytes
+) -> tuple[int, int] | None:
+    """Collect the lines of data that start right after a match of the needle.
+
+    Returns where the first of them starts and the last ends, if any.
+    """
     start = data.find(needle)
+    found = None
     while start >= 0:
         end = data.find(b"\n", start + 1)
         rows.append(data[start + 1 : end if end >= 0 else None])
+        found = (found[0] if found else start + 1, end + 1 if end >= 0 else len(data))
         if end < 0:
             break
         start = data.find(needle, end)
+    return found
 
 
 def _station_time(timestamp: str | None) -> datetime.datetime | None:
@@ -493,17 +544,22 @@ class MeteoSwissOGD:
         self._orders: dict[str, int] = {}
         # Parameters whose files are ordered by time rather than by point.
         self._by_time: set[str] = set()
-        # Where each point's rows started in the last file, by (parameter, point),
-        # and how many bytes they took.
-        self._offsets: dict[tuple[str, tuple[int, int]], int] = {}
+        # Where each point's rows started in the last file it was read from,
+        # by (parameter, point), with that file's size; and how many bytes
+        # the rows took.
+        self._offsets: dict[tuple[str, tuple[int, int]], tuple[int, int]] = {}
         self._spans: dict[tuple[str, tuple[int, int]], int] = {}
-        # The size of the last file of each parameter, and how much it changed.
-        self._sizes: dict[str, int] = {}
+        # The latest file of each parameter and its size, and how much its
+        # size changed from the file before.
+        self._files: dict[str, tuple[str, int]] = {}
         self._size_changes: dict[str, int] = {}
         # Files ordered by time, by parameter: their layout, and where each
         # point's row was in each block of the last file, by time.
         self._blocks: dict[str, _Blocks] = {}
         self._block_positions: dict[tuple[str, tuple[int, int]], dict[str, int]] = {}
+        # The day each point was last looked for in a whole file ordered by
+        # point, by (parameter, point).
+        self._whole_reads: dict[tuple[str, tuple[int, int]], str] = {}
         # The last small file ordered by time, by parameter: its URL and text.
         self._small_files: dict[str, tuple[str, str]] = {}
         self._small_file_lock = asyncio.Lock()
@@ -879,11 +935,11 @@ class MeteoSwissOGD:
         if parameter in self._by_time:
             return (await self._blocked_rows(url, [point]))[point.key]
         if (hint := self._offsets.get((parameter, point.key))) is not None:
-            rows = await self._hinted_point_values(url, point, prefix, hint)
+            rows = await self._hinted_point_values(url, point, prefix, *hint)
             if rows:
                 return rows
         head, total = await self._get(url, (0, HEAD_BYTES - 1))
-        self._note_size(parameter, total)
+        self._note_size(url, total)
         if total > len(head):
             lines = head.decode("latin-1").splitlines()[1:3]
             keys = [_key(line) for line in lines]
@@ -893,13 +949,19 @@ class MeteoSwissOGD:
             return (await self._blocked_rows(url, [point]))[point.key]
         return _rows_with_prefix(head.decode("latin-1"), prefix)
 
-    def _note_size(self, parameter: str, total: int) -> None:
-        """Remember a file's size, and how much it changed since the last one."""
-        if (last := self._sizes.get(parameter)) is not None and last != total:
-            self._size_changes[parameter] = total - last
-        elif last is not None:
-            self._size_changes[parameter] = 0
-        self._sizes[parameter] = total
+    def _note_size(self, url: str, total: int) -> None:
+        """Remember a file's size, and how much it changed from the one before."""
+        parameter = _parameter(url)
+        last = self._files.get(parameter)
+        if last is None or last[0] != url:
+            if last is not None:
+                self._size_changes[parameter] = total - last[1]
+            self._files[parameter] = (url, total)
+
+    def _known_size(self, url: str) -> int | None:
+        """The size of a file, if it is known without asking."""
+        last = self._files.get(_parameter(url))
+        return last[1] if last is not None and last[0] == url else None
 
     async def _time_ordered_point_values(
         self, url: str, prefixes: list[str], total: int | None
@@ -927,52 +989,123 @@ class MeteoSwissOGD:
     ) -> dict[tuple[int, int], dict[str, str]]:
         """The rows of points in a file ordered by time, read block by block.
 
-        Points that cannot be followed through the blocks are looked up in the
-        whole file instead.
+        Points that cannot be followed through the blocks are followed again
+        with the order of the points read afresh, and if that fails too, or
+        costs as much as the whole file, are looked up in the whole file.
         """
         parameter = _parameter(url)
-        date = _run_of(url)[:8]
+        cached = self._small_files.get(parameter)
+        if cached is not None and cached[0] == url:
+            # Downloaded whole for this run already.
+            return await self._whole_file_rows(url, points, None)
+        size = self._known_size(url) or (self._files.get(parameter) or (url, None))[1]
         blocks = self._blocks.get(parameter)
-        known: dict[tuple[int, int], dict[str, tuple[int, str]]] = {}
-        total: int | None = None
-        if (
-            blocks is None
-            or blocks.date != date
-            or any((parameter, p.key) not in self._block_positions for p in points)
-        ):
-            head, total = await self._get(url, (0, BLOCK_HEAD - 1))
-            parsed = _parse_blocks(head, total, date)
-            if parsed is None:
-                _LOGGER.debug("%s cannot be read by block", url)
-                return await self._whole_file_rows(url, points, total)
-            margin = blocks.margin if blocks else BLOCK_MARGIN
-            if blocks is not None and blocks.date != date:
+        # The order of the points is read once a day; points not read before
+        # are found from it.
+        fresh = blocks is None or blocks.date != _run_of(url)[:8]
+        if size is not None and blocks is not None and blocks.cost is not None:
+            expected = len(points) * blocks.cost + (BLOCK_HEAD if fresh else 0)
+            if expected > _whole_cost(size):
+                _LOGGER.debug("%s is cheaper whole for %d points", url, len(points))
+                return await self._whole_file_rows(url, points, size)
+        budget = _Budget(size)
+        found: dict[tuple[int, int], dict[str, str]] = {}
+        todo = list(points)
+        for attempt in range(2):
+            known: dict[tuple[int, int], dict[str, tuple[int, str]]] = {}
+            if fresh or attempt:
+                try:
+                    learned = await self._learn_blocks(url, budget)
+                except _OverBudget:
+                    break
+                if learned is None:
+                    _LOGGER.debug("%s cannot be read by block", url)
+                    break
+                blocks, known, size, small = learned
+                if small:
+                    # A small file: all of it was read already.
+                    for p in todo:
+                        found[p.key] = {
+                            t: v for t, (_, v) in known.get(p.key, {}).items()
+                        }
+                    todo = []
+                    break
+            assert blocks is not None
+            todo, over = await self._walk_points(
+                url, blocks, todo, known, size, budget, found
+            )
+            if not todo or over:
+                break
+            _LOGGER.debug("Lost %s in %s, reading the order again", todo, url)
+        for point in points:
+            if point not in todo:
+                found.setdefault(point.key, {})
+        if todo:
+            _LOGGER.debug("Reading %s whole for %s", url, [p.key for p in todo])
+            found.update(await self._whole_file_rows(url, todo, size))
+        return found
+
+    async def _learn_blocks(self, url: str, budget: _Budget):
+        """Read the first block of a file for the order of the points.
+
+        Returns the layout, the rows read, the file's size and whether that was
+        all of it; None if the file is not laid out in blocks.
+        """
+        parameter = _parameter(url)
+        head, total = await self._get(url, (0, BLOCK_HEAD - 1))
+        self._note_size(url, total)
+        if total > len(head):  # otherwise the whole file is in hand already
+            budget.spend(len(head), total)
+        parsed = _parse_blocks(head, total, _run_of(url)[:8])
+        if parsed is None:
+            return None
+        old = self._blocks.get(parameter)
+        blocks, known = parsed
+        if old is not None:
+            blocks.margin, blocks.cost = old.margin, old.cost
+            if old.date != blocks.date:
                 # Where the rows were in another day's file says little.
                 for key in [k for k in self._block_positions if k[0] == parameter]:
                     del self._block_positions[key]
-            blocks, known = parsed
-            blocks.margin = margin
-            self._blocks[parameter] = blocks
-            if total <= len(head):
-                # A small file: all of it was read already.
-                return {
-                    p.key: {t: v for t, (_, v) in known.get(p.key, {}).items()}
-                    for p in points
-                }
-        found: dict[tuple[int, int], dict[str, str]] = {}
-        lost: list[Point] = []
-        errors: list[int] = []
+        self._blocks[parameter] = blocks
+        return blocks, known, total, total <= len(head)
+
+    async def _walk_points(
+        self,
+        url: str,
+        blocks: _Blocks,
+        points: list[Point],
+        known: dict[tuple[int, int], dict[str, tuple[int, str]]],
+        size: int | None,
+        budget: _Budget,
+        found: dict[tuple[int, int], dict[str, str]],
+    ) -> tuple[list[Point], bool]:
+        """Follow points through the blocks, adding their rows to found.
+
+        Returns the points that were lost, and whether the budget ran out.
+        """
+        parameter = _parameter(url)
         walks = [p for p in points if p.key in blocks.order]
+        for point in points:
+            if point.key not in blocks.order:
+                found[point.key] = {}  # not in the file
+        spent = budget.spent
         results = await asyncio.gather(
             *(
-                self._walk_blocks(url, blocks, p.key, known.get(p.key, {}), total)
+                self._walk_blocks(
+                    url, blocks, p.key, known.get(p.key, {}), size, budget
+                )
                 for p in walks
             ),
             return_exceptions=True,
         )
+        lost: list[Point] = []
+        errors: list[int] = []
+        over = False
         for point, result in zip(walks, results):
             if isinstance(result, _Lost):
                 lost.append(point)
+                over = over or isinstance(result, _OverBudget)
             elif isinstance(result, BaseException):
                 raise result
             else:
@@ -980,16 +1113,13 @@ class MeteoSwissOGD:
                 found[point.key] = rows
                 self._block_positions[(parameter, point.key)] = positions
                 errors.extend(misses)
-        for point in points:
-            found.setdefault(point.key, {})
         if errors:
             low, high = BLOCK_MARGIN_RANGE
             error = sorted(errors)[int(BLOCK_MARGIN_SHARE * (len(errors) - 1))]
             blocks.margin = min(high, max(low, int(error * 1.1) + BLOCK_ROW))
-        if lost:
-            _LOGGER.debug("Lost %s in %s, reading it whole", [p.key for p in lost], url)
-            found.update(await self._whole_file_rows(url, lost, total))
-        return found
+        if walks and not lost:
+            blocks.cost = (budget.spent - spent) // len(walks)
+        return lost, over
 
     async def _whole_file_rows(
         self, url: str, points: list[Point], total: int | None
@@ -1007,6 +1137,7 @@ class MeteoSwissOGD:
         key: tuple[int, int],
         known: dict[str, tuple[int, str]],
         total: int | None,
+        budget: _Budget,
     ) -> tuple[dict[str, str], dict[str, int], list[int]]:
         """A point's rows in every block: its values and positions by time.
 
@@ -1021,12 +1152,12 @@ class MeteoSwissOGD:
             timestamp = blocks.time(block)
             if timestamp in positions:
                 continue
-            guess = _guess_position(blocks, positions, old, block)
+            guess = _guess_position(blocks, key, positions, old, block)
             if guess is None:
                 raise _Lost
             if total is not None and guess - blocks.margin >= total:
                 break
-            found = await self._block_row(url, blocks, key, block, guess, total)
+            found = await self._block_row(url, blocks, key, block, guess, total, budget)
             if found is None:
                 break  # past the last block
             position, value, total = found
@@ -1043,6 +1174,7 @@ class MeteoSwissOGD:
         block: int,
         guess: int,
         total: int | None,
+        budget: _Budget,
     ) -> tuple[int, str, int] | None:
         """A point's row in a block near a guessed position: position, value, size.
 
@@ -1059,6 +1191,7 @@ class MeteoSwissOGD:
                     return None
                 end = min(end, total)
             chunk, total = await self._get(url, (start, end - 1))
+            budget.spend(len(chunk), total)
             rows = _whole_rows(chunk, start, total)
             for position, row_key, row_time, value in rows:
                 if row_key == key and row_time == timestamp:
@@ -1066,6 +1199,8 @@ class MeteoSwissOGD:
             if not rows:
                 margin *= 2
                 continue
+            if start + len(chunk) >= total and rows[-1][2] < timestamp:
+                return None  # the file ends before the block
             # How many rows away the point is, from a row in the middle.
             position, row_key, row_time, _ = rows[len(rows) // 2]
             ahead = blocks.blocks_between(timestamp, row_time)
@@ -1077,38 +1212,44 @@ class MeteoSwissOGD:
                 if len(rows) > 1
                 else blocks.length / len(blocks.order)
             )
-            guess = position + round(away * width)
-            if start + len(chunk) >= total and guess >= total:
-                return None  # the file ends before the block
+            guess = max(0, position + round(away * width))
         raise _Lost
 
     async def _hinted_point_values(
-        self, url: str, point: Point, prefix: str, offset: int
+        self, url: str, point: Point, prefix: str, offset: int, old: int
     ) -> dict[str, str]:
-        """The rows of a point near where they were before, if all are there."""
+        """The rows of a point near where they were before, if all are there.
+
+        offset is where they were in a file of size old.
+        """
         parameter = _parameter(url)
         span = self._spans.get((parameter, point.key), ROW_SPAN)
-        change = self._size_changes.get(parameter)
-        last = self._sizes.get(parameter)
-        size = None
-        if last is not None and (change is None or abs(change) > HINT_SCALE_FROM):
-            size = await self._size(url)
-        if size is None or last is None:
-            margin = HINT_MARGIN + 2 * abs(change or 0)
-            rows, total = await self._hint_window(
-                url, point, prefix, offset, span, margin
-            )
-            if rows or total is None or last is None or total == last:
-                return rows
-            size = total  # moved further than the last time: try where scaled
+        size = self._known_size(url)
+        if size is None:
+            change = self._size_changes.get(parameter)
+            if change is None or abs(change) > HINT_SCALE_FROM:
+                size = await self._size(url)
+                if size is not None:
+                    self._note_size(url, size)
+            else:
+                # Probably about as small a change as the last time.
+                margin = HINT_MARGIN + 2 * abs(change)
+                rows, total = await self._hint_window(
+                    url, point, prefix, offset, span, margin
+                )
+                if rows or total is None or total == old:
+                    return rows
+                size = total  # moved further than the last time: try where scaled
+        if size is None:
+            size = old
         rows, _ = await self._hint_window(
             url,
             point,
             prefix,
             # Rows move in proportion to their position in the file.
-            round(offset * size / last),
+            round(offset * size / old),
             span,
-            HINT_MARGIN + int(HINT_SCALED_SHARE * abs(size - last)),
+            HINT_MARGIN + int(HINT_SCALED_SHARE * abs(size - old)),
         )
         return rows
 
@@ -1139,19 +1280,19 @@ class MeteoSwissOGD:
             or (found[-1] == len(keys) - 1 and start + len(chunk) < total)
         ):
             return {}, total
-        self._note_size(_parameter(url), total)
-        self._remember_offset(url, point, chunk, start, prefix)
+        self._note_size(url, total)
+        self._remember_offset(url, point, chunk, start, prefix, total)
         return _rows_with_prefix(b"\n".join(lines).decode("latin-1"), prefix), total
 
     def _remember_offset(
-        self, url: str, point: Point, chunk: bytes, start: int, prefix: str
+        self, url: str, point: Point, chunk: bytes, start: int, prefix: str, total: int
     ) -> None:
         needle = b"\n" + prefix.encode("latin-1")
         position = chunk.find(needle)
         if position < 0:
             return
         key = (_parameter(url), point.key)
-        self._offsets[key] = start + position + 1
+        self._offsets[key] = (start + position + 1, total)
         # The rows end with the line break before the first row of another point.
         last = position
         while (following := chunk.find(needle, last + 1)) >= 0:
@@ -1161,13 +1302,27 @@ class MeteoSwissOGD:
             self._spans[key] = end - position
 
     async def _streamed_point_values(
-        self, url: str, prefixes: list[str]
+        self,
+        url: str,
+        prefixes: list[str],
+        where: dict[str, tuple[int, int]] | None = None,
     ) -> dict[str, dict[str, str]]:
-        """Stream a whole file, keeping only the rows starting with the prefixes."""
+        """Stream a whole file, keeping only the rows starting with the prefixes.
+
+        where gets where each prefix's rows start and end in the file.
+        """
         needles = {prefix: b"\n" + prefix.encode("latin-1") for prefix in prefixes}
         rows: dict[str, list[bytes]] = {prefix: [] for prefix in prefixes}
+        where = {} if where is None else where
+
+        def collect(prefix: str, data: bytes, offset: int) -> None:
+            if found := _rows_with_needle(rows[prefix], data, needles[prefix]):
+                start, end = found[0] + offset, found[1] + offset
+                where[prefix] = (where.get(prefix, (start, end))[0], end)
+
         # Carries the incomplete last line of a chunk, after its line break.
         tail = b""
+        offset = 0  # where in the file tail starts
         try:
             async with self._session.get(
                 url, headers=self._headers, timeout=STREAM_TIMEOUT
@@ -1179,13 +1334,14 @@ class MeteoSwissOGD:
                     if cut < 0:
                         tail = data
                         continue
-                    for prefix, needle in needles.items():
-                        _rows_with_needle(rows[prefix], data[:cut], needle)
+                    for prefix in needles:
+                        collect(prefix, data[:cut], offset)
                     tail = data[cut:]
+                    offset += cut
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
-        for prefix, needle in needles.items():
-            _rows_with_needle(rows[prefix], tail, needle)
+        for prefix in needles:
+            collect(prefix, tail, offset)
         return {
             prefix: _rows_with_prefix(b"\n".join(found).decode("latin-1"), prefix)
             for prefix, found in rows.items()
@@ -1194,23 +1350,49 @@ class MeteoSwissOGD:
     async def _ordered_point_values(
         self, url: str, total: int, point: Point, prefix: str
     ) -> dict[str, str]:
-        """Find a point in a file ordered by point, trying the known orders."""
+        """Find a point in a file ordered by point, trying the known orders.
+
+        If the file is in neither order, the point is looked up in the whole
+        file instead.
+        """
         parameter = _parameter(url)
         last = self._orders.get(parameter, 0)
+        ordered = False
         for index in (last, *(i for i in range(len(POINT_ORDERS)) if i != last)):
-            rows = await self._ranged_point_values(
+            rows, in_order = await self._ranged_point_values(
                 url, total, point, prefix, POINT_ORDERS[index]
             )
             if rows:
                 self._orders[parameter] = index
                 return rows
-        _LOGGER.debug("Point %s not found in %s", point.key, url)
-        return {}
+            ordered = ordered or in_order
+        if ordered:
+            _LOGGER.debug("Point %s not in %s", point.key, url)
+            return {}
+        # Read whole, at most once a day: where the rows are is remembered, so
+        # the next runs look there, which needs no order.
+        date = _run_of(url)[:8]
+        if self._whole_reads.get((parameter, point.key)) == date:
+            _LOGGER.debug("Point %s not found in %s, read whole today", point.key, url)
+            return {}
+        self._whole_reads[(parameter, point.key)] = date
+        _LOGGER.warning("%s is in no known order; reading it whole", url)
+        where: dict[str, tuple[int, int]] = {}
+        rows = (await self._streamed_point_values(url, [prefix], where))[prefix]
+        if prefix in where:
+            start, end = where[prefix]
+            self._offsets[(parameter, point.key)] = (start, total)
+            self._spans[(parameter, point.key)] = end - start
+        return rows
 
     async def _ranged_point_values(
         self, url: str, total: int, point: Point, prefix: str, order
-    ) -> dict[str, str]:
-        """Binary search a file ordered by point, in the given order."""
+    ) -> tuple[dict[str, str], bool]:
+        """Binary search a file ordered by point, in the given order.
+
+        Also whether the rows where the point would be are in that order, so
+        that a point not found is really not in the file.
+        """
         target = order(point.point_id, point.point_type)
         # The first row of the target starts after the first line break past
         # `lo` and no later than the first line break past `hi`.
@@ -1226,16 +1408,21 @@ class MeteoSwissOGD:
                 hi = mid
         end = min(hi + ROW_SPAN, total)
         chunk, _ = await self._get(url, (lo, end - 1))
-        self._remember_offset(url, point, chunk, lo, prefix)
+        self._remember_offset(url, point, chunk, lo, prefix, total)
         lines = chunk.split(b"\n")
         if lo > 0:
             lines = lines[1:]  # starts mid-line
         if end < total:
             lines = lines[:-1]  # ends mid-line
-        return _rows_with_prefix(
-            b"\n".join(lines).decode("latin-1"),
-            prefix,
+        rows = _rows_with_prefix(b"\n".join(lines).decode("latin-1"), prefix)
+        keys = [order(*k) for line in lines if (k := _key(line))]
+        in_order = (
+            bool(keys)
+            and keys == sorted(keys)
+            and (lo == 0 or keys[0] < target)
+            and (end == total or keys[-1] > target)
         )
+        return rows, in_order
 
     async def get_hourly_rows(
         self, points: list[Point], run: str, parameter: str
