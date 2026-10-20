@@ -63,7 +63,6 @@ class CountingSession:
 class _Counted:
     def __init__(self, owner: CountingSession, method: str, url: str, kw) -> None:
         self._owner, self._method, self._url, self._kw = owner, method, url, kw
-        self._read = 0
 
     async def __aenter__(self):
         call = (
@@ -78,15 +77,8 @@ class _Counted:
     async def __aexit__(self, *exc):
         r = self._response
         headers = sum(len(k) + len(v) + 4 for k, v in r.raw_headers) + 20
-        length = r.headers.get("Content-Length")
-        body = 0
-        if self._method == "GET":
-            # Compressed responses have no length; counted uncompressed then.
-            body = (
-                int(length)
-                if length and "Content-Encoding" not in r.headers
-                else self._read
-            )
+        # As transferred: compressed, if it was.
+        body = r.content.total_raw_bytes if self._method == "GET" else 0
         self._owner.log.append(
             Exchange(
                 self._method,
@@ -102,9 +94,7 @@ class _Counted:
         return getattr(self._response, name)
 
     async def read(self):
-        body = await self._response.read()
-        self._read = len(body)
-        return body
+        return await self._response.read()
 
     @property
     def content(self):

@@ -232,38 +232,23 @@ unavailable when the station has reported nothing for six hours.
 
 ## Download volumes
 
-Per day, for one postal-code entry with the default settings (hourly
-temperatures, a weather, a precipitation and a pollen station, climate
-normals):
+MeteoSwiss publishes its forecast as large files covering all of
+Switzerland.  The integration reads only the part for your place, so in
+normal use one entry with the default settings downloads **about 10 MB a
+day**, and each further place about 7 MB more.  Starting Home Assistant costs
+a few MB extra.
 
-| | Best case | Worst case |
-|---|---|---|
-| Forecast | 3 MB | 380 MB |
-| Hourly temperatures | 4 MB | 270 MB, at most 530 MB |
-| Freezing level (when turned on) | 4 MB | 270 MB, at most 530 MB |
-| Weather warnings | 0.2 MB | 37 MB |
-| Station measurements and pollen | 1.5 MB | 3.5 MB |
-| Climate normals | 0.1 MB | 1.5 MB |
-| **Total** | **about 10 MB** | **about 700 MB** |
+If MeteoSwiss changes how it publishes its files, the integration may have to
+download them whole until it is updated: **at worst several hundred MB a
+day**.  A repair notice tells you when that happens, and the forecast is
+paused rather than downloaded whole every hour if the servers stop sending
+parts of files.  The integration is checked against MeteoSwiss's files every
+day, so such changes are noticed quickly.
 
-Each further entry for another place adds about 7 MB a day at best.  Starting
-Home Assistant costs about 4 MB more, as nothing is kept on disk.
-
-The best case is the usual one.  The worst case comes from:
-
-* **Many weather warnings**: the warnings are only available for all of
-  Switzerland at once, 8 kB per warning, so with 90 warnings in force that
-  change all day, 37 MB.  On quiet days almost nothing.
-* **MeteoSwiss changing how its files are laid out**, so that the integration
-  no longer finds a place's part of them.  It then downloads them whole
-  instead, as versions before 2.0.0b9 did: the forecast once a day (380 MB),
-  the hourly temperatures every three hours.  The repository checks against
-  MeteoSwiss's files daily, so such a change is noticed and fixed.
-
-On a metered connection, turn off *Hourly temperatures* (and the freezing
-level): the hourly forecast then has no temperatures, and the snow and
-lowest-temperature sensors are unavailable.  That removes the largest worst
-case.
+On a metered connection, turn off *Hourly temperatures* under *Configure*:
+the hourly forecast then has no temperatures, and the snow and
+lowest-temperature sensors are unavailable, but most of the worst case goes
+away.
 
 ## Data sources
 

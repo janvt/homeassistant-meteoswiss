@@ -37,8 +37,8 @@ BUDGET = {
     # small requests per place.
     ("hourly", "cold"): 0.03,
     ("hourly", "3 hours later"): 0.025,
-    # The daily lows and highs (220 kB compressed): the first block when cold,
-    # which is about the whole file; a request per day after that.
+    # The daily lows and highs (220 kB compressed): the whole file when cold,
+    # as learning its layout would cost as much; a request per day after that.
     ("daily", "cold"): 1.1,
     ("daily", "next run"): 0.15,
     # All 14 files of a run (about 380 MB): a binary search in each when
@@ -118,6 +118,7 @@ async def test_hourly_file_ordered_by_time(
         assert (blocks - 2) * found <= requests <= 1.5 * blocks * found + 10
     within_budget("hourly", "cold", cold_cost[1], whole, found)
     within_budget("hourly", "3 hours later", warm_cost[1], whole, found)
+    assert client.whole_downloads == 0 and not client.ranges_ignored
 
 
 async def test_daily_file_ordered_by_time(http, client, counting, places, latest_run):
@@ -141,6 +142,7 @@ async def test_daily_file_ordered_by_time(http, client, counting, places, latest
     assert warm_cost[0] <= 9 + 4
     within_budget("daily", "cold", cold_cost[1], whole, 1)
     within_budget("daily", "next run", warm_cost[1], whole, 1)
+    assert client.whole_downloads == 0 and not client.ranges_ignored
 
 
 async def test_forecast(http, client, counting, places, latest_run):
@@ -171,6 +173,8 @@ async def test_forecast(http, client, counting, places, latest_run):
         # A request or two per file, more when a file changed much.
         assert requests <= 70 * len(places)
         within_budget("forecast", "next run", transferred, whole, len(places))
+    # Nothing downloaded whole for lack of a way to search it.
+    assert client.whole_downloads == 0 and not client.ranges_ignored
 
 
 async def test_station_files_are_fetched_only_when_they_changed(
