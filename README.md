@@ -272,8 +272,11 @@ with high cloud cover.  The measured values are described in the
 
 The integration contacts only `data.geo.admin.ch` (forecasts, measurements and
 the lists of places and stations) and `feeds.meteoalarm.org` (warnings).  Your
-location never leaves Home Assistant: the closest postal code, stations and
-warnings are found locally from those lists.
+coordinates never leave Home Assistant: the closest postal code, stations and
+warnings are worked out locally from those lists.  What it downloads still hints
+at your approximate area: the files of the stations you chose, the part of the
+forecast files holding your postal code, and the details of warnings that cover
+you.
 
 ## Troubleshooting
 
