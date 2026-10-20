@@ -182,26 +182,27 @@ class TestGetWarnings:
         meteoalarm, session = client(files)
         minutes = datetime.timedelta(minutes=1)
 
-        for later in (0, 5, 9):
+        # Not even its size for half an hour.
+        for later in (0, 10, 29):
             await meteoalarm.get_warnings(*ALTDORF, "en", NOW + later * minutes)
         assert [r[:2] for r in session.requests] == [
             ("GET", alerts.FEED_URL),
             ("GET", "https://cap.test/wind"),
         ]
-        session.requests.clear()
+        session.clear()
 
-        # Its size is checked every 10 minutes, and the same means unchanged.
-        for later in (11, 15, 22):
+        # Then its size every 5 minutes, and the same means unchanged.
+        for later in (31, 33, 37, 41):
             await meteoalarm.get_warnings(*ALTDORF, "en", NOW + later * minutes)
         assert [r[:2] for r in session.requests] == [
             ("HEAD", alerts.FEED_URL),
             ("HEAD", alerts.FEED_URL),
         ]
-        session.requests.clear()
+        session.clear()
 
         files[alerts.FEED_URL] = feed(WIND, entry("rain", URI, NOW, NOW + 9 * HOUR))
         files["https://cap.test/rain"] = details(kind="10; rain")
-        warnings = await meteoalarm.get_warnings(*ALTDORF, "en", NOW + 33 * minutes)
+        warnings = await meteoalarm.get_warnings(*ALTDORF, "en", NOW + 47 * minutes)
         assert [r[:2] for r in session.requests] == [
             ("HEAD", alerts.FEED_URL),
             ("GET", alerts.FEED_URL),
@@ -209,6 +210,18 @@ class TestGetWarnings:
             ("GET", "https://cap.test/rain"),
         ]
         assert [w["type"] for w in warnings] == ["wind", "rain"]
+
+    async def test_the_feed_is_fetched_at_most_every_half_hour(self):
+        files = {alerts.FEED_URL: feed(WIND), "https://cap.test/wind": details()}
+        meteoalarm, session = client(files)
+        minutes = datetime.timedelta(minutes=1)
+
+        # Even if it changes all the time.
+        for later in range(0, 24 * 60, 5):
+            files[alerts.FEED_URL] = feed(WIND, "<!--" + "x" * later + "-->")
+            await meteoalarm.get_warnings(*ALTDORF, "en", NOW + later * minutes)
+
+        assert session.count("GET", alerts.FEED_URL) <= 48
 
     async def test_the_feed_is_fetched_when_a_warning_runs_out(self):
         files = {

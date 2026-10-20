@@ -22,11 +22,14 @@ _LOGGER = logging.getLogger(__name__)
 
 FEED_URL = "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-switzerland"
 # The feed is up to about 800 kB (8 kB per warning), uncompressed, and the
-# server supports neither ETags nor ranges.  So it is checked at most this
-# often, once for all entries, by asking for its size; and fetched only when
-# that changed, a warning in it has run out (it may have been extended), or it
-# is this old.  A change that keeps the size exactly is missed until then.
-FEED_CHECK = datetime.timedelta(minutes=10)
+# server supports neither ETags nor ranges.  So, once for all entries, it is
+# fetched again only when a warning in it has run out (it may have been
+# extended), or it is this old; or, once it is at least FEED_MIN_AGE old, when
+# its size changed, which is checked at most every FEED_CHECK.  A change that
+# keeps the size exactly is missed until FEED_MAX_AGE.  At most every 30
+# minutes, as before checking the size, so it never costs more than that did.
+FEED_MIN_AGE = datetime.timedelta(minutes=30)
+FEED_CHECK = datetime.timedelta(minutes=5)
 FEED_MAX_AGE = datetime.timedelta(hours=3)
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
@@ -242,13 +245,16 @@ class MeteoAlarm:
         if self._entries is None or self._fetched is None:
             return True
         # abs(): the clock may have been set back.
-        if self._checked is not None and abs(now - self._checked) < FEED_CHECK:
-            return False
-        self._checked = now
-        if abs(now - self._fetched) >= FEED_MAX_AGE or any(
+        age = abs(now - self._fetched)
+        if age >= FEED_MAX_AGE or any(
             self._fetched < e.expires <= now for e in self._entries
         ):
             return True
+        if age < FEED_MIN_AGE or (
+            self._checked is not None and abs(now - self._checked) < FEED_CHECK
+        ):
+            return False
+        self._checked = now
         size = await self._feed_size()
         return size is None or size != self._size
 
