@@ -232,21 +232,29 @@ unavailable when the station has reported nothing for six hours.
 
 ## Download volumes
 
-Most data takes a few kilobytes per update, and all entries share the same
-downloads.  The exceptions are files MeteoSwiss only publishes for all of
-Switzerland at once:
+With the defaults, one postal-code entry downloads about 310 MB a day, most of
+it hourly temperatures.  Station and pollen measurements take a few kilobytes
+per update (about 1 MB a day per station at the default interval).  The rest:
 
 | Data | Download | Setting |
 |---|---|---|
-| Hourly temperatures | 33 MB every 3 hours, about 260 MB a day | *Hourly temperatures* (on by default) |
-| Freezing level | 33 MB every 3 hours, about 260 MB a day | *Freezing level* (on by default for mountains with hourly temperatures) |
-| Weather warnings | 800 kB at most every 30 minutes, about 37 MB a day | — |
-| Climate normals | 6 MB a week per station, plus 50 kB every 6 hours | *Climate normals* |
+| Hourly temperatures | 33 MB at most every 3 hours, up to 264 MB a day | *Hourly temperatures* (on by default) |
+| Freezing level | 34 MB at most every 3 hours, up to 270 MB a day | *Freezing level* (on by default for mountains with hourly temperatures) |
+| Forecast | 290 kB a run per entry, about 7 MB a day | — |
+| Weather warnings | about 8 kB per warning in force in Switzerland, every 30 minutes: 37 MB a day with 90 warnings, little on quiet days | — |
+| Climate normals | 1.4 MB a week per station, plus up to 20 kB every 6 hours | *Climate normals* (on by default) |
+
+Sizes are as transferred.  The hourly temperatures and the freezing level are
+whole files of all of Switzerland, ordered by time, and too large for the
+server to compress; the warnings are not compressed either.  The rest of the
+forecast is read in 20 kB slices of the files of all of Switzerland.  The
+large files are shared by all entries; the slices are read for each entry.
 
 On a metered connection, turn off *Hourly temperatures*: the hourly forecast
 then has no temperatures, and the snow and lowest-temperature sensors are
 unavailable.  Nothing is written to disk; downloads are kept in memory only as
-long as needed.
+long as needed, so restarting Home Assistant, or adding an entry for another
+place, downloads the large files again.
 
 ## Data sources
 
@@ -272,8 +280,11 @@ with high cloud cover.  The measured values are described in the
 
 The integration contacts only `data.geo.admin.ch` (forecasts, measurements and
 the lists of places and stations) and `feeds.meteoalarm.org` (warnings).  Your
-location never leaves Home Assistant: the closest postal code, stations and
-warnings are found locally from those lists.
+coordinates never leave Home Assistant: the closest postal code, stations and
+warnings are worked out locally from those lists.  What it downloads still hints
+at your approximate area: the files of the stations you chose, the part of the
+forecast files holding your postal code, and the details of warnings that cover
+you.
 
 ## Troubleshooting
 
