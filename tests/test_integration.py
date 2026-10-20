@@ -17,6 +17,19 @@ from custom_components.meteoswiss.ogd import OGDError
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
+# The entity IDs of the summaries, after the device's name.
+SUMMARY_NAMES = (
+    "snow_tonight",
+    "snow_next_24_hours",
+    "snow_next_48_hours",
+    "sunshine_tomorrow_9_15",
+    "sunshine_tomorrow",
+    "strongest_gust_tomorrow_9_15",
+    "precipitation_next_hour",
+    "chance_of_rain_next_hour",
+    "lowest_temperature_tonight",
+)
+
 
 async def setup(hass, entry):
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -212,7 +225,10 @@ async def test_entry_without_stations_only_has_the_forecast(hass, entry_data):
 
     await setup(hass, entry)
 
-    assert not hass.states.async_all("sensor")
+    # Only the forecast summaries, no station sensors.
+    assert {s.entity_id for s in hass.states.async_all("sensor")} == {
+        f"sensor.zurich_{name}" for name in SUMMARY_NAMES
+    }
     state = hass.states.get(weather_id(hass, entry))
     assert state.state == "sunny"
     assert "temperature" not in state.attributes
@@ -417,7 +433,10 @@ async def test_mountain_without_large_downloads(hass, fake_ogd):
     entry = await add_mountain(hass, hourly_temperature=False)
 
     assert fake_ogd.large_downloads == {}
-    assert not hass.states.async_all("sensor")
+    # No freezing level, only the forecast summaries.
+    assert {s.entity_id for s in hass.states.async_all("sensor")} == {
+        f"sensor.bristen_{name}" for name in SUMMARY_NAMES
+    }
     state = hass.states.get(weather_id(hass, entry))
     assert "temperature" not in state.attributes
     assert state.attributes["wind_speed"] == 8.0
@@ -503,3 +522,74 @@ async def test_entries_share_one_client(hass, entry, fake_ogd):
     await add_mountain(hass)
 
     assert len(fake_ogd.instances) == 1
+
+
+def summary(hass, entry, key):
+    return hass.states.get(entity_id(hass, "sensor", f"sensor.{entry.entry_id}-{key}"))
+
+
+async def test_forecast_summaries(hass, entry):
+    await setup(hass, entry)
+
+    # At 12:30 UTC the next hour is the one starting 13:00 (i = 4 in the fake).
+    rain = summary(hass, entry, "precipitation_next_hour")
+    assert rain.state == "0.4"
+    assert rain.attributes["unit_of_measurement"] == "mm"
+    assert rain.attributes["friendly_name"] == "Zurich Precipitation next hour"
+    chance = summary(hass, entry, "precipitation_probability_next_hour")
+    assert chance.state == "20.0"
+    assert chance.attributes["unit_of_measurement"] == "%"
+    # The fake forecast ends at 21:00 UTC, so these windows are not covered.
+    for key in (
+        "snow_tonight",
+        "snow_next_24h",
+        "snow_next_48h",
+        "sunshine_tomorrow_midday",
+        "sunshine_tomorrow",
+        "max_gust_tomorrow_midday",
+        "min_temperature_tonight",
+    ):
+        assert summary(hass, entry, key).state == "unavailable", key
+    sunshine = summary(hass, entry, "sunshine_tomorrow")
+    assert sunshine.attributes["unit_of_measurement"] == "h"
+
+
+async def test_forecast_summaries_over_whole_windows(hass, entry, fake_ogd):
+    # The fake forecast then runs from 09:00 UTC on the 20th for 80 hours, with
+    # temperatures of 10 + i °C, gusts of 20 + i km/h and 30 minutes of sun.
+    fake_ogd.hours = 80
+    await setup(hass, entry)
+
+    def value(key):
+        return summary(hass, entry, key).state
+
+    assert value("snow_tonight") == "0.0"  # too warm
+    assert value("snow_next_24h") == "0.0"
+    assert value("snow_next_48h") == "0.0"
+    assert value("sunshine_tomorrow") == "12.0"
+    assert value("sunshine_tomorrow_midday") == "3.0"
+    # Tomorrow 09-15 local is 07-13 UTC on the 21st: i = 22 to 27.
+    assert value("max_gust_tomorrow_midday") == "47.0"
+    # Tonight from 18:00 local (16:00 UTC, i = 7) on.
+    assert value("min_temperature_tonight") == "17.0"
+
+
+async def test_summaries_needing_hourly_temperatures(hass, entry_data, fake_ogd):
+    """Unavailable without hourly temperatures, rather than a guess."""
+    fake_ogd.hours = 80
+    entry = MockConfigEntry(
+        domain=DOMAIN, data={**entry_data, "hourly_temperature": False}
+    )
+    entry.add_to_hass(hass)
+
+    await setup(hass, entry)
+
+    for key in (
+        "snow_tonight",
+        "snow_next_24h",
+        "snow_next_48h",
+        "min_temperature_tonight",
+    ):
+        assert summary(hass, entry, key).state == "unavailable", key
+    assert summary(hass, entry, "sunshine_tomorrow").state == "12.0"
+    assert summary(hass, entry, "precipitation_next_hour").state == "0.4"

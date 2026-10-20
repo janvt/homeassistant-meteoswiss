@@ -144,7 +144,7 @@ NOW = datetime.datetime(2026, 10, 20, 12, 30, tzinfo=UTC)
 
 
 def make_forecast(
-    run: str = "202610201200", with_temperature: bool = True
+    run: str = "202610201200", with_temperature: bool = True, hours: int = 12
 ) -> LocalForecast:
     """A forecast with 3 days and the hours around NOW."""
     start = datetime.datetime(2026, 10, 20, 9, tzinfo=UTC)
@@ -174,8 +174,9 @@ def make_forecast(
                 "wind_bearing": 180.0,
                 "wind_gust": 20.0 + i,
                 "cloud_coverage": 10.0 * i,
+                "sunshine": 30.0,
             }
-            for i in range(12)
+            for i in range(hours)
         ],
     }
 
@@ -204,6 +205,8 @@ class FakeOGD:
     run_checks = 0
     temperature_calls = 0
     temperature_error: Exception | None = None
+    # Hours of hourly forecast, from 09:00 UTC on the 20th.
+    hours = 12
     # The points each download of a large file was for, by parameter.
     large_downloads: dict[str, list[set[tuple[int, int]]]] = {}
 
@@ -221,6 +224,7 @@ class FakeOGD:
         cls.temperature_calls = 0
         cls.temperature_error = None
         cls.large_downloads = {}
+        cls.hours = 12
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
@@ -280,7 +284,9 @@ class FakeOGD:
         self, point, run, hourly_temperature=None, freezing_level=None
     ):
         FakeOGD.forecast_calls += 1
-        forecast = make_forecast(run, with_temperature=bool(hourly_temperature))
+        forecast = make_forecast(
+            run, with_temperature=bool(hourly_temperature), hours=FakeOGD.hours
+        )
         for hour in forecast["hourly"]:
             hour["freezing_level"] = 2900.0 if freezing_level else None
         # Remember which run the large files came from.

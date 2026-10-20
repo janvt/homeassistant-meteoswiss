@@ -108,5 +108,36 @@
                 }
             }
         }
+    },
+    "entity": {
+        "sensor": {
+            "snow_tonight": {
+                "name": "Schnee heute Nacht"
+            },
+            "snow_next_24h": {
+                "name": "Schnee nächste 24 Stunden"
+            },
+            "snow_next_48h": {
+                "name": "Schnee nächste 48 Stunden"
+            },
+            "sunshine_tomorrow_midday": {
+                "name": "Sonnenschein morgen 9–15 Uhr"
+            },
+            "sunshine_tomorrow": {
+                "name": "Sonnenschein morgen"
+            },
+            "max_gust_tomorrow_midday": {
+                "name": "Stärkste Böe morgen 9–15 Uhr"
+            },
+            "precipitation_next_hour": {
+                "name": "Niederschlag nächste Stunde"
+            },
+            "precipitation_probability_next_hour": {
+                "name": "Regenwahrscheinlichkeit nächste Stunde"
+            },
+            "min_temperature_tonight": {
+                "name": "Tiefsttemperatur heute Nacht"
+            }
+        }
     }
 }

@@ -108,5 +108,36 @@
                 }
             }
         }
+    },
+    "entity": {
+        "sensor": {
+            "snow_tonight": {
+                "name": "Snø i natt"
+            },
+            "snow_next_24h": {
+                "name": "Snø neste 24 timer"
+            },
+            "snow_next_48h": {
+                "name": "Snø neste 48 timer"
+            },
+            "sunshine_tomorrow_midday": {
+                "name": "Sol i morgen 9–15"
+            },
+            "sunshine_tomorrow": {
+                "name": "Sol i morgen"
+            },
+            "max_gust_tomorrow_midday": {
+                "name": "Sterkeste vindkast i morgen 9–15"
+            },
+            "precipitation_next_hour": {
+                "name": "Nedbør neste time"
+            },
+            "precipitation_probability_next_hour": {
+                "name": "Sjanse for regn neste time"
+            },
+            "min_temperature_tonight": {
+                "name": "Laveste temperatur i natt"
+            }
+        }
     }
 }

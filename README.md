@@ -142,6 +142,25 @@ To change the postal code, place or stations later, choose *Reconfigure* in
 the menu of the integration entry; its entities and their history are kept.
 Hourly temperatures can also be switched under *Configure*.
 
+## Forecast summary sensors
+
+Every forecast also has sensors summarising it, for dashboards and automations
+that cannot read the forecast itself.  All times are local (Europe/Zurich), and
+a window holds the hours that start in it.
+
+| Sensor | Value |
+|---|---|
+| Snow tonight | mm of water from 18:00 to 08:00 (from the current hour on), counting the precipitation of hours at 0.5 °C or colder |
+| Snow next 24 hours, Snow next 48 hours | The same, from the current hour on |
+| Sunshine tomorrow 9–15, Sunshine tomorrow | Hours of sunshine |
+| Strongest gust tomorrow 9–15 | km/h |
+| Precipitation next hour, Chance of rain next hour | For the hour after the current one; the chance of rain is MeteoSwiss's for the three hours up to its end |
+| Lowest temperature tonight | °C, 18:00 to 08:00 from the current hour on |
+
+The snow and temperature sensors need *Hourly temperatures*.  A sensor is
+unavailable when any hour of its window, or a value it needs, is missing,
+rather than showing a partial result.
+
 ## How to create a sensor that has the weather forecast data
 
 Here is a sample of a YAML-based trigger-powered template sensor that creates

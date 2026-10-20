@@ -1,22 +1,32 @@
 import logging
 import pprint
 import typing
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
+    SensorEntityDescription,
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfLength
+from homeassistant.const import (
+    PERCENTAGE,
+    UnitOfLength,
+    UnitOfPrecipitationDepth,
+    UnitOfSpeed,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.meteoswiss import MeteoSwissDataUpdateCoordinator
+from custom_components.meteoswiss import MeteoSwissDataUpdateCoordinator, summaries
 from custom_components.meteoswiss.const import (
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
@@ -31,12 +41,108 @@ from custom_components.meteoswiss.const import (
     SENSOR_TYPE_UNIT,
     SENSOR_TYPES,
 )
-from custom_components.meteoswiss.ogd import StationType, current_hour
+from custom_components.meteoswiss.ogd import HourlyForecast, StationType, current_hour
 
 _LOGGER = logging.getLogger(__name__)
 
 # Precipitation stations only measure rain.
 PRECIPITATION_SENSOR_TYPES = ("10minrain",)
+
+
+@dataclass(frozen=True, kw_only=True)
+class SummaryDescription(SensorEntityDescription):
+    """A summary of the hourly forecast over a local time window."""
+
+    # None when its data is missing, e.g. temperatures with hourly
+    # temperatures turned off.
+    value: Callable[[list[HourlyForecast], datetime], float | None]
+
+
+def _snow(description: str, window) -> SummaryDescription:
+    return SummaryDescription(
+        key=description,
+        translation_key=description,
+        icon="mdi:snowflake",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=lambda hourly, now: summaries.snow(hourly, window(now)),
+    )
+
+
+def _sunshine(description: str, window) -> SummaryDescription:
+    return SummaryDescription(
+        key=description,
+        translation_key=description,
+        icon="mdi:weather-sunny",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=lambda hourly, now: summaries.sunshine_hours(hourly, window(now)),
+    )
+
+
+SUMMARIES: tuple[SummaryDescription, ...] = (
+    # In mm of water: the precipitation of the hours at or below 0.5 °C.
+    _snow("snow_tonight", summaries.tonight),
+    _snow("snow_next_24h", lambda now: summaries.coming_hours(now, 24)),
+    _snow("snow_next_48h", lambda now: summaries.coming_hours(now, 48)),
+    _sunshine(
+        "sunshine_tomorrow_midday",
+        lambda now: summaries.tomorrow(now, *summaries.MIDDAY),
+    ),
+    _sunshine("sunshine_tomorrow", summaries.tomorrow),
+    SummaryDescription(
+        key="max_gust_tomorrow_midday",
+        translation_key="max_gust_tomorrow_midday",
+        icon="mdi:weather-windy",
+        device_class=SensorDeviceClass.WIND_SPEED,
+        native_unit_of_measurement=UnitOfSpeed.KILOMETERS_PER_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value=lambda hourly, now: summaries.max_gust(
+            hourly, summaries.tomorrow(now, *summaries.MIDDAY)
+        ),
+    ),
+    SummaryDescription(
+        key="precipitation_next_hour",
+        translation_key="precipitation_next_hour",
+        icon="mdi:weather-rainy",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=lambda hourly, now: summaries.precipitation(
+            hourly, summaries.next_hour(now)
+        ),
+    ),
+    SummaryDescription(
+        # MeteoSwiss's chance of rain in the three hours up to its end.
+        key="precipitation_probability_next_hour",
+        translation_key="precipitation_probability_next_hour",
+        icon="mdi:umbrella-outline",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        value=lambda hourly, now: summaries.precipitation_probability(
+            hourly, summaries.next_hour(now)
+        ),
+    ),
+    SummaryDescription(
+        key="min_temperature_tonight",
+        translation_key="min_temperature_tonight",
+        icon="mdi:thermometer-low",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value=lambda hourly, now: summaries.min_temperature(
+            hourly, summaries.tonight(now)
+        ),
+    ),
+)
 
 
 async def async_setup_entry(
@@ -77,6 +183,46 @@ async def async_setup_entry(
     # The freezing level comes with the hourly temperatures.
     if c.is_mountain and c.hourly_temperature:
         async_add_entities([MeteoSwissFreezingLevelSensor(entry.entry_id, c)], True)
+    async_add_entities(
+        [MeteoSwissSummarySensor(entry.entry_id, c, d) for d in SUMMARIES], True
+    )
+
+
+class MeteoSwissSummarySensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """A summary of the forecast, such as the snow expected tonight.
+
+    Without the data it needs, it is unavailable rather than a guess.
+    """
+
+    entity_description: SummaryDescription
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        integration_id: str,
+        coordinator: MeteoSwissDataUpdateCoordinator,
+        description: SummaryDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
+        self._attr_device_info = coordinator.device_info
+
+    @property
+    def native_value(self) -> float | None:
+        forecast = self.coordinator.data["forecast"]
+        if not forecast:
+            return None
+        return self.entity_description.value(
+            forecast["hourly"], datetime.now(timezone.utc)
+        )
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
 
 
 class MeteoSwissFreezingLevelSensor(

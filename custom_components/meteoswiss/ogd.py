@@ -90,6 +90,9 @@ HOURLY_PARAMETERS = {
     "cloud_low": "nprolohs",
     "cloud_medium": "npromths",
     "cloud_high": "nprohihs",
+    # Minutes of sunshine in the hour; Home Assistant forecasts have no field
+    # for it, so it is only used for sensors.
+    "sunshine": "sre000h0",
 }
 # Ordered by time rather than point, so they are downloaded whole (about
 # 33 MB each): see MeteoSwissOGD.get_hourly_rows.
@@ -167,6 +170,7 @@ class HourlyForecast(TypedDict):
     wind_gust: float | None  # strongest gust of the hour, km/h
     cloud_coverage: float | None  # %, all layers together
     freezing_level: float | None  # metres above sea level
+    sunshine: float | None  # minutes
 
 
 class LocalForecast(TypedDict):
@@ -771,6 +775,7 @@ class MeteoSwissOGD:
                     _number(hourly["cloud_high"].get(hour)),
                 ),
                 "freezing_level": _number(hourly["freezing_level"].get(hour)),
+                "sunshine": _number(hourly["sunshine"].get(hour)),
             }
             for hour in hours
         ]
