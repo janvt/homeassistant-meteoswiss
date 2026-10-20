@@ -30,6 +30,9 @@ from custom_components.meteoswiss.ogd import StationType
 
 _LOGGER = logging.getLogger(__name__)
 
+# Precipitation stations only measure rain.
+PRECIPITATION_SENSOR_TYPES = ("10minrain",)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -57,7 +60,7 @@ async def async_setup_entry(
         async_add_entities(
             [
                 MeteoSwissSensor(entry.entry_id, typ, c, StationType.PRECIPITATION)
-                for typ in SENSOR_TYPES
+                for typ in PRECIPITATION_SENSOR_TYPES
             ],
             True,
         )

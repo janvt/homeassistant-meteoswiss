@@ -67,7 +67,12 @@ async def test_sensors(hass, entry):
     assert value("10minrain") == "0.0"
     # The precipitation station only measures rain.
     assert value("10minrain-precipitation") == "0.2"
-    assert value("temperature-precipitation") == "unavailable"
+    precipitation_sensors = [
+        e
+        for e in er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+        if e.unique_id.endswith("-precipitation")
+    ]
+    assert len(precipitation_sensors) == 1
     # Missing measurements are unavailable rather than wrong.
     assert value("dew_point") == "unavailable"
 
