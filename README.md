@@ -121,8 +121,8 @@ Now you are ready to add one or more instances of the integration.
 
 ![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/weatherstation.png)
 
-- For a mountain, hut or pass, pick it from the list, which is sorted by
-  distance from your location and shows each place's altitude.  The forecast is
+- For a mountain, hut or pass, pick it from the list of the 100 closest,
+  sorted by distance from your location, with each place's altitude.  The forecast is
   for that altitude.  No station is suggested, as summits rarely have one
   nearby; without a station, the weather entity shows the forecast for the
   current hour as its current conditions.  With hourly temperatures turned on,

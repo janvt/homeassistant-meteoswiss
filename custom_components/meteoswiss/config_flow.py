@@ -54,6 +54,8 @@ _LOGGER = logging.getLogger(__name__)
 
 NO_STATION = "No real-time weather station"
 NO_PRECIPITATION_STATION = "No real-time precipitation station"
+# The dropdown cannot be searched, so only the closest places are offered.
+MAX_MOUNTAINS = 100
 
 
 def mountain_label(point: Point, lat: float, lon: float) -> str:
@@ -151,7 +153,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
         errors = {}
         try:
-            points = await ogd.get_poi_points(self._lat, self._lon)
+            points = (await ogd.get_poi_points(self._lat, self._lon))[:MAX_MOUNTAINS]
         except OGDError:
             points = []
             errors["base"] = "cannot_query_points"

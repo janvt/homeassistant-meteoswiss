@@ -71,7 +71,7 @@
             },
             "mountain": {
                 "title": "Fjell, hytte eller pass",
-                "description": "Stedene er sortert etter avstand fra posisjonen din, og varslene gjelder for høyden som vises. Uten stasjon er de nåværende forholdene som vises varselet for inneværende time.",
+                "description": "Stedene er sortert etter avstand fra posisjonen din, og varslene gjelder for høyden som vises. Bare de 100 nærmeste vises. Uten stasjon er de nåværende forholdene som vises varselet for inneværende time.",
                 "data": {
                     "point_id": "Sted",
                     "forecast_name": "Navn på varselenheten (vær)",

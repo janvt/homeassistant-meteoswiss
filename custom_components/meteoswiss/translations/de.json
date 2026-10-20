@@ -71,7 +71,7 @@
             },
             "mountain": {
                 "title": "Berg, Hütte oder Pass",
-                "description": "Die Orte sind nach Entfernung von deinem Standort sortiert, und ihre Prognosen gelten für die angegebene Höhe. Ohne Station sind die angezeigten aktuellen Bedingungen die Prognose für die aktuelle Stunde.",
+                "description": "Die Orte sind nach Entfernung von deinem Standort sortiert, und ihre Prognosen gelten für die angegebene Höhe. Es werden nur die 100 nächsten aufgeführt. Ohne Station sind die angezeigten aktuellen Bedingungen die Prognose für die aktuelle Stunde.",
                 "data": {
                     "point_id": "Ort",
                     "forecast_name": "Name des Prognose-(Wetter)-Entities",

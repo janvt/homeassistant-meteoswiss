@@ -71,7 +71,7 @@
             },
             "mountain": {
                 "title": "Montagna, capanna o passo",
-                "description": "I luoghi sono ordinati per distanza dalla tua posizione e le loro previsioni valgono per l'altitudine indicata. Senza stazione, le condizioni attuali mostrate sono le previsioni per l'ora corrente.",
+                "description": "I luoghi sono ordinati per distanza dalla tua posizione e le loro previsioni valgono per l'altitudine indicata. Sono elencati solo i 100 più vicini. Senza stazione, le condizioni attuali mostrate sono le previsioni per l'ora corrente.",
                 "data": {
                     "point_id": "Luogo",
                     "forecast_name": "Nome dell'entità di previsione (meteo)",

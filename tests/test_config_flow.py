@@ -74,11 +74,13 @@ async def test_postcode_and_name_are_guessed_from_the_location(hass):
     }
 
 
-async def test_postcode_cannot_be_guessed_when_metadata_is_unavailable(hass, fake_ogd):
+async def test_postcode_cannot_be_guessed_when_metadata_is_unavailable(
+    hass, fake_ogd, monkeypatch
+):
     async def fail(self, lat, lon):
         raise OGDError("down")
 
-    fake_ogd.get_nearest_postcode_point = fail
+    monkeypatch.setattr(fake_ogd, "get_nearest_postcode_point", fail)
 
     result = await start(hass)
 
@@ -370,12 +372,20 @@ async def test_a_mountain_can_be_named(hass):
     assert result["data"]["station"] == "SMA"
 
 
-async def test_mountain_list_unavailable(hass, fake_ogd):
+async def test_mountain_list_unavailable(hass, fake_ogd, monkeypatch):
     async def fail(self, lat, lon):
         raise OGDError("down")
 
-    fake_ogd.get_poi_points = fail
+    monkeypatch.setattr(fake_ogd, "get_poi_points", fail)
 
     result = await start(hass, "mountain")
 
     assert result["errors"] == {"base": "cannot_query_points"}
+
+
+async def test_only_the_closest_mountains_are_listed(hass, monkeypatch):
+    monkeypatch.setattr("custom_components.meteoswiss.config_flow.MAX_MOUNTAINS", 2)
+
+    result = await start(hass, "mountain")
+
+    assert [value for value, _ in options(result, "point_id")] == ["864", "442"]

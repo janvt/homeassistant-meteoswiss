@@ -71,7 +71,7 @@
             },
             "mountain": {
                 "title": "Montaña, refugio o puerto",
-                "description": "Los lugares están ordenados por distancia a su ubicación, y sus previsiones son para la altitud indicada. Sin estación, las condiciones actuales mostradas son la previsión para la hora actual.",
+                "description": "Los lugares están ordenados por distancia a su ubicación, y sus previsiones son para la altitud indicada. Solo se muestran los 100 más cercanos. Sin estación, las condiciones actuales mostradas son la previsión para la hora actual.",
                 "data": {
                     "point_id": "Lugar",
                     "forecast_name": "Nombre de la entidad de previsión (tiempo)",

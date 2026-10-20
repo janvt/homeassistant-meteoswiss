@@ -71,7 +71,7 @@
             },
             "mountain": {
                 "title": "Montagne, cabane ou col",
-                "description": "Les lieux sont triés selon leur distance de votre position, et leurs prévisions valent pour l'altitude indiquée. Sans station, les conditions actuelles affichées sont la prévision pour l'heure en cours.",
+                "description": "Les lieux sont triés selon leur distance de votre position, et leurs prévisions valent pour l'altitude indiquée. Seuls les 100 plus proches sont listés. Sans station, les conditions actuelles affichées sont la prévision pour l'heure en cours.",
                 "data": {
                     "point_id": "Lieu",
                     "forecast_name": "Nom de l'entité de prévision (météo)",

@@ -71,7 +71,7 @@
             },
             "mountain": {
                 "title": "Mountain, hut or pass",
-                "description": "Places are sorted by distance from your location, and their forecasts are for the altitude shown.  Without a station, the current conditions shown are the forecast for the current hour.",
+                "description": "Places are sorted by distance from your location, and their forecasts are for the altitude shown.  Only the 100 closest are listed.  Without a station, the current conditions shown are the forecast for the current hour.",
                 "data": {
                     "point_id": "Place",
                     "forecast_name": "Forecast (weather) entity name",
