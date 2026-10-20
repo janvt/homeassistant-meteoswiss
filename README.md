@@ -232,29 +232,63 @@ unavailable when the station has reported nothing for six hours.
 
 ## Download volumes
 
-With the defaults, one postal-code entry downloads about 310 MB a day, most of
-it hourly temperatures.  Station and pollen measurements take a few kilobytes
-per update (about 1 MB a day per station at the default interval).  The rest:
+With the defaults, one postal-code entry with a weather, a precipitation and a
+pollen station downloads about 10–20 MB a day, depending mostly on how many
+weather warnings are in force in Switzerland.  Restarting Home Assistant costs
+about 4 MB more, as nothing is kept on disk.
 
 | Data | Download | Setting |
 |---|---|---|
-| Hourly temperatures | 33 MB at most every 3 hours, up to 264 MB a day | *Hourly temperatures* (on by default) |
-| Freezing level | 34 MB at most every 3 hours, up to 270 MB a day | *Freezing level* (on by default for mountains with hourly temperatures) |
-| Forecast | 290 kB a run per entry, about 7 MB a day | — |
-| Weather warnings | about 8 kB per warning in force in Switzerland, every 30 minutes: 37 MB a day with 90 warnings, little on quiet days | — |
-| Climate normals | 1.4 MB a week per station, plus up to 20 kB every 6 hours | *Climate normals* (on by default) |
+| Forecast | about 150 kB a run, every hour: 3–4 MB a day per entry | — |
+| Hourly temperatures | 0.4–0.7 MB every 3 hours per place: about 4 MB a day | *Hourly temperatures* (on by default) |
+| Freezing level | the same again | *Freezing level* (on by default for mountains with hourly temperatures) |
+| Weather warnings | a size check every 10 minutes (60 kB a day), and the feed (8 kB per warning in force in Switzerland) when that changed, when one of its warnings has run out, and at least every 3 hours: 6–10 MB a day with 90 warnings, little on quiet days | — |
+| Station measurements | 5.5 kB when a station has a new row, 0.5 kB to check that it has not: about 0.9 MB a day per station at the default interval; pollen 0.1 MB | — |
+| Climate normals | 1.4 MB per station when Home Assistant starts, then a check once a week and this year's days, 20 kB, every 6 hours | *Climate normals* (on by default) |
 
-Sizes are as transferred.  The hourly temperatures and the freezing level are
-whole files of all of Switzerland, ordered by time, and too large for the
-server to compress; the warnings are not compressed either.  The rest of the
-forecast is read in 20 kB slices of the files of all of Switzerland.  The
-large files are shared by all entries; the slices are read for each entry.
+Sizes are as transferred, including the headers of each request.
 
-On a metered connection, turn off *Hourly temperatures*: the hourly forecast
-then has no temperatures, and the snow and lowest-temperature sensors are
-unavailable.  Nothing is written to disk; downloads are kept in memory only as
-long as needed, so restarting Home Assistant, or adding an entry for another
-place, downloads the large files again.
+### How, and what it costs
+
+MeteoSwiss publishes each forecast parameter as one file of all 5,800 places
+in Switzerland, of up to 34 MB.  The integration reads only the rows of its
+places, with HTTP range requests:
+
+* Files ordered by place (most of them) hold a place's rows together.  They
+  are found once by a binary search, and in later runs in a single request
+  where they were before, moved in proportion to how much the file grew or
+  shrank (which is asked for first when that changes much).
+* Files ordered by time (hourly temperatures, the freezing level and the daily
+  lows and highs) hold a block of all places for each hour or day.  A place's
+  row is read from each block, near where the previous file and the blocks
+  before put it: about 220 small requests for an hourly file, 9 for a daily
+  one.  The first read of each day (UTC) also reads the first 192 kB, to
+  learn the order of the places.
+
+The caveats:
+
+* This relies on how MeteoSwiss lays out its files.  If that changes, rows
+  that cannot be found are read from the whole file instead: 33 MB, or 220 kB
+  compressed for the daily lows and highs.  The debug log says so ("cannot be
+  read by block", "reading it whole").
+* Each place is read on its own.  The large files used to be downloaded whole
+  once for all entries, so with many places this saves less, and past about
+  70 places it costs more.
+* The hourly temperatures and the freezing level are read at most every 3
+  hours, as before, so they can be up to 3 hours older than the rest of the
+  forecast.
+* The warnings server supports neither compression, ranges nor ETags, so a
+  change to the warnings is noticed by the size of the feed.  A change that
+  keeps the size exactly (such as a warning moved by a few hours) is noticed
+  only when the feed is fetched anyway, within 3 hours.  Warnings that run out
+  are always checked for an extension.
+* Station files are fetched only if they changed (HTTP `If-None-Match`); the
+  sensors still update at the interval you set.
+
+On a metered connection, turn off *Hourly temperatures* (and the freezing
+level): the hourly forecast then has no temperatures, and the snow and
+lowest-temperature sensors are unavailable.  Nothing is written to disk, so
+after restarting Home Assistant everything is read again from the start.
 
 ## Data sources
 
@@ -282,9 +316,8 @@ The integration contacts only `data.geo.admin.ch` (forecasts, measurements and
 the lists of places and stations) and `feeds.meteoalarm.org` (warnings).  Your
 coordinates never leave Home Assistant: the closest postal code, stations and
 warnings are worked out locally from those lists.  What it downloads still hints
-at your approximate area: the files of the stations you chose, the part of the
-forecast files holding your postal code, and the details of warnings that cover
-you.
+at your approximate area: the files of the stations you chose, the parts of the
+forecast files holding your place, and the details of warnings that cover you.
 
 ## Troubleshooting
 

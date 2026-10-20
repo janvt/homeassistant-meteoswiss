@@ -66,7 +66,7 @@
                 "description": "The postal code is used to look up the nine-day forecast.  The name you enter here will be used for the forecast (weather) entity.",
                 "title": "Forecast",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. The freezing level is a setting of its own. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland (33 MB). Only the rows of your place are read from it: about 0.5 MB every three hours, 4 MB a day. The freezing level is a setting of its own. Turn this off to save that too: the hourly forecast then has no temperatures, and the rest of the forecast needs about 150 kB an hour."
                 }
             },
             "mountain": {
@@ -80,7 +80,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Leave empty to use the name of the place.",
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures and the freezing level in files for all of Switzerland, of about 33 MB each, downloaded every three hours (about 530 MB a day, 16 GB a month, shared with your other MeteoSwiss forecasts). Turn this off on a metered connection: the forecast then has no hourly temperatures and there is no freezing level sensor."
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures and the freezing level in files for all of Switzerland (33 MB each). Only the rows of this place are read from them: about 0.5 MB each every three hours, 8 MB a day for both. Turn this off to save that: the forecast then has no hourly temperatures and there is no freezing level sensor."
                 }
             },
             "user_three": {
@@ -115,14 +115,14 @@
                     "climate_normals": "Climate normals"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. The freezing level is a setting of its own. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour.",
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland (33 MB). Only the rows of your place are read from it: about 0.5 MB every three hours, 4 MB a day. The freezing level is a setting of its own. Turn this off to save that too: the hourly forecast then has no temperatures, and the rest of the forecast needs about 150 kB an hour.",
                     "foehn": "Sensors for Föhn: MeteoSwiss's measured Föhn index at the weather station, and an outlook from the pressure difference across the Alps, which rises hours before the Föhn breaks through.",
                     "foehn_south_station": "Its sea-level pressure is compared with the station north of the Alps. Lugano is the classic choice.",
                     "foehn_north_station": "Zürich/Kloten is the classic choice.",
                     "foehn_threshold": "Pressure difference from which Föhn is likely; about 4 hPa reaches the northern valleys, as in Altdorf. The same the other way round for north Föhn.",
                     "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa.",
-                    "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in another 33 MB file every three hours (about 260 MB a day), downloaded once for all your MeteoSwiss forecasts, so it costs nothing more if one of them already has it.",
-                    "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 6 MB) is downloaded once a week, this year's days every six hours."
+                    "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in a file for all of Switzerland (33 MB), of which only the rows of this place are read: about 0.5 MB every three hours, 4 MB a day.",
+                    "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 1.4 MB) is downloaded when Home Assistant starts, then only checked for changes once a week; this year's days every six hours."
                 }
             }
         },

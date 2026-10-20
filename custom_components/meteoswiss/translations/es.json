@@ -66,7 +66,7 @@
                 "description": "El código postal se usa para obtener el pronóstico de los siguientos 5 días.  El nombre que usted suministre aquí se usará en el nombre de la entidad de pronóstico (clima).",
                 "title": "Pronóstico",
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. La isoterma de cero grados es un ajuste aparte. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza (33 MB). Solo se leen las filas de su lugar: unos 0,5 MB cada tres horas, 4 MB al día. La isoterma de cero grados es un ajuste aparte. Desactívelo para ahorrar también eso: la previsión por hora no tendrá temperaturas, y el resto de la previsión necesita unos 150 kB por hora."
                 }
             },
             "mountain": {
@@ -80,7 +80,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Déjelo vacío para usar el nombre del lugar.",
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora y la isoterma de cero grados en archivos para toda Suiza, de unos 33 MB cada uno, que se descargan cada tres horas (unos 530 MB al día, 16 GB al mes, compartidos con sus otras previsiones de MeteoSuiza). Desactívelo en una conexión con datos limitados: la previsión no tendrá temperaturas por hora y no habrá sensor de la isoterma de cero grados."
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora y la isoterma de cero grados en archivos para toda Suiza (33 MB cada uno). Solo se leen las filas de este lugar: unos 0,5 MB cada uno cada tres horas, 8 MB al día entre los dos. Desactívelo para ahorrarlo: la previsión no tendrá temperaturas por hora y no habrá sensor de la isoterma de cero grados."
                 }
             },
             "user_three": {
@@ -115,14 +115,14 @@
                     "climate_normals": "Normales climáticas"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. La isoterma de cero grados es un ajuste aparte. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora.",
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza (33 MB). Solo se leen las filas de su lugar: unos 0,5 MB cada tres horas, 4 MB al día. La isoterma de cero grados es un ajuste aparte. Desactívelo para ahorrar también eso: la previsión por hora no tendrá temperaturas, y el resto de la previsión necesita unos 150 kB por hora.",
                     "foehn": "Sensores para el foehn: el índice de foehn medido por MeteoSuiza en la estación meteorológica y una tendencia a partir de la diferencia de presión a través de los Alpes, que sube horas antes de que irrumpa el foehn.",
                     "foehn_south_station": "Su presión a nivel del mar se compara con la de la estación al norte de los Alpes. Lugano es la elección clásica.",
                     "foehn_north_station": "Zúrich/Kloten es la elección clásica.",
                     "foehn_threshold": "Diferencia de presión a partir de la cual el foehn es probable; unos 4 hPa llegan a los valles del norte, como en Altdorf. Igual en sentido contrario para el foehn del norte.",
                     "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa.",
-                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en otro archivo de 33 MB cada tres horas (unos 260 MB al día), que se descarga una vez para todas sus previsiones de MeteoSwiss, así que no cuesta nada más si una de ellas ya la tiene.",
-                    "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 6 MB) se descarga una vez por semana, los días de este año cada seis horas."
+                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en un archivo para toda Suiza (33 MB), del que solo se leen las filas de este lugar: unos 0,5 MB cada tres horas, 4 MB al día.",
+                    "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 1,4 MB) se descarga al iniciar Home Assistant y después solo se comprueba una vez por semana; los días de este año cada seis horas."
                 }
             }
         },
