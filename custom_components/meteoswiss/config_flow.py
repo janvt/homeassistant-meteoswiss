@@ -11,6 +11,12 @@ from homeassistant.core import callback
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity
+from homeassistant.helpers.selector import (
+    SelectOptionDict,
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from custom_components.meteoswiss.const import (
     CONF_FORECAST_NAME,
@@ -18,6 +24,7 @@ from custom_components.meteoswiss.const import (
     CONF_LAT,
     CONF_LON,
     CONF_POINT_ID,
+    CONF_POINT_TYPE,
     CONF_POSTCODE,
     CONF_PRECIPITATION_NAME,
     CONF_PRECIPITATION_STATION,
@@ -32,9 +39,13 @@ from custom_components.meteoswiss.const import (
     USER_AGENT,
 )
 from custom_components.meteoswiss.ogd import (
+    POINT_TYPE_POI,
+    POINT_TYPE_POSTCODE,
     MeteoSwissOGD,
     OGDError,
+    Point,
     StationType,
+    distance_km,
     nearest,
 )
 
@@ -43,6 +54,13 @@ _LOGGER = logging.getLogger(__name__)
 
 NO_STATION = "No real-time weather station"
 NO_PRECIPITATION_STATION = "No real-time precipitation station"
+
+
+def mountain_label(point: Point, lat: float, lon: float) -> str:
+    """E.g. Bristen, 3073 m, 14 km: some names are used by several mountains."""
+    distance = distance_km(lat, lon, point.lat, point.lon)
+    height = f", {point.height:.0f} m" if point.height is not None else ""
+    return f"{point.name}{height}, {distance:.0f} km"
 
 
 class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:ignore
@@ -56,6 +74,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         self._lon = None
         self._postcode = None
         self._point_id = None
+        self._point_type = POINT_TYPE_POSTCODE
         self._forecast_name = None
         self._update_interval = None
         self._hourly_temperature = DEFAULT_HOURLY_TEMPERATURE
@@ -119,7 +138,83 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             self._lon,
             self._postcode,
         )
-        return await self.async_step_user_two()
+        return await self.async_step_location()
+
+    async def async_step_location(self, user_input=None):
+        """Choose between the forecast of a postal code and of a mountain."""
+        return self.async_show_menu(
+            step_id="location", menu_options=["user_two", "mountain"]
+        )
+
+    async def async_step_mountain(self, user_input=None):
+        """Choose a mountain, hut or pass, closest first."""
+        ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
+        errors = {}
+        try:
+            points = await ogd.get_poi_points(self._lat, self._lon)
+        except OGDError:
+            points = []
+            errors["base"] = "cannot_query_points"
+
+        if user_input is not None and points:
+            point = next(
+                (p for p in points if str(p.point_id) == user_input[CONF_POINT_ID]),
+                None,
+            )
+            if point is None:
+                errors[CONF_POINT_ID] = "invalid_point"
+            if user_input[CONF_UPDATE_INTERVAL] < 1:
+                errors[CONF_UPDATE_INTERVAL] = "update_interval_too_low"
+            if not errors:
+                self._point_type = POINT_TYPE_POI
+                self._point_id = point.point_id
+                self._postcode = None
+                self._forecast_name = (
+                    user_input.get(CONF_FORECAST_NAME, "").strip() or point.name
+                )
+                self._update_interval = int(user_input[CONF_UPDATE_INTERVAL])
+                self._hourly_temperature = bool(user_input[CONF_HOURLY_TEMPERATURE])
+                return await self.async_step_user_three()
+
+        user_input = user_input or {}
+        default_point = user_input.get(
+            CONF_POINT_ID, str(points[0].point_id) if points else ""
+        )
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_POINT_ID, default=default_point): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            SelectOptionDict(
+                                value=str(p.point_id),
+                                label=mountain_label(p, self._lat, self._lon),
+                            )
+                            for p in points
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional(
+                    CONF_FORECAST_NAME,
+                    default=user_input.get(CONF_FORECAST_NAME, ""),
+                ): str,
+                vol.Required(
+                    CONF_UPDATE_INTERVAL,
+                    default=user_input.get(
+                        CONF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL
+                    ),
+                ): int,
+                vol.Required(
+                    CONF_HOURLY_TEMPERATURE,
+                    default=user_input.get(
+                        CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE
+                    ),
+                ): bool,
+            }
+        )
+        return self.async_show_form(
+            step_id="mountain", data_schema=schema, errors=errors
+        )
 
     async def async_step_user_two(self, user_input=None):
         """Handle the second step of setup.
@@ -370,6 +465,12 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 )
             else:
                 default_station_selection = NO_STATION
+            if self._point_type == POINT_TYPE_POI:
+                # Stations are rarely near a summit.
+                default_weather_station = default_precipitation_station = None
+                default_weather_station_name = None
+                default_precipitation_station_name = None
+                default_station_selection = NO_STATION
             if default_precipitation_station:
                 default_precipitation_station_selection = "%s (%s)" % (
                     default_precipitation_station_name,
@@ -402,11 +503,14 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             )
 
         data = {
-            CONF_POSTCODE: self._postcode,
             CONF_FORECAST_NAME: self._forecast_name,
             CONF_UPDATE_INTERVAL: self._update_interval,
             CONF_HOURLY_TEMPERATURE: self._hourly_temperature,
         }
+        if self._point_type == POINT_TYPE_POI:
+            data[CONF_POINT_TYPE] = POINT_TYPE_POI
+        else:
+            data[CONF_POSTCODE] = self._postcode
         if self._point_id is not None:
             data[CONF_POINT_ID] = self._point_id
         if weather_station and real_time_weather_name:

@@ -31,6 +31,8 @@ SMN_PRECIP_URL = BASE_URL + "/ch.meteoschweiz.ogd-smn-precip"
 
 # Forecast point types (point_type_id in the metadata).
 POINT_TYPE_POSTCODE = 2
+# Mountains, huts, passes and a few regions.
+POINT_TYPE_POI = 3
 
 # Hourly model runs are published a few minutes past each hour.
 MAX_RUN_LOOKBACK_HOURS = 12
@@ -78,16 +80,21 @@ HOURLY_PARAMETERS = {
     "cloud_medium": "npromths",
     "cloud_high": "nprohihs",
 }
-# Ordered by time rather than point, so it is downloaded whole: see
-# MeteoSwissOGD.get_hourly_temperature.
+# Ordered by time rather than point, so they are downloaded whole (about
+# 33 MB each): see MeteoSwissOGD.get_hourly_rows.
 HOURLY_TEMPERATURE = "tre200h0"
+FREEZING_LEVEL = "zprfr0hs"
 
 
 class OGDError(Exception):
     """Data could not be obtained from MeteoSwiss."""
 
 
-class UnknownPostcodeError(OGDError):
+class UnknownPointError(OGDError):
+    """MeteoSwiss has no forecast for a configured place."""
+
+
+class UnknownPostcodeError(UnknownPointError):
     """MeteoSwiss has no forecast for a postal code."""
 
 
@@ -108,6 +115,12 @@ class Point:
     postcode: str
     lat: float
     lon: float
+    height: float | None = None  # metres above sea level
+
+    @property
+    def key(self) -> tuple[int, int]:
+        """IDs are only unique within a point type."""
+        return (self.point_id, self.point_type)
 
 
 @dataclass(frozen=True)
@@ -142,6 +155,7 @@ class HourlyForecast(TypedDict):
     wind_bearing: float | None
     wind_gust: float | None  # strongest gust of the hour, km/h
     cloud_coverage: float | None  # %, all layers together
+    freezing_level: float | None  # metres above sea level
 
 
 class LocalForecast(TypedDict):
@@ -192,6 +206,15 @@ def _key(line: bytes | str) -> tuple[int, int] | None:
         return int(parts[0]), int(parts[1])
     except (ValueError, IndexError):
         return None
+
+
+# The orders of the files that are ordered by point, as sort keys of
+# (point_id, point_type_id).  Some files are sorted by number; others by type,
+# then by point ID as text (1, 10, 10101, ..., 2).
+POINT_ORDERS = (
+    lambda point_id, point_type: (point_id, point_type),
+    lambda point_id, point_type: (point_type, str(point_id)),
+)
 
 
 def _rows_with_prefix(text: str, prefix: str) -> dict[str, str]:
@@ -253,6 +276,18 @@ def _local_daily_max(values: dict[str, str]) -> dict[str, float]:
     return highest
 
 
+def current_hour(
+    hourly: list[HourlyForecast], now: datetime.datetime
+) -> HourlyForecast | None:
+    """The forecast of the hour we are in."""
+    current = None
+    for forecast in hourly:
+        if forecast["time"] > now:
+            break
+        current = forecast
+    return current
+
+
 def _utc(timestamp: str) -> datetime.datetime:
     return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M").replace(
         tzinfo=datetime.timezone.utc
@@ -267,6 +302,8 @@ class MeteoSwissOGD:
         self._headers = {"User-Agent": user_agent}
         self._points: list[Point] | None = None
         self._stations: dict[StationType, list[Station]] = {}
+        # The index in POINT_ORDERS that worked last, by parameter.
+        self._orders: dict[str, int] = {}
 
     async def _get(
         self, url: str, byte_range: tuple[int, int] | None = None
@@ -304,11 +341,19 @@ class MeteoSwissOGD:
                     postcode=row["postal_code"],
                     lat=float(row["point_coordinates_wgs84_lat"]),
                     lon=float(row["point_coordinates_wgs84_lon"]),
+                    height=_number(row.get("point_height_masl")),
                 )
                 for row in reader
                 if row["point_id"]
             ]
         return self._points
+
+    async def get_poi_points(self, lat: float, lon: float) -> list[Point]:
+        """Mountains, huts and passes, closest first."""
+        return sorted(
+            (p for p in await self.get_points() if p.point_type == POINT_TYPE_POI),
+            key=lambda p: distance_km(lat, lon, p.lat, p.lon),
+        )
 
     async def get_postcode_points(self, postcode: str | int) -> list[Point]:
         """The forecast points of a postal code (some span several points)."""
@@ -326,13 +371,23 @@ class MeteoSwissOGD:
         )
 
     async def resolve_point(
-        self, postcode: str | int, point_id: int | None = None
+        self,
+        postcode: str | int | None,
+        point_id: int | None = None,
+        point_type: int = POINT_TYPE_POSTCODE,
     ) -> Point:
         """The forecast point for a configuration.
 
-        An explicit point ID wins; otherwise it is the first point of the
-        postal code.
+        Mountains are configured by point. For postal codes an explicit point
+        ID wins; otherwise it is the first point of the postal code.
         """
+        if point_type != POINT_TYPE_POSTCODE:
+            for point in await self.get_points():
+                if point.key == (point_id, point_type):
+                    return point
+            raise UnknownPointError(
+                f"No forecast point {point_id} of type {point_type}"
+            )
         points = await self.get_postcode_points(postcode)
         if point_id is not None:
             points = [p for p in points if p.point_id == point_id] or points
@@ -442,14 +497,16 @@ class MeteoSwissOGD:
             lines = head.decode("latin-1").splitlines()[1:3]
             keys = [_key(line) for line in lines]
             if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
-                return await self._ranged_point_values(url, total, point, prefix)
-            return await self._streamed_point_values(url, prefix)
+                return await self._ordered_point_values(url, total, point, prefix)
+            return (await self._streamed_point_values(url, [prefix]))[prefix]
         return _rows_with_prefix(head.decode("latin-1"), prefix)
 
-    async def _streamed_point_values(self, url: str, prefix: str) -> dict[str, str]:
-        """Stream a whole file, keeping only the rows starting with the prefix."""
-        needle = b"\n" + prefix.encode("latin-1")
-        rows: list[bytes] = []
+    async def _streamed_point_values(
+        self, url: str, prefixes: list[str]
+    ) -> dict[str, dict[str, str]]:
+        """Stream a whole file, keeping only the rows starting with the prefixes."""
+        needles = {prefix: b"\n" + prefix.encode("latin-1") for prefix in prefixes}
+        rows: dict[str, list[bytes]] = {prefix: [] for prefix in prefixes}
         # Carries the incomplete last line of a chunk, after its line break.
         tail = b""
         try:
@@ -463,18 +520,39 @@ class MeteoSwissOGD:
                     if cut < 0:
                         tail = data
                         continue
-                    _rows_with_needle(rows, data[:cut], needle)
+                    for prefix, needle in needles.items():
+                        _rows_with_needle(rows[prefix], data[:cut], needle)
                     tail = data[cut:]
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
-        _rows_with_needle(rows, tail, needle)
-        return _rows_with_prefix(b"\n".join(rows).decode("latin-1"), prefix)
+        for prefix, needle in needles.items():
+            _rows_with_needle(rows[prefix], tail, needle)
+        return {
+            prefix: _rows_with_prefix(b"\n".join(found).decode("latin-1"), prefix)
+            for prefix, found in rows.items()
+        }
 
-    async def _ranged_point_values(
+    async def _ordered_point_values(
         self, url: str, total: int, point: Point, prefix: str
     ) -> dict[str, str]:
-        """Binary search a file ordered by (point_id, point_type_id)."""
-        target = (point.point_id, point.point_type)
+        """Find a point in a file ordered by point, trying the known orders."""
+        parameter = url.rsplit(".", 2)[-2]
+        last = self._orders.get(parameter, 0)
+        for index in (last, *(i for i in range(len(POINT_ORDERS)) if i != last)):
+            rows = await self._ranged_point_values(
+                url, total, point, prefix, POINT_ORDERS[index]
+            )
+            if rows:
+                self._orders[parameter] = index
+                return rows
+        _LOGGER.debug("Point %s not found in %s", point.key, url)
+        return {}
+
+    async def _ranged_point_values(
+        self, url: str, total: int, point: Point, prefix: str, order
+    ) -> dict[str, str]:
+        """Binary search a file ordered by point, in the given order."""
+        target = order(point.point_id, point.point_type)
         # The first row of the target starts after the first line break past
         # `lo` and no later than the first line break past `hi`.
         lo, hi = 0, total
@@ -483,7 +561,7 @@ class MeteoSwissOGD:
             chunk, _ = await self._get(url, (mid, min(mid + PROBE_BYTES, total) - 1))
             newline = chunk.find(b"\n")
             key = _key(chunk[newline + 1 :].split(b"\n")[0]) if newline >= 0 else None
-            if key is not None and key < target:
+            if key is not None and order(*key) < target:
                 lo = mid
             else:
                 hi = mid
@@ -499,24 +577,32 @@ class MeteoSwissOGD:
             prefix,
         )
 
-    async def get_hourly_temperature(self, point: Point, run: str) -> dict[str, str]:
-        """The hourly temperatures of a point, as the raw rows for get_forecast.
+    async def get_hourly_rows(
+        self, points: list[Point], run: str, parameter: str
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        """The rows of several points in a file ordered by time, for get_forecast.
 
-        This downloads about 33 MB, so it is fetched separately from (and less
-        often than) the rest of the forecast.
+        Such a file is downloaded whole (about 33 MB), so it is fetched
+        separately from (and less often than) the rest of the forecast, once
+        for all points that need it.
         """
-        return await self._point_values(self._run_url(run, HOURLY_TEMPERATURE), point)
+        prefixes = {p.key: f"{p.point_id};{p.point_type};" for p in points}
+        found = await self._streamed_point_values(
+            self._run_url(run, parameter), list(prefixes.values())
+        )
+        return {key: found[prefix] for key, prefix in prefixes.items()}
 
     async def get_forecast(
         self,
         point: Point,
         run: str,
         hourly_temperature: dict[str, str] | None = None,
+        freezing_level: dict[str, str] | None = None,
     ) -> LocalForecast:
         """The daily and hourly forecast of a point for a model run.
 
-        The hourly temperatures come from get_hourly_temperature, possibly of
-        an earlier run.
+        Hourly temperatures and the freezing level come from get_hourly_rows,
+        possibly of an earlier run.
         """
         names = [
             *(("daily", k, p) for k, p in DAILY_PARAMETERS.items()),
@@ -534,6 +620,7 @@ class MeteoSwissOGD:
         if not daily["symbol"] and not hourly["symbol"]:
             raise OGDError(f"Run {run} has no data for point {point}")
         hourly["temperature"] = hourly_temperature or {}
+        hourly["freezing_level"] = freezing_level or {}
 
         # MeteoSwiss has no daily chance of rain or gusts: take the highest.
         daily_probability = _local_daily_max(hourly["precipitation_probability"])
@@ -574,6 +661,7 @@ class MeteoSwissOGD:
                     _number(hourly["cloud_medium"].get(hour)),
                     _number(hourly["cloud_high"].get(hour)),
                 ),
+                "freezing_level": _number(hourly["freezing_level"].get(hour)),
             }
             for hour in hours
         ]

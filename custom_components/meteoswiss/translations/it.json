@@ -15,6 +15,10 @@
         "improperly_configured": {
             "title": "L'integrazione di MeteoSvizzera non è configurata correttamente",
             "description": "L'integrazione di MeteoSvizzera con ID di inserimento {entry_id} non è configurata correttamente.\\n\\nPer favore, rimuovi il tuo entry di configurazione e ricrearlo."
+        },
+        "point_no_data": {
+            "title": "MeteoSvizzera non fornisce più previsioni per un luogo",
+            "description": "MeteoSvizzera non sembra più offrire previsioni per {name}.\n\nRimuovere l'integrazione MeteoSvizzera per questo luogo e aggiungerla di nuovo scegliendone un altro.\n\nFino ad allora, le previsioni risulteranno non disponibili."
         }
     },
     "config": {
@@ -31,7 +35,9 @@
             "invalid_postcode": "Il codice postale è invalido; questa integrazione funziona solo con i codici postali svizzeri",
             "forecast_name_empty": "Il nome del preavviso non può essere vuoto",
             "empty_name": "Il nome da visualizzare è vuoto",
-            "update_interval_too_low": "L'intervallo di aggiornamento è troppo basso; deve essere almeno 1 minuto"
+            "update_interval_too_low": "L'intervallo di aggiornamento è troppo basso; deve essere almeno 1 minuto",
+            "cannot_query_points": "Non è stato possibile caricare l'elenco dei luoghi di MeteoSvizzera; riprovare più tardi",
+            "invalid_point": "Scegliere un luogo dall'elenco"
         },
         "step": {
             "user": {
@@ -41,6 +47,14 @@
                 },
                 "description": "Conferma la tua posizione geografica. Questo verrà utilizzato per indovinare la stazione meteorologica in tempo reale più vicina e approssimare il codice postale per i preavvisi.",
                 "title": "Posizione"
+            },
+            "location": {
+                "title": "Previsioni per",
+                "description": "Usare le previsioni di un codice postale, oppure di una montagna, una capanna o un passo.",
+                "menu_options": {
+                    "user_two": "Codice postale",
+                    "mountain": "Montagna, capanna o passo"
+                }
             },
             "user_two": {
                 "data": {
@@ -52,7 +66,21 @@
                 "description": "Il codice postale viene utilizzato per cercare il preavviso a 5 giorni. Il nome che inserisci qui verrà utilizzato per l'entità del preavviso.",
                 "title": "Preavviso",
                 "data_description": {
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese). Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Le previsioni per le montagne scaricano anche lo zero termico, un altro file della stessa dimensione. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                }
+            },
+            "mountain": {
+                "title": "Montagna, capanna o passo",
+                "description": "I luoghi sono ordinati per distanza dalla tua posizione e le loro previsioni valgono per l'altitudine indicata. Senza stazione, le condizioni attuali mostrate sono le previsioni per l'ora corrente.",
+                "data": {
+                    "point_id": "Luogo",
+                    "forecast_name": "Nome dell'entità di previsione (meteo)",
+                    "update_interval": "Intervallo di aggiornamento (minuti)",
+                    "hourly_temperature": "Temperature orarie e limite dello zero termico"
+                },
+                "data_description": {
+                    "forecast_name": "Lasciare vuoto per usare il nome del luogo.",
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie e lo zero termico solo in file per tutta la Svizzera, di circa 33 MB ciascuno, scaricati ogni tre ore (circa 530 MB al giorno, 16 GB al mese, condivisi con le altre previsioni MeteoSvizzera). Disattivare l'opzione con una connessione a consumo: le previsioni non avranno temperature orarie e non ci sarà il sensore dello zero termico."
                 }
             },
             "user_three": {
@@ -76,7 +104,7 @@
                     "hourly_temperature": "Temperature orarie"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese). Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Le previsioni per le montagne scaricano anche lo zero termico, un altro file della stessa dimensione. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
                 }
             }
         }

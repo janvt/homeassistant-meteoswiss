@@ -12,6 +12,7 @@ This is the MeteoSwiss integration for Home Assistant.
 * Detects when your real-time weather station has been retired,
   and offers suggestions on how to fix the issue.
 * Supports hourly forecasts.
+* Forecasts for mountains, huts and passes, with a freezing level sensor.
 * Supports two different real-time stations: a weather station
   that may not give you rain data, and a precipitation station
   that will give you rain data but may not give you other info.
@@ -102,7 +103,10 @@ Now you are ready to add one or more instances of the integration.
 
 ![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/latitude.png)
 
-- The next screen will ask you (with a good guess) about your postal code, and update interval.  This information
+- Next, choose whether the forecast is for a postal code or for a mountain,
+  hut or pass.
+
+- For a postal code, the next screen will ask you (with a good guess) about your postal code, and update interval.  This information
   will be used by the weather entity — and the name onscreen is what your weather entity will be named after.
 
 ![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/postalcode.png)
@@ -116,6 +120,14 @@ Now you are ready to add one or more instances of the integration.
   rain information closer to where you are.
 
 ![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/weatherstation.png)
+
+- For a mountain, hut or pass, pick it from the list, which is sorted by
+  distance from your location and shows each place's altitude.  The forecast is
+  for that altitude.  No station is suggested, as summits rarely have one
+  nearby; without a station, the weather entity shows the forecast for the
+  current hour as its current conditions.  With hourly temperatures turned on,
+  a *freezing level* sensor shows the forecast height of the 0 °C line.  Add
+  the integration once more for each place you want a forecast for.
 
 - Your task is done and your integration is working.
 
@@ -253,7 +265,9 @@ of the postal code (updated hourly), and current conditions are the
 [automatic weather and precipitation stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased).
 Hourly temperatures are only published in a file of over 30 MB that covers
 all of Switzerland, so the integration downloads it at most every three hours
-(about 260 MB a day); the rest of the forecast takes a few kilobytes per hour.
+(about 260 MB a day), once for all your MeteoSwiss forecasts; the rest of the
+forecast takes a few kilobytes per hour.  Mountain forecasts also download the
+freezing level, another file of the same size.
 On a metered connection, turn off *Hourly temperatures* when setting up the
 integration or later in its options: the hourly forecast then has no temperatures.
 The daily chance of rain and gusts are the highest of the day.  Cloud cover

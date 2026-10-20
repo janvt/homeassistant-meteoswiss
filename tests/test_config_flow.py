@@ -16,13 +16,18 @@ def defaults(result):
     return {str(key): key.default() for key in result["data_schema"].schema}
 
 
-async def start(hass):
+async def start(hass, step="user_two"):
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": "user"}
     )
     assert result["step_id"] == "user"
     result = await hass.config_entries.flow.async_configure(result["flow_id"], ZURICH)
-    assert result["step_id"] == "user_two"
+    assert result["type"] is FlowResultType.MENU
+    assert result["menu_options"] == ["user_two", "mountain"]
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": step}
+    )
+    assert result["step_id"] == step
     return result
 
 
@@ -276,3 +281,101 @@ async def test_yaml_is_imported_only_once(hass):
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
     assert len(hass.config_entries.async_entries(DOMAIN)) == 1
+
+
+def options(result, field):
+    """The (value, label) choices of a select field."""
+    for key, validator in result["data_schema"].schema.items():
+        if str(key) == field:
+            return [(o["value"], o["label"]) for o in validator.config["options"]]
+    raise KeyError(field)
+
+
+async def test_mountains_are_listed_closest_first(hass):
+    result = await start(hass, "mountain")
+
+    assert not result["errors"]
+    assert options(result, "point_id") == [
+        ("864", "Bristen, 3073 m, 71 km"),
+        ("442", "Treschhütte SAC, 1475 m, 71 km"),
+        ("213", "Ouest romand, 490 m, 136 km"),
+    ]
+    assert defaults(result) == {
+        "point_id": "864",
+        "forecast_name": "",
+        "update_interval": 5,
+        "hourly_temperature": True,
+    }
+
+
+async def test_mountain_flow(hass):
+    result = await start(hass, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 10, "hourly_temperature": True},
+    )
+    assert result["step_id"] == "user_three"
+    # Summits rarely have a station nearby, so none is suggested.
+    assert defaults(result)["station"] == "No real-time weather station"
+    assert defaults(result)["precipitation_station"] == (
+        "No real-time precipitation station"
+    )
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "station": "No real-time weather station",
+            "real_time_name": "",
+            "precipitation_station": "No real-time precipitation station",
+            "real_time_precipitation_name": "",
+        },
+    )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    # Named after the mountain, as no name was given.
+    assert result["title"] == "Bristen"
+    assert result["data"] == {
+        "point_type": 3,
+        "point_id": 864,
+        "forecast_name": "Bristen",
+        "update_interval": 10,
+        "hourly_temperature": True,
+    }
+
+
+async def test_a_mountain_can_be_named(hass):
+    result = await start(hass, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "point_id": "442",
+            "forecast_name": " Hut ",
+            "update_interval": 5,
+            "hourly_temperature": False,
+        },
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "station": "Zürich / Fluntern (SMA)",
+            "real_time_name": "Fluntern",
+            "precipitation_station": "No real-time precipitation station",
+            "real_time_precipitation_name": "",
+        },
+    )
+
+    assert result["title"] == "Hut / Fluntern"
+    assert result["data"]["forecast_name"] == "Hut"
+    assert result["data"]["point_id"] == 442
+    assert result["data"]["station"] == "SMA"
+
+
+async def test_mountain_list_unavailable(hass, fake_ogd):
+    async def fail(self, lat, lon):
+        raise OGDError("down")
+
+    fake_ogd.get_poi_points = fail
+
+    result = await start(hass, "mountain")
+
+    assert result["errors"] == {"base": "cannot_query_points"}

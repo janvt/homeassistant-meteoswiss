@@ -16,6 +16,7 @@ from .fakes import (
     FakeSession,
     point_major_csv,
     time_major_csv,
+    type_then_text_csv,
 )
 
 UTC = datetime.timezone.utc
@@ -143,6 +144,37 @@ class TestPointValues:
         assert session.ranged_bytes < len(body) / 10
         assert all(r is not None for _, _, r in session.requests)
 
+    # IDs whose order as text differs from their order as numbers.
+    MIXED_POINTS = [
+        *((i, 1) for i in (1, 2, 10, 101, 1024, 10239, 20, 3, 912, 99)),
+        *((i, 2) for i in (100025, 120000, 800500, 965800)),
+        *((i, 3) for i in (2, 213, 864, 1061, 99)),
+    ]
+
+    @pytest.mark.parametrize("target", MIXED_POINTS)
+    async def test_files_ordered_by_type_then_id_as_text(self, target):
+        body = type_then_text_csv("p", self.MIXED_POINTS, HOURS, value)
+        client, _ = make_client({url("p"): body})
+        point = Point(target[0], target[1], "x", "", 0, 0)
+
+        result = await client._point_values(url("p"), point)
+
+        expected = ogd._rows_with_prefix(body.decode(), f"{target[0]};{target[1]};")
+        assert len(expected) == 217
+        assert result == expected
+
+    async def test_the_order_of_a_file_is_remembered(self):
+        body = type_then_text_csv("p", self.MIXED_POINTS, HOURS, value)
+        client, session = make_client({url("p"): body})
+
+        await client._point_values(url("p"), Point(864, 3, "x", "", 0, 0))
+        first = len(session.requests)
+        await client._point_values(url("p"), Point(1024, 1, "x", "", 0, 0))
+
+        # The second lookup searched only once, in the order that worked.
+        assert len(session.requests) - first < first
+        assert client._orders == {"p": 1}
+
     async def test_point_not_in_file(self):
         body = point_major_csv("p", BIG_POINTS, HOURS, value)
         client, _ = make_client({url("p"): body})
@@ -267,12 +299,12 @@ class TestGetForecast:
         client, session = make_client(forecast_files())
         point = Point(100025, 2, "Lausanne 25", "1000", 46.56, 6.68)
 
-        temperature = await client.get_hourly_temperature(point, RUN)
-        forecast = await client.get_forecast(point, RUN, temperature)
+        rows = await client.get_hourly_rows([point], RUN, "tre200h0")
+        forecast = await client.get_forecast(point, RUN, rows[point.key])
 
         # The whole file was streamed, as it is ordered by time.
         assert ("GET", url("tre200h0"), None) in session.requests
-        assert len(temperature) == 218
+        assert len(rows[point.key]) == 218
         hours = {h["time"]: h for h in forecast["hourly"]}
         # The earlier hours from the temperature file are kept too.
         early = hours[datetime.datetime(2026, 10, 19, 21, tzinfo=UTC)]
@@ -281,6 +313,45 @@ class TestGetForecast:
         assert hours[datetime.datetime(2026, 10, 20, 11, tzinfo=UTC)][
             "temperature"
         ] == float(f"{100025 % 7}.2")  # the row ending 12:00
+
+    async def test_one_download_serves_several_points(self):
+        client, session = make_client(forecast_files())
+        points = [
+            Point(100025, 2, "Lausanne 25", "1000", 46.56, 6.68),
+            Point(800500, 2, "Zürich", "8005", 47.39, 8.52),
+            Point(864, 3, "Bristen", "", 46.75, 8.71),  # not in the file
+        ]
+
+        rows = await client.get_hourly_rows(points, RUN, "tre200h0")
+
+        # A single plain download for all three points.
+        assert [r for r in session.requests if r[1] == url("tre200h0")] == [
+            ("GET", url("tre200h0"), None)
+        ]
+        assert {k: len(v) for k, v in rows.items()} == {
+            (100025, 2): 218,
+            (800500, 2): 218,
+            (864, 3): 0,
+        }
+        assert rows[(800500, 2)]["202610201200"] == f"{800500 % 7}.2"
+
+    async def test_freezing_level(self):
+        client, _ = make_client(forecast_files())
+        point = Point(800500, 2, "Zürich", "8005", 47.39, 8.52)
+
+        forecast = await client.get_forecast(
+            point, RUN, freezing_level={"202610201200": "3572"}
+        )
+
+        hours = {h["time"]: h for h in forecast["hourly"]}
+        assert (
+            hours[datetime.datetime(2026, 10, 20, 11, tzinfo=UTC)]["freezing_level"]
+            == 3572.0
+        )
+        assert (
+            hours[datetime.datetime(2026, 10, 20, 12, tzinfo=UTC)]["freezing_level"]
+            is None
+        )
 
     async def test_unknown_point_is_an_error(self):
         client, _ = make_client(forecast_files())
@@ -310,6 +381,27 @@ class TestMetadata:
 
     def client(self):
         return make_client({ogd.POINTS_URL: self.POINTS_CSV.encode("latin-1")})[0]
+
+    async def test_mountains_closest_first(self):
+        points = await self.client().get_poi_points(47.0, 9.0)
+        assert [(p.point_id, p.name, p.height) for p in points] == [
+            (437, "Glattalphütte SAC", 1.0)
+        ]
+
+    async def test_resolve_a_mountain(self):
+        point = await self.client().resolve_point(None, 437, ogd.POINT_TYPE_POI)
+        assert point.name == "Glattalphütte SAC"
+
+    async def test_unknown_mountain(self):
+        with pytest.raises(ogd.UnknownPointError) as exc:
+            await self.client().resolve_point(None, 1, ogd.POINT_TYPE_POI)
+        # Point 1 exists, but is a station rather than a mountain.
+        assert not isinstance(exc.value, ogd.UnknownPostcodeError)
+
+    async def test_heights(self):
+        points = {p.key: p for p in await self.client().get_points()}
+        assert points[(1, 1)].height == 1878.0
+        assert points[(800500, 2)].height == 404.0
 
     async def test_postcode_points_skip_stations_and_mountains(self):
         points = await self.client().get_postcode_points(1000)

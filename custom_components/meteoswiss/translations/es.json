@@ -15,6 +15,10 @@
         "improperly_configured": {
             "title": "La integración MeteoSwiss no está correctamente configurada",
             "description": "La integración MeteoSwiss con ID {entry_id} no está correctamente configurada.\n\nPor favor elimine esa entrada de configuración y vuelva a recrearla."
+        },
+        "point_no_data": {
+            "title": "MeteoSuiza ya no ofrece la previsión de un lugar",
+            "description": "MeteoSuiza ya no parece ofrecer la previsión para {name}.\n\nElimine la integración de MeteoSuiza de este lugar y vuelva a añadirla eligiendo otro.\n\nHasta entonces, su previsión aparecerá como no disponible."
         }
     },
     "config": {
@@ -31,7 +35,9 @@
             "invalid_postcode": "Código postal incorrecto; esta integración sólo funciona con códigos postales suizos",
             "forecast_name_empty": "El nombre para el pronóstico no puede estar vacío",
             "empty_name": "El nombre para mostrar es inválido",
-            "update_interval_too_low": "La frecuencia de actualización es muy baja; debe ser mínimo un minuto"
+            "update_interval_too_low": "La frecuencia de actualización es muy baja; debe ser mínimo un minuto",
+            "cannot_query_points": "No se pudo cargar la lista de lugares de MeteoSuiza; inténtelo de nuevo más tarde",
+            "invalid_point": "Elija un lugar de la lista"
         },
         "step": {
             "user": {
@@ -41,6 +47,14 @@
                 },
                 "description": "Confirme su ubicación geográfica.  Esta información será usada para sugerir un código postal y una estación meteorológica adecuadas.",
                 "title": "Ubicación"
+            },
+            "location": {
+                "title": "Previsión para",
+                "description": "Usar la previsión de un código postal, o de una montaña, un refugio o un puerto de montaña.",
+                "menu_options": {
+                    "user_two": "Código postal",
+                    "mountain": "Montaña, refugio o puerto"
+                }
             },
             "user_two": {
                 "data": {
@@ -52,7 +66,21 @@
                 "description": "El código postal se usa para obtener el pronóstico de los siguientos 5 días.  El nombre que usted suministre aquí se usará en el nombre de la entidad de pronóstico (clima).",
                 "title": "Pronóstico",
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes). Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. Las previsiones de montaña también descargan la isoterma de cero grados, otro archivo del mismo tamaño. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                }
+            },
+            "mountain": {
+                "title": "Montaña, refugio o puerto",
+                "description": "Los lugares están ordenados por distancia a su ubicación, y sus previsiones son para la altitud indicada. Sin estación, las condiciones actuales mostradas son la previsión para la hora actual.",
+                "data": {
+                    "point_id": "Lugar",
+                    "forecast_name": "Nombre de la entidad de previsión (tiempo)",
+                    "update_interval": "Intervalo de actualización (minutos)",
+                    "hourly_temperature": "Temperaturas por hora e isoterma de cero grados"
+                },
+                "data_description": {
+                    "forecast_name": "Déjelo vacío para usar el nombre del lugar.",
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora y la isoterma de cero grados en archivos para toda Suiza, de unos 33 MB cada uno, que se descargan cada tres horas (unos 530 MB al día, 16 GB al mes, compartidos con sus otras previsiones de MeteoSuiza). Desactívelo en una conexión con datos limitados: la previsión no tendrá temperaturas por hora y no habrá sensor de la isoterma de cero grados."
                 }
             },
             "user_three": {
@@ -76,7 +104,7 @@
                     "hourly_temperature": "Temperaturas por hora"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes). Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. Las previsiones de montaña también descargan la isoterma de cero grados, otro archivo del mismo tamaño. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
                 }
             }
         }

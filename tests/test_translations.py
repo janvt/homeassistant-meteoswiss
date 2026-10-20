@@ -35,7 +35,11 @@ def test_config_flow_errors_have_texts():
 @pytest.mark.parametrize("path", ["config", "options"])
 def test_data_descriptions_have_labels(path):
     for step in EN[path]["step"].values():
-        assert set(step.get("data_description", {})) <= set(step["data"])
+        assert set(step.get("data_description", {})) <= set(step.get("data", {}))
+
+
+# Romansh falls back to English for what it does not translate.
+PARTIAL = {"rm"}
 
 
 @pytest.mark.parametrize(
@@ -46,4 +50,21 @@ def test_translations_are_valid_json_with_the_same_steps(language):
     translation = json.loads(
         (COMPONENT / "translations" / f"{language}.json").read_text()
     )
-    assert set(translation["config"]["step"]) == set(EN["config"]["step"])
+    steps = set(translation["config"]["step"])
+    if language in PARTIAL:
+        assert steps <= set(EN["config"]["step"])
+    else:
+        assert steps == set(EN["config"]["step"])
+        assert set(translation["issues"]) == set(EN["issues"])
+        assert set(translation["config"]["error"]) == set(EN["config"]["error"])
+
+
+def test_menu_options_have_texts():
+    import re
+
+    flow = (COMPONENT / "config_flow.py").read_text()
+    menus = re.findall(r'step_id="(\w+)", menu_options=\[([^\]]*)\]', flow)
+    assert menus  # the pattern above found the menu
+    for step_id, options in menus:
+        names = set(re.findall(r'"(\w+)"', options))
+        assert names == set(EN["config"]["step"][step_id]["menu_options"])

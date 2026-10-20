@@ -15,6 +15,10 @@
         "improperly_configured": {
             "title": "MeteoSwiss integration improperly configured",
             "description": "The MeteoSwiss integration with entry ID {entry_id} is improperly configured.\n\nPlease remove your configuration entry and recreate it."
+        },
+        "point_no_data": {
+            "title": "MeteoSwiss no longer provides a forecast for a place",
+            "description": "MeteoSwiss does not appear to offer a forecast for {name} any more.\n\nRemove and re-add the MeteoSwiss integration for this place, choosing another one.\n\nUntil then, its forecast will show as unavailable."
         }
     },
     "config": {
@@ -31,7 +35,9 @@
             "invalid_postcode": "Postal code is invalid; this integration only works with Swiss postal codes",
             "forecast_name_empty": "Forecast name cannot be empty",
             "empty_name": "The display name is empty",
-            "update_interval_too_low": "The update interval is too low; must be at least 1 minute"
+            "update_interval_too_low": "The update interval is too low; must be at least 1 minute",
+            "cannot_query_points": "The MeteoSwiss list of places could not be loaded; please try again later",
+            "invalid_point": "Choose a place from the list"
         },
         "step": {
             "user": {
@@ -41,6 +47,14 @@
                 },
                 "description": "Confirm your geographical position.  This will be used to guess the closest real-time weather station and approximate your postal code for forecasts.",
                 "title": "Location"
+            },
+            "location": {
+                "title": "Forecast for",
+                "description": "Use the forecast of a postal code, or of a mountain, hut or pass.",
+                "menu_options": {
+                    "user_two": "Postal code",
+                    "mountain": "Mountain, hut or pass"
+                }
             },
             "user_two": {
                 "data": {
@@ -52,7 +66,21 @@
                 "description": "The postal code is used to look up the nine-day forecast.  The name you enter here will be used for the forecast (weather) entity.",
                 "title": "Forecast",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month). Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. Mountain forecasts also download the freezing level, another file of the same size. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
+                }
+            },
+            "mountain": {
+                "title": "Mountain, hut or pass",
+                "description": "Places are sorted by distance from your location, and their forecasts are for the altitude shown.  Without a station, the current conditions shown are the forecast for the current hour.",
+                "data": {
+                    "point_id": "Place",
+                    "forecast_name": "Forecast (weather) entity name",
+                    "update_interval": "Update interval (minutes)",
+                    "hourly_temperature": "Hourly temperatures and freezing level"
+                },
+                "data_description": {
+                    "forecast_name": "Leave empty to use the name of the place.",
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures and the freezing level in files for all of Switzerland, of about 33 MB each, downloaded every three hours (about 530 MB a day, 16 GB a month, shared with your other MeteoSwiss forecasts). Turn this off on a metered connection: the forecast then has no hourly temperatures and there is no freezing level sensor."
                 }
             },
             "user_three": {
@@ -76,7 +104,7 @@
                     "hourly_temperature": "Hourly temperatures"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month). Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. Mountain forecasts also download the freezing level, another file of the same size. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
                 }
             }
         }

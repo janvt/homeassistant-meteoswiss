@@ -1,11 +1,16 @@
 import logging
 import pprint
 import typing
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
-from homeassistant.components.sensor import SensorEntity, SensorStateClass
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfLength
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
@@ -26,7 +31,7 @@ from custom_components.meteoswiss.const import (
     SENSOR_TYPE_UNIT,
     SENSOR_TYPES,
 )
-from custom_components.meteoswiss.ogd import StationType
+from custom_components.meteoswiss.ogd import StationType, current_hour
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,6 +74,41 @@ async def async_setup_entry(
             "The data update coordinator has no real-time precipitation station"
             + " configured — not providing precipitation sensor data."
         )
+    # The freezing level comes with the hourly temperatures.
+    if c.is_mountain and c.hourly_temperature:
+        async_add_entities([MeteoSwissFreezingLevelSensor(entry.entry_id, c)], True)
+
+
+class MeteoSwissFreezingLevelSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """The forecast height of the 0 °C line for the current hour."""
+
+    _attr_device_class = SensorDeviceClass.DISTANCE
+    _attr_native_unit_of_measurement = UnitOfLength.METERS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:snowflake-thermometer"
+    _attr_suggested_display_precision = 0
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-freezing_level"
+        self._attr_name = f"{coordinator.forecast_name} freezing level"
+
+    @property
+    def native_value(self) -> float | None:
+        forecast = self.coordinator.data["forecast"]
+        if not forecast:
+            return None
+        current = current_hour(forecast["hourly"], datetime.now(timezone.utc))
+        return current["freezing_level"] if current else None
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
 
 
 class MeteoSwissSensor(

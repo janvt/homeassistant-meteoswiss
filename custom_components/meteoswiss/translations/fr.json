@@ -15,6 +15,10 @@
         "improperly_configured": {
             "title": "L'intégration de MétéoSuisse est mal configurée",
             "description": "L'intégration de MétéoSuisse avec l'ID d'entrée {entry_id} n'est pas correctement configurée.\\n\\nVeuillez supprimer votre entrée de configuration et la recréer."
+        },
+        "point_no_data": {
+            "title": "MeteoSuisse ne fournit plus de prévision pour un lieu",
+            "description": "MeteoSuisse ne semble plus proposer de prévision pour {name}.\n\nSupprimez l'intégration MeteoSuisse de ce lieu et ajoutez-la à nouveau en choisissant un autre lieu.\n\nD'ici là, sa prévision sera affichée comme indisponible."
         }
     },
     "config": {
@@ -31,7 +35,9 @@
             "invalid_postcode": "Le code postal est invalide. Cette intégration ne fonctionne que avec les codes postaux suisses",
             "forecast_name_empty": "Le nom de prévision ne peut pas être vide",
             "empty_name": "Le nom à afficher est vide",
-            "update_interval_too_low": "L'intervalle d'actualisation est trop bas.  Doit être minimum 1 minute"
+            "update_interval_too_low": "L'intervalle d'actualisation est trop bas.  Doit être minimum 1 minute",
+            "cannot_query_points": "La liste des lieux de MeteoSuisse n'a pas pu être chargée ; veuillez réessayer plus tard",
+            "invalid_point": "Choisissez un lieu dans la liste"
         },
         "step": {
             "user": {
@@ -41,6 +47,14 @@
                 },
                 "description": "Confirmez votre position géographique. Celle-ci sera utilisée pour déterminer la station météorologique en temps réel la plus proche et le code postal approximatif pour les prévisions.",
                 "title": "Localisation"
+            },
+            "location": {
+                "title": "Prévision pour",
+                "description": "Utiliser la prévision d'un code postal, ou d'une montagne, d'une cabane ou d'un col.",
+                "menu_options": {
+                    "user_two": "Code postal",
+                    "mountain": "Montagne, cabane ou col"
+                }
             },
             "user_two": {
                 "data": {
@@ -52,7 +66,21 @@
                 "description": "Le code postal est utilisé pour consulter les prévisions météo à 5 jours. Le nom que vous entrez ici sera utilisé pour l'entité de prévision (météo).",
                 "title": "Prévisions",
                 "data_description": {
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois). Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure."
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois), partagé par toutes vos prévisions MeteoSuisse. Les prévisions de montagne téléchargent aussi l'isotherme zéro degré, un autre fichier de même taille. Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure."
+                }
+            },
+            "mountain": {
+                "title": "Montagne, cabane ou col",
+                "description": "Les lieux sont triés selon leur distance de votre position, et leurs prévisions valent pour l'altitude indiquée. Sans station, les conditions actuelles affichées sont la prévision pour l'heure en cours.",
+                "data": {
+                    "point_id": "Lieu",
+                    "forecast_name": "Nom de l'entité de prévision (météo)",
+                    "update_interval": "Intervalle de mise à jour (minutes)",
+                    "hourly_temperature": "Températures horaires et isotherme zéro degré"
+                },
+                "data_description": {
+                    "forecast_name": "Laisser vide pour utiliser le nom du lieu.",
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires et l'isotherme zéro degré que dans des fichiers pour toute la Suisse, d'environ 33 Mo chacun, téléchargés toutes les trois heures (environ 530 Mo par jour, 16 Go par mois, partagés avec vos autres prévisions MeteoSuisse). Désactivez cette option avec une connexion à volume limité : la prévision n'a alors pas de températures horaires, et il n'y a pas de capteur d'isotherme zéro degré."
                 }
             },
             "user_three": {
@@ -76,7 +104,7 @@
                     "hourly_temperature": "Températures horaires"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois). Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure."
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse : elles coûtent donc un téléchargement de 33 Mo toutes les trois heures (environ 260 Mo par jour, 8 Go par mois), partagé par toutes vos prévisions MeteoSuisse. Les prévisions de montagne téléchargent aussi l'isotherme zéro degré, un autre fichier de même taille. Désactivez cette option avec une connexion à volume limité : la prévision horaire n'a alors pas de températures, et le reste de la prévision ne demande que quelques kilo-octets par heure."
                 }
             }
         }

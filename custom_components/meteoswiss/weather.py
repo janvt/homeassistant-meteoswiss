@@ -46,7 +46,7 @@ from custom_components.meteoswiss.const import (
     DOMAIN,
     STATION_URL,
 )
-from custom_components.meteoswiss.ogd import HourlyForecast
+from custom_components.meteoswiss.ogd import HourlyForecast, current_hour
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -127,8 +127,22 @@ class MeteoSwissWeather(
             CONF_REAL_TIME_PRECIPITATION_NAME
         ]
 
+        point = coordinator.data["point"]
+        # A summit has no station, so show the forecast for the current hour.
+        self._from_forecast = coordinator.is_mountain and not self._attr_station
         a = "Data provided by MeteoSwiss."
-        a += "  Forecasts from postal code %s." % (self._attr_postcode,)
+        if coordinator.is_mountain:
+            a += "  Forecasts for %s" % (point.name if point else "a mountain",)
+            if point and point.height is not None:
+                a += " (%.0f m)" % (point.height,)
+            a += "."
+            self._attr_extra_state_attributes = {
+                "elevation": point.height if point else None
+            }
+        else:
+            a += "  Forecasts from postal code %s." % (self._attr_postcode,)
+        if self._from_forecast:
+            a += "  Current conditions are forecast, not measured."
         if self._attr_weather_station:
             a += "  Real-time weather data from weather station %s (%s)." % (
                 self._attr_weather_station,
@@ -160,11 +174,20 @@ class MeteoSwissWeather(
         self.__set_data(data)
         self.async_write_ha_state()
 
+    def _measured_or_forecast(
+        self, station_code: str, forecast_key: str
+    ) -> float | None:
+        """A station measurement, or the current hour's forecast for summits."""
+        if self._from_forecast:
+            current = self._current_hour()
+            return current[forecast_key] if current else None  # type: ignore[literal-required]
+        return condition_name_to_first_value(
+            self._condition_for_all_stations, station_code
+        )
+
     @property
     def native_temperature(self) -> float | None:
-        return condition_name_to_first_value(
-            self._condition_for_all_stations, "tre200s0"
-        )
+        return self._measured_or_forecast("tre200s0", "temperature")
 
     @property
     def native_pressure(self) -> float | None:
@@ -180,15 +203,11 @@ class MeteoSwissWeather(
 
     @property
     def native_wind_speed(self) -> float | None:
-        return condition_name_to_first_value(
-            self._condition_for_all_stations, "fu3010z0"
-        )
+        return self._measured_or_forecast("fu3010z0", "wind_speed")
 
     @property
     def native_wind_gust_speed(self) -> float | None:
-        return condition_name_to_first_value(
-            self._condition_for_all_stations, "fu3010z1"
-        )
+        return self._measured_or_forecast("fu3010z1", "wind_gust")
 
     @property
     def native_dew_point(self) -> float | None:
@@ -198,21 +217,22 @@ class MeteoSwissWeather(
 
     @property
     def wind_bearing(self) -> float | None:
-        return condition_name_to_first_value(
-            self._condition_for_all_stations, "dkl010z0"
-        )
+        return self._measured_or_forecast("dkl010z0", "wind_bearing")
+
+    @property
+    def cloud_coverage(self) -> float | None:
+        # Stations do not measure clouds.
+        if not self._from_forecast:
+            return None
+        current = self._current_hour()
+        return current["cloud_coverage"] if current else None
 
     def _current_hour(self) -> HourlyForecast | None:
         """The forecast of the hour we are in."""
         if not self._forecastData:
             return None
         now = datetime.datetime.now(datetime.timezone.utc)
-        current = None
-        for forecast in self._forecastData["hourly"]:
-            if forecast["time"] > now:
-                break
-            current = forecast
-        return current
+        return current_hour(self._forecastData["hourly"], now)
 
     @property
     def condition(self) -> str | None:

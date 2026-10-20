@@ -15,6 +15,10 @@
         "improperly_configured": {
             "title": "Integrasjonsfellet for MeteoSveits er ikke konfigurert korrekt",
             "description": "MeteoSveits-integreringen med entry ID {entry_id} er ikke konfigurert korrekt.\n\nVennligst fjern din konfigurasjon og skap den på nytt."
+        },
+        "point_no_data": {
+            "title": "MeteoSwiss gir ikke lenger varsel for et sted",
+            "description": "MeteoSwiss ser ikke lenger ut til å tilby varsel for {name}.\n\nFjern MeteoSwiss-integrasjonen for dette stedet og legg den til på nytt med et annet sted.\n\nInntil da vises varselet som utilgjengelig."
         }
     },
     "config": {
@@ -31,7 +35,9 @@
             "invalid_postcode": "Postnummeret er ugyldig. Denne integrasjonen fungerer bare med Sveits' postnummer",
             "forecast_name_empty": "Været navn kan ikke være tomt",
             "empty_name": "Visningsnavnet er tomt",
-            "update_interval_too_low": "Oppdateringsintervall er for lavt.  Må være minimum 1 minut"
+            "update_interval_too_low": "Oppdateringsintervall er for lavt.  Må være minimum 1 minut",
+            "cannot_query_points": "MeteoSwiss-listen over steder kunne ikke lastes; prøv igjen senere",
+            "invalid_point": "Velg et sted fra listen"
         },
         "step": {
             "user": {
@@ -41,6 +47,14 @@
                 },
                 "description": "Bevis din geografiske posisjon. Dette vil brukes til å gueß den nærmeste sanntids værstasjon og anner opp postnummer for prosjekter.",
                 "title": "Lokasjon"
+            },
+            "location": {
+                "title": "Varsel for",
+                "description": "Bruk varselet for et postnummer, eller for et fjell, en hytte eller et pass.",
+                "menu_options": {
+                    "user_two": "Postnummer",
+                    "mountain": "Fjell, hytte eller pass"
+                }
             },
             "user_two": {
                 "data": {
@@ -52,7 +66,21 @@
                 "description": "Postnummeret brukes til å lete opp 5-dagers værforslag. Navnet du skriver inn her, vil brukes for vær- (vær) enhetsnavn.",
                 "title": "Værforslag",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned). Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned), delt av alle MeteoSwiss-varslene dine. Fjellvarsler laster også ned nullgradersgrensen, en annen fil av samme størrelse. Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
+                }
+            },
+            "mountain": {
+                "title": "Fjell, hytte eller pass",
+                "description": "Stedene er sortert etter avstand fra posisjonen din, og varslene gjelder for høyden som vises. Uten stasjon er de nåværende forholdene som vises varselet for inneværende time.",
+                "data": {
+                    "point_id": "Sted",
+                    "forecast_name": "Navn på varselenheten (vær)",
+                    "update_interval": "Oppdateringsintervall (minutter)",
+                    "hourly_temperature": "Temperatur per time og nullgradersgrense"
+                },
+                "data_description": {
+                    "forecast_name": "La stå tomt for å bruke navnet på stedet.",
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time og nullgradersgrensen bare i filer for hele Sveits, på omtrent 33 MB hver, som lastes ned hver tredje time (omtrent 530 MB per dag, 16 GB per måned, delt med de andre MeteoSwiss-varslene dine). Slå dette av på en forbindelse med begrenset datamengde: varselet får da ingen temperatur per time, og det blir ingen sensor for nullgradersgrensen."
                 }
             },
             "user_three": {
@@ -76,7 +104,7 @@
                     "hourly_temperature": "Temperatur per time"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned). Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned), delt av alle MeteoSwiss-varslene dine. Fjellvarsler laster også ned nullgradersgrensen, en annen fil av samme størrelse. Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
                 }
             }
         }

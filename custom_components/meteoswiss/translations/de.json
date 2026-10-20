@@ -15,6 +15,10 @@
         "improperly_configured": {
             "title": "MeteoSwiss-Integration ist nicht korrekt konfiguriert",
             "description": "Die MeteoSwiss-Integration mit der Eintrags-ID {entry_id} ist nicht korrekt konfiguriert.\n\nBitte entferne deinen Konfigurationseintrag und erstelle ihn erneut."
+        },
+        "point_no_data": {
+            "title": "MeteoSwiss bietet für einen Ort keine Prognose mehr an",
+            "description": "MeteoSwiss scheint für {name} keine Prognose mehr anzubieten.\n\nEntferne die MeteoSwiss-Integration für diesen Ort und füge sie mit einem anderen Ort neu hinzu.\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
         }
     },
     "config": {
@@ -31,7 +35,9 @@
             "invalid_postcode": "Postleitzahl ist ungültig; diese Integration funktioniert nur mit Schweizer Postleitzahlen",
             "forecast_name_empty": "Der Prognose-Name darf nicht leer sein",
             "empty_name": "Der Anzeigename ist leer",
-            "update_interval_too_low": "Das Aktualisierungsintervall ist zu niedrig; es muss mindestens 1 Minute betragen"
+            "update_interval_too_low": "Das Aktualisierungsintervall ist zu niedrig; es muss mindestens 1 Minute betragen",
+            "cannot_query_points": "Die MeteoSwiss-Liste der Orte konnte nicht geladen werden; bitte später erneut versuchen",
+            "invalid_point": "Bitte einen Ort aus der Liste wählen"
         },
         "step": {
             "user": {
@@ -41,6 +47,14 @@
                 },
                 "description": "Bestätige deine geografische Position. Diese wird verwendet, um die nächstgelegene Echtzeit-Wetterstation zu bestimmen und deine Postleitzahl für Prognosen zu approximieren.",
                 "title": "Standort"
+            },
+            "location": {
+                "title": "Prognose für",
+                "description": "Die Prognose einer Postleitzahl oder eines Bergs, einer Hütte oder eines Passes verwenden.",
+                "menu_options": {
+                    "user_two": "Postleitzahl",
+                    "mountain": "Berg, Hütte oder Pass"
+                }
             },
             "user_two": {
                 "data": {
@@ -52,7 +66,21 @@
                 "description": "Die Postleitzahl wird verwendet, um die 5-Tage-Prognose abzurufen. Der hier eingegebene Name wird für das Prognose-(Wetter)-Entity verwendet.",
                 "title": "Prognose",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat). Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Prognosen für Berge laden zusätzlich die Nullgradgrenze herunter, eine weitere Datei derselben Grösse. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde."
+                }
+            },
+            "mountain": {
+                "title": "Berg, Hütte oder Pass",
+                "description": "Die Orte sind nach Entfernung von deinem Standort sortiert, und ihre Prognosen gelten für die angegebene Höhe. Ohne Station sind die angezeigten aktuellen Bedingungen die Prognose für die aktuelle Stunde.",
+                "data": {
+                    "point_id": "Ort",
+                    "forecast_name": "Name des Prognose-(Wetter)-Entities",
+                    "update_interval": "Aktualisierungsintervall (Minuten)",
+                    "hourly_temperature": "Stündliche Temperaturen und Nullgradgrenze"
+                },
+                "data_description": {
+                    "forecast_name": "Leer lassen, um den Namen des Orts zu verwenden.",
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz, je etwa 33 MB, die alle drei Stunden heruntergeladen werden (etwa 530 MB pro Tag, 16 GB pro Monat, gemeinsam mit deinen anderen MeteoSwiss-Prognosen). Bei einer volumenbegrenzten Verbindung ausschalten: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
                 }
             },
             "user_three": {
@@ -76,7 +104,7 @@
                     "hourly_temperature": "Stündliche Temperaturen"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat). Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Prognosen für Berge laden zusätzlich die Nullgradgrenze herunter, eine weitere Datei derselben Grösse. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde."
                 }
             }
         }

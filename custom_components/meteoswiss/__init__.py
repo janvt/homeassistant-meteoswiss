@@ -22,6 +22,7 @@ from custom_components.meteoswiss.const import (
     CONF_FORECAST_NAME,
     CONF_HOURLY_TEMPERATURE,
     CONF_POINT_ID,
+    CONF_POINT_TYPE,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
@@ -33,13 +34,18 @@ from custom_components.meteoswiss.const import (
     DOMAIN,
     USER_AGENT,
 )
+from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.ogd import (
+    FREEZING_LEVEL,
+    HOURLY_TEMPERATURE,
+    POINT_TYPE_POI,
+    POINT_TYPE_POSTCODE,
     LocalForecast,
     MeteoSwissOGD,
     OGDError,
     Point,
     StationType,
-    UnknownPostcodeError,
+    UnknownPointError,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,11 +54,10 @@ MAX_CONTINUOUS_ERROR_TIME = 60 * 60
 # MeteoSwiss publishes a new forecast run every hour.  Look for one this often
 # rather than on every (much more frequent) station update.
 FORECAST_CHECK_INTERVAL = datetime.timedelta(minutes=15)
-# Hourly temperatures are only published in a 33 MB file, so they are
-# downloaded at most this often rather than for every run.
-TEMPERATURE_REFRESH_INTERVAL = datetime.timedelta(hours=3)
-# Leaves time for that download on a slow connection.
+# Leaves time for the large downloads (see downloads.py) on a slow connection.
 UPDATE_TIMEOUT = 300
+# Shared by all entries.
+DATA_DOWNLOADS = f"{DOMAIN}_downloads"
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
@@ -106,12 +111,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
         * 60
     )
+    if DATA_DOWNLOADS not in hass.data:
+        hass.data[DATA_DOWNLOADS] = SharedDownloads(
+            MeteoSwissOGD(async_get_clientsession(hass), USER_AGENT)
+        )
     coordinator = MeteoSwissDataUpdateCoordinator(
         hass,
         entry,
         interval,
-        entry.data[CONF_POSTCODE],
+        entry.data.get(CONF_POSTCODE),
         point_id=entry.data.get(CONF_POINT_ID),
+        point_type=entry.data.get(CONF_POINT_TYPE, POINT_TYPE_POSTCODE),
+        downloads=hass.data[DATA_DOWNLOADS],
         # Set up with the entry, then changeable in the options.
         hourly_temperature=entry.options.get(
             CONF_HOURLY_TEMPERATURE,
@@ -153,6 +164,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if unload_ok:
         hass.data[DOMAIN].pop(entry.entry_id)
+        downloads: SharedDownloads = hass.data[DATA_DOWNLOADS]
+        downloads.unregister(entry.entry_id)
+        if downloads.unused:
+            hass.data.pop(DATA_DOWNLOADS)
 
     return unload_ok
 
@@ -164,7 +179,8 @@ class MeteoSwissClientResult(TypedDict):
     # The same, in order of preference.
     condition: list[dict[str, float | None]]
     # Forecast attributes.
-    postcode: int  # e.g. 8005
+    postcode: int | None  # e.g. 8005, None for mountains
+    point: Point | None  # where the forecast is for
     forecast_name: str
     # Real-time weather station attributes.
     station: str | None  # e.g. BLA
@@ -184,8 +200,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         hass: HomeAssistant,
         config_entry: ConfigEntry,
         update_interval: datetime.timedelta,
-        postcode: int,
+        postcode: int | None,
         point_id: int | None,
+        point_type: int,
+        downloads: SharedDownloads,
         hourly_temperature: bool,
         forecast_name: str,
         weather_station: str | None,
@@ -207,12 +225,15 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         self.hass = hass
         self.postcode = postcode
         self.point_id = point_id
+        self.point_type = point_type
+        self.downloads = downloads
         self.hourly_temperature = hourly_temperature
         self.forecast_name = forecast_name
         _LOGGER.debug(
-            "Forecast %s will be provided for post code %s every %s",
+            "Forecast %s will be provided for post code %s / point %s every %s",
             forecast_name,
             postcode,
+            point_id,
             update_interval,
         )
 
@@ -240,8 +261,6 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         self._point: Point | None = None
         self._forecast: LocalForecast | None = None
         self._forecast_checked: datetime.datetime | None = None
-        self._temperature: dict[str, str] | None = None
-        self._temperature_fetched: datetime.datetime | None = None
         _LOGGER.debug("Client obtained")
 
         super().__init__(
@@ -264,14 +283,24 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         try:
             if self._point is None:
                 self._point = await self.client.resolve_point(
-                    self.postcode, self.point_id
+                    self.postcode, self.point_id, self.point_type
+                )
+                self.downloads.register(
+                    self.config_entry.entry_id, self._point, self._large_parameters
                 )
             run = await self.client.latest_run(now)
             if self._forecast is None or self._forecast["run"] != run:
-                if self.hourly_temperature:
-                    await self._async_refresh_temperature(run, now)
+                large = {
+                    parameter: await self.downloads.get(
+                        self._point, parameter, run, now
+                    )
+                    for parameter in self._large_parameters
+                }
                 self._forecast = await self.client.get_forecast(
-                    self._point, run, self._temperature
+                    self._point,
+                    run,
+                    hourly_temperature=large.get(HOURLY_TEMPERATURE),
+                    freezing_level=large.get(FREEZING_LEVEL),
                 )
                 _LOGGER.debug("Forecast for run %s obtained", run)
             self._forecast_checked = now
@@ -281,42 +310,41 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             _LOGGER.warning("Keeping the previous forecast: %s", exc)
         return self._forecast
 
-    async def _async_refresh_temperature(
-        self, run: str, now: datetime.datetime
-    ) -> None:
-        """Fetch hourly temperatures if they are missing or old.
+    @property
+    def is_mountain(self) -> bool:
+        return self.point_type == POINT_TYPE_POI
 
-        Without them the forecast simply has no hourly temperatures, so a
-        failure only keeps the previous ones.
-        """
-        assert self._point is not None
-        if (
-            self._temperature is not None
-            and self._temperature_fetched is not None
-            and now - self._temperature_fetched < TEMPERATURE_REFRESH_INTERVAL
-        ):
-            return
-        try:
-            self._temperature = await self.client.get_hourly_temperature(
-                self._point, run
-            )
-            self._temperature_fetched = now
-            _LOGGER.debug("Hourly temperatures for run %s obtained", run)
-        except OGDError as exc:
-            _LOGGER.warning("Cannot update the hourly temperatures: %s", exc)
+    @property
+    def _large_parameters(self) -> set[str]:
+        """The large files this entry needs, which are only fetched on request."""
+        if not self.hourly_temperature:
+            return set()
+        if self.is_mountain:
+            return {HOURLY_TEMPERATURE, FREEZING_LEVEL}
+        return {HOURLY_TEMPERATURE}
 
-    def _async_create_postcode_issue(self) -> None:
+    @property
+    def _no_forecast_issue_id(self) -> str:
+        if self.is_mountain:
+            return f"point_{self.point_id}_provides_no_forecast_{DOMAIN}"
+        return f"{self.postcode}_provides_no_forecast_{DOMAIN}"
+
+    def _async_create_no_forecast_issue(self) -> None:
+        if self.is_mountain:
+            translation_key = "point_no_data"
+            placeholders = {"name": self.forecast_name}
+        else:
+            translation_key = "postcode_no_data"
+            placeholders = {"postcode": str(self.postcode)}
         ir.async_create_issue(
             self.hass,
             DOMAIN,
-            f"{self.postcode}_provides_no_forecast_{DOMAIN}",
+            self._no_forecast_issue_id,
             is_fixable=False,
             is_persistent=False,
             severity=IssueSeverity.ERROR,
-            translation_key="postcode_no_data",
-            translation_placeholders={
-                "postcode": str(self.postcode),
-            },
+            translation_key=translation_key,
+            translation_placeholders=placeholders,
         )
         self.error_raised[CONF_POSTCODE] = True
 
@@ -339,9 +367,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                         _LOGGER.warning("Station %s: %s", station, exc)
                         condition_by_station[station] = {}
                 forecast = await self._async_get_forecast()
-        except UnknownPostcodeError as exc:
+        except UnknownPointError as exc:
             # This will not fix itself, so tell the user straight away.
-            self._async_create_postcode_issue()
+            self._async_create_no_forecast_issue()
             raise UpdateFailed(exc) from exc
         except Exception as exc:
             _LOGGER.exception("Failed getting data")
@@ -405,7 +433,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         if not data["forecast"]:
             # Oh no.  The forecast is empty.
             _LOGGER.warning(
-                "Post code %s provided us with no forecast",
+                "%s (postal code %s) provided us with no forecast",
+                self.forecast_name,
                 self.postcode,
             )
             if self.first_error[CONF_POSTCODE] is None:
@@ -416,19 +445,16 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 float, self.first_error[CONF_POSTCODE]
             )
             if not self.error_raised[CONF_POSTCODE] and last_error > m:
-                self._async_create_postcode_issue()
+                self._async_create_no_forecast_issue()
         else:
             if self.error_raised[CONF_POSTCODE]:
-                ir.async_delete_issue(
-                    self.hass,
-                    DOMAIN,
-                    f"{self.postcode}_provides_no_forecast_{DOMAIN}",
-                )
+                ir.async_delete_issue(self.hass, DOMAIN, self._no_forecast_issue_id)
             self.first_error[CONF_POSTCODE] = None
             self.error_raised[CONF_POSTCODE] = False
 
         newdata = cast(MeteoSwissClientResult, data)
         newdata[CONF_POSTCODE] = self.postcode
+        newdata["point"] = self._point
         newdata[CONF_FORECAST_NAME] = self.forecast_name
         newdata[CONF_STATION] = self.weather_station
         newdata[CONF_REAL_TIME_NAME] = self.real_time_weather_station_name

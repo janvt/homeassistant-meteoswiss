@@ -13,6 +13,7 @@ from custom_components.meteoswiss.ogd import (
     Point,
     Station,
     StationType,
+    UnknownPointError,
     UnknownPostcodeError,
     distance_km,
 )
@@ -104,6 +105,15 @@ def point_major_csv(param: str, points, timestamps, value) -> bytes:
     return ("\n".join(lines) + "\n").encode("latin-1")
 
 
+def type_then_text_csv(param: str, points, timestamps, value) -> bytes:
+    """Ordered by point type, then by point ID as text, as some real files are."""
+    lines = [f"point_id;point_type_id;Date;{param}"]
+    for point_id, point_type in sorted(points, key=lambda k: (k[1], str(k[0]))):
+        for ts in timestamps:
+            lines.append(f"{point_id};{point_type};{ts};{value(point_id, ts)}")
+    return ("\n".join(lines) + "\n").encode("latin-1")
+
+
 def time_major_csv(param: str, points, timestamps, value) -> bytes:
     lines = [f"point_id;point_type_id;Date;{param}"]
     for ts in timestamps:
@@ -118,6 +128,9 @@ POINTS = [
     Point(800100, 2, "Zürich", "8001", 47.3723, 8.5422),
     Point(800500, 2, "Zürich", "8005", 47.3875, 8.5210),
     Point(1, 1, "Arosa", "", 46.7927, 9.6790),
+    Point(864, 3, "Bristen", "", 46.7526, 8.7062, 3073.0),
+    Point(442, 3, "Treschhütte SAC", "", 46.7489, 8.6814, 1475.0),
+    Point(213, 3, "Ouest romand", "", 46.8116, 6.9424, 490.0),
 ]
 WEATHER_STATIONS = [
     Station("SMA", "Zürich / Fluntern", 47.3810, 8.5672),
@@ -189,6 +202,8 @@ class FakeOGD:
     run_checks = 0
     temperature_calls = 0
     temperature_error: Exception | None = None
+    # The points each download of a large file was for, by parameter.
+    large_downloads: dict[str, list[set[tuple[int, int]]]] = {}
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
@@ -203,6 +218,7 @@ class FakeOGD:
         cls.run_checks = 0
         cls.temperature_calls = 0
         cls.temperature_error = None
+        cls.large_downloads = {}
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
@@ -213,7 +229,18 @@ class FakeOGD:
             key=lambda p: distance_km(lat, lon, p.lat, p.lon),
         )
 
-    async def resolve_point(self, postcode, point_id=None):
+    async def get_poi_points(self, lat, lon):
+        return sorted(
+            (p for p in POINTS if p.point_type == 3),
+            key=lambda p: distance_km(lat, lon, p.lat, p.lon),
+        )
+
+    async def resolve_point(self, postcode, point_id=None, point_type=2):
+        if point_type != 2:
+            for p in POINTS:
+                if p.key == (point_id, point_type):
+                    return p
+            raise UnknownPointError(f"No forecast point {point_id}")
         points = await self.get_postcode_points(postcode)
         if not points:
             raise UnknownPostcodeError(f"No forecast point for postal code {postcode}")
@@ -237,15 +264,24 @@ class FakeOGD:
             raise self.forecast_error
         return FakeOGD.run
 
-    async def get_hourly_temperature(self, point, run):
-        FakeOGD.temperature_calls += 1
+    async def get_hourly_rows(self, points, run, parameter):
+        FakeOGD.large_downloads.setdefault(parameter, []).append(
+            {p.key for p in points}
+        )
+        if parameter == "tre200h0":
+            FakeOGD.temperature_calls += 1
         if self.temperature_error:
             raise self.temperature_error
-        return {"run": run}
+        return {p.key: {"run": run} for p in points}
 
-    async def get_forecast(self, point, run, hourly_temperature=None):
+    async def get_forecast(
+        self, point, run, hourly_temperature=None, freezing_level=None
+    ):
         FakeOGD.forecast_calls += 1
         forecast = make_forecast(run, with_temperature=bool(hourly_temperature))
-        # Remember which run the temperatures came from.
+        for hour in forecast["hourly"]:
+            hour["freezing_level"] = 2900.0 if freezing_level else None
+        # Remember which run the large files came from.
         forecast["temperature_run"] = (hourly_temperature or {}).get("run")
+        forecast["freezing_level_run"] = (freezing_level or {}).get("run")
         return forecast

@@ -355,3 +355,104 @@ async def test_attribution_links_to_meteoswiss(hass, entry):
     attribution = hass.states.get(weather_id(hass, entry)).attributes["attribution"]
     assert "https://www.meteoswiss.admin.ch/" in attribution
     assert "rudd-o.com" not in attribution
+
+
+MOUNTAIN = {
+    "point_type": 3,
+    "point_id": 864,
+    "forecast_name": "Bristen",
+    "update_interval": 5,
+    "hourly_temperature": True,
+}
+
+
+async def add_mountain(hass, **changes):
+    entry = MockConfigEntry(domain=DOMAIN, data={**MOUNTAIN, **changes})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+    return entry
+
+
+async def test_mountain_shows_the_forecast_for_the_current_hour(hass):
+    entry = await add_mountain(hass)
+
+    state = hass.states.get(weather_id(hass, entry))
+
+    # The 12:00 hour of the fake forecast.
+    assert state.state == "sunny"
+    assert state.attributes["temperature"] == 13.0
+    assert state.attributes["wind_speed"] == 8.0
+    assert state.attributes["wind_gust_speed"] == 23.0
+    assert state.attributes["wind_bearing"] == 180.0
+    assert state.attributes["cloud_coverage"] == 30.0
+    assert state.attributes["elevation"] == 3073.0
+    assert "humidity" not in state.attributes
+    assert "Forecasts for Bristen (3073 m)" in state.attributes["attribution"]
+    assert "forecast, not measured" in state.attributes["attribution"]
+
+
+async def test_mountain_with_a_station_shows_measurements(hass):
+    entry = await add_mountain(hass, station="SMA", real_time_name="Fluntern")
+
+    state = hass.states.get(weather_id(hass, entry))
+
+    assert state.attributes["temperature"] == 13.4
+    assert "cloud_coverage" not in state.attributes
+    assert "forecast, not measured" not in state.attributes["attribution"]
+
+
+async def test_freezing_level_sensor(hass, fake_ogd):
+    entry = await add_mountain(hass)
+
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-freezing_level")
+    state = hass.states.get(sensor)
+    assert state.state == "2900.0"
+    assert state.attributes["unit_of_measurement"] == "m"
+    assert state.attributes["friendly_name"] == "Bristen freezing level"
+    assert [len(d) for d in fake_ogd.large_downloads["zprfr0hs"]] == [1]
+
+
+async def test_mountain_without_large_downloads(hass, fake_ogd):
+    entry = await add_mountain(hass, hourly_temperature=False)
+
+    assert fake_ogd.large_downloads == {}
+    assert not hass.states.async_all("sensor")
+    state = hass.states.get(weather_id(hass, entry))
+    assert "temperature" not in state.attributes
+    assert state.attributes["wind_speed"] == 8.0
+
+
+async def test_freezing_level_is_only_for_mountains(hass, entry, fake_ogd):
+    await setup(hass, entry)
+
+    assert set(fake_ogd.large_downloads) == {"tre200h0"}
+
+
+async def test_an_unknown_mountain_is_reported(hass):
+    entry = MockConfigEntry(domain=DOMAIN, data={**MOUNTAIN, "point_id": 999})
+    entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert issues(hass) == {"point_999_provides_no_forecast_meteoswiss"}
+
+
+async def test_entries_share_the_large_downloads(hass, entry, fake_ogd, frozen_now):
+    await setup(hass, entry)
+    await add_mountain(hass)
+    zurich, bristen = (800500, 2), (864, 3)
+    # Each entry fetched when it was set up, as the other did not know about it.
+    assert fake_ogd.large_downloads["tre200h0"] == [{zurich}, {zurich, bristen}]
+
+    # After that, one download serves both.
+    fake_ogd.run = "202610201600"
+    await refresh_after(hass, frozen_now, 4 * 60)
+    assert fake_ogd.large_downloads["tre200h0"][2:] == [{zurich, bristen}]
+    assert fake_ogd.large_downloads["zprfr0hs"][-1] == {bristen}
+
+    # An entry that is removed is left out.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    fake_ogd.run = "202610202000"
+    await refresh_after(hass, frozen_now, 4 * 60)
+    assert fake_ogd.large_downloads["tre200h0"][-1] == {bristen}
