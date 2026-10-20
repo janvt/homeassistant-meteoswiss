@@ -1,275 +1,314 @@
-# homeassistant-meteoswiss (forked)
+# MeteoSwiss for Home Assistant
 
-This is the MeteoSwiss integration for Home Assistant.
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![Tests](https://github.com/janvt/homeassistant-meteoswiss/actions/workflows/tests.yaml/badge.svg)](https://github.com/janvt/homeassistant-meteoswiss/actions/workflows/tests.yaml)
+
+Forecasts, measurements, warnings, pollen, Föhn and climate normals for
+Switzerland in Home Assistant, from MeteoSwiss's official
+[open data](https://opendatadocs.meteoswiss.ch/).  No API key and no account
+are needed.
+
+This started as a fork of [Rudd-O's integration](https://github.com/Rudd-O/homeassistant-meteoswiss)
+(itself a fork of [websylv's original](https://github.com/websylv/homeassistant-meteoswiss)),
+and is now maintained on its own: see [Credits](#credits).
+
+![The forecast of a postal code, with its sensors](docs/forecast-device.png)
 
 ## Features
 
-* Interactive setup flow with reasonably good explanations of the
-  settings.
-* Lets you determine the real-time weather update frequency.
-* Lets you customize all entities this integration provides
-  (every entity has a unique ID).
-* Detects when your real-time weather station has been retired,
-  and offers suggestions on how to fix the issue.
-* Supports hourly forecasts.
-* Supports two different real-time stations: a weather station
-  that may not give you rain data, and a precipitation station
-  that will give you rain data but may not give you other info.
-* Code is much cleaner and works properly.
-
-See below for common issues.
+* **Weather entity** with the daily (nine days) and hourly forecast of a postal
+  code, or of one of MeteoSwiss's mountains, huts and passes, at its altitude.
+  The forecast includes temperatures, precipitation and its probability,
+  wind and gusts, cloud cover, sunshine and dew point.
+* **Current conditions** from a SwissMetNet weather station every 10 minutes,
+  and optionally rain from a separate precipitation station closer to you.
+* **Forecast summaries** such as snow tonight, sunshine tomorrow or rain in the
+  next hour, as sensors for dashboards and automations.
+* **Weather warnings** of MeteoSwiss for the place, at its height, with a link to
+  the warning on a map.
+* **Pollen** measurements from the closest pollen station.
+* **Föhn**: an outlook from the pressure difference across the Alps, and
+  MeteoSwiss's Föhn index measured at the station.
+* **Climate normals**: today and this month against the station's 1991–2020
+  normals, and the record for the date.
+* **Freezing level** forecast.
+* Guided setup that suggests the postal code and stations closest to your Home
+  Assistant location.  Stations, place and options can be changed later without
+  losing entities or history.
+* Repair notices when a station or a forecast stops publishing.
+* Translations in English, German, French, Italian, Spanish and Norwegian.
 
 ## Installation
 
-### Removal of the obsolete integration
+### HACS
 
-*You only need to do this if you had either Websylv's integration
-or an older version of this integration installed and setup.*
+1. In HACS, open the menu → *Custom repositories*, add
+   `https://github.com/janvt/homeassistant-meteoswiss` with the type
+   *Integration*.
+2. Search for *MeteoSwiss* in HACS and download it.  Beta versions are listed
+   when *Show beta versions* is turned on for the repository.
+3. Restart Home Assistant.
 
-* Remove the old integration from your HACS integrations screen.
-  * Go into the integration within the HACS integrations screen.
-  * Click on the three dots menu at the upper right corner.
-  * Select *Remove*.
-* Remove the repository from your HACS setup.
-  * In the HACS integration screen, click the three dots menu.
-  * Delete the integration from the *Custom repositories* dialog.
-* Remove the config entry.
-  * Write down the names you have given to your existing weather and
-    sensor entities.
-  * In the Devices & Services settings screen, locate the integration
-    configuration entry, then click its three-dots menu.
-  * Select *Delete*.
-* Stop Home Assistant.
-* Change into your Home Assistant configuration directory.
-* Verify the folder `custom_components/meteo-swiss` is nonexistent
-  under the Home Assistant configuration directory.  Note the dash!
-* Start Home Assistant.
-* Proceed with installation.
-  * Once you get to the setup stage, when you are asked for the
-    names of the weather and sensor entities, re-use the same
-    names you used before.  Your statistics will then be preserved
-    from the old entities managed by the old integration.
+### Manually
 
-### Installation of the updated integration
+Copy `custom_components/meteoswiss` from the
+[latest release](https://github.com/janvt/homeassistant-meteoswiss/releases) to
+the `custom_components` folder of your Home Assistant configuration, and restart
+Home Assistant.
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+### Coming from Rudd-O's or websylv's version
 
-Add this integration as a custom repository to HACS.  If you use
-HACS you already know the generic instructions on how to do this.
-Here is how it looks like on the add custom repo screen:
+This integration has the same domain (`meteoswiss`) as Rudd-O's, so it replaces
+it in place: remove Rudd-O's repository from HACS's custom repositories, add this
+one and download it.  Existing entries keep working, with their entities and
+history.  A few stations of the old data source no longer publish open data
+(such as MRP and VSOXE); their sensors become unavailable and a repair notice
+appears after an hour.  Choose *Reconfigure* to pick another station.
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/addcustomrepo.png)
-
-Once added as a custom repository, add the integration to your
-HACS setup:
-
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/addrepository.png)
-
-Once done you should see a pending restart box:
-
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/pendingrestart.png)
-
-Restart your Home Assistant:
-
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/restart.png)
-
-Now you are ready to add one or more instances of the integration.
+websylv's integration (*Meteo Swiss*, folder `meteo-swiss`) is a different
+integration: remove it and its YAML configuration first, then set this one up.
+YAML configuration of this integration is imported once and raises a repair
+notice; remove it from `configuration.yaml` afterwards.
 
 ## Setup
 
-- First make sure that your Home Assistant's basic setup (latitude, longitude)
-  is correct.  This information is used to help you set up the weather station.
-  If, however, it is not correct, you can still override it later.
+Make sure your Home Assistant location is set (*Settings → System → General*),
+as setup uses it to suggest a postal code and stations.  Then go to
+*Settings → Devices & services → Add integration* and search for *MeteoSwiss*.
 
-- Get to the Home Asssistant settings screen:
+1. **Location.**  Confirm or change the coordinates used to find what is
+   closest to you.
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/settings.png)
-  
-- Then click on "Devices & Services":
+   <img src="docs/setup-location.png" alt="Location step" width="460">
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/devicesservices.png)
+2. **Forecast for** a postal code, or a mountain, hut or pass.
 
-- Than add a new integration:
+   <img src="docs/setup-forecast-for.png" alt="Choice between a postal code and a mountain" width="460">
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/add.png)
-  
-- Search for *MeteoSwiss* and then proceed:
+3. **Forecast.**  For a postal code: the postal code (the closest is suggested),
+   the name of the weather entity, the update interval of the station sensors,
+   and whether to download hourly temperatures (see
+   [Download volumes](#download-volumes)).
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/search.png)
+   <img src="docs/setup-postal-code.png" alt="Postal code step" width="460">
 
-- By default the integration will try to determine the best settings for you
-  based on your Home zone latitude and longitude (which you can override):
+   For a mountain, hut or pass, pick it from the 100 closest, sorted by distance,
+   with each one's altitude.  Its forecast is for that altitude.
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/latitude.png)
+   <img src="docs/setup-mountain.png" alt="Mountain step" width="460">
 
-- The next screen will ask you (with a good guess) about your postal code, and update interval.  This information
-  will be used by the weather entity — and the name onscreen is what your weather entity will be named after.
+4. **Stations.**  The weather station gives the current conditions, the
+   precipitation station the 10-minute rain, and the pollen station the pollen
+   sensors.  The closest are suggested; the first option of each list is
+   *none*.  Summits rarely have a station nearby, so none is suggested for
+   mountains: their weather entity then shows the forecast for the current hour
+   as its current conditions.
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/postalcode.png)
+   <img src="docs/setup-stations.png" alt="Stations step" width="460">
 
-- Finally, you get to select the real-time weather station closest to you
-  (a good guess is provided) and name your location.  You can select no
-  weather station if you so desire — useful if there is no real-time
-  weather station near where you live — in which case the real-time sensor
-  data is simply not provided as sensors.  You may also select a real-time
-  precipitation station that is different from your weather station, to get
-  rain information closer to where you are.
+The forecast and each station become a device of the entry:
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/weatherstation.png)
+![The entry with its forecast and station devices](docs/integration-entry.png)
 
-- Your task is done and your integration is working.
+Home Assistant names entities after their device, so a station sensor shows as
+e.g. *Altdorf Temperature*.  Add the integration once more for each further place.
 
-![enter image description here](https://github.com/Rudd-O/homeassistant-meteoswiss/raw/master/docs/addedandworking.png)
+### Changing the setup
 
-If you are not happy with the settings, in a future release you
-will be able to update them.
+* **Reconfigure** (in the entry's menu) changes the postal code or place and the
+  stations; entities and their history are kept.
+* **Configure** (the cog) turns hourly temperatures, the freezing level, climate
+  normals and Föhn on or off, and sets the Föhn stations and thresholds.
 
-## How to create a sensor that has the weather forecast data
+  <img src="docs/options.png" alt="Options" width="460">
 
-Here is a sample of a YAML-based trigger-powered template sensor that creates
-three different sensors from a service call every fifteen minutes.  From the
-sample code below, you are to modify the `entity_id` to match your own weather
-entity ID, then place the adjusted code within your Home Assistant's
-`configuration.yaml` file (under `template:` as exemplified below), then
-restart Home Assistant.
+## Entities
+
+### Weather station
+
+![A weather station with its sensors](docs/station-device.png)
+
+Temperature, humidity, dew point, pressure (station, QFF and QNH), wind speed,
+gusts and direction, 10-minute rain and sunshine and sun irradiation, from the
+station's latest 10-minute measurement.  Values older than 90 minutes are not
+shown; a value missing from the latest measurement is taken from the half
+hour before.  A
+precipitation station has only the 10-minute rain.
+
+### Forecast summaries
+
+Every forecast has sensors summarising it.  All times are local
+(Europe/Zurich), and a window holds the hours that start in it.
+
+| Sensor | Value |
+|---|---|
+| Snow tonight | mm of water from 18:00 to 08:00 (from the current hour on), counting the precipitation of hours at 0.5 °C or colder |
+| Snow next 24 hours, Snow next 48 hours | The same, from the current hour on |
+| Sunshine tomorrow 9–15, Sunshine tomorrow | Hours of sunshine |
+| Strongest gust tomorrow 9–15 | km/h |
+| Precipitation next hour, Chance of rain next hour | For the hour after the current one; the chance of rain is MeteoSwiss's for the three hours up to its end |
+| Lowest temperature tonight | °C, 18:00 to 08:00 from the current hour on |
+| Freezing level | Forecast height of the 0 °C line for the current hour, in m (when turned on) |
+
+The snow and temperature sensors need *Hourly temperatures*.  A sensor is
+unavailable when any hour of its window, or a value it needs, is missing,
+rather than showing a partial result.  Being forecasts, these sensors keep no
+long-term statistics.
+
+To use the forecast itself in a template, call `weather.get_forecasts`:
 
 ```yaml
-# ...
 template:
-# ...
   - trigger:
-      - platform: time_pattern
+      - trigger: time_pattern
         minutes: /15
-    action:
-      - service: weather.get_forecasts
+    actions:
+      - action: weather.get_forecasts
         data:
           type: daily
         target:
-          entity_id: weather.meteoswiss
-        response_variable: response_forecast_daily
+          entity_id: weather.altdorf_ur
+        response_variable: daily
     sensor:
-      - name: Tomorrow Max Temp
-        unique_id: d1b441ec-e9c6-43f8-a50a-c7c5c42c0ef5
-        state: "{{ response_forecast_daily['weather.meteoswiss'].forecast[1].temperature }}"
-
-      - name: Tomorrow Min Temp
-        unique_id: b88a351c-8eb7-40ae-8a9e-dcfeaa224551
-        state: "{{ response_forecast_daily['weather.meteoswiss'].forecast[1].templow }}"
-
-      - name: Tomorrow Mean Temp
-        unique_id: 6344f875-4569-4c3f-ad8d-ad6bccc5bc61
-        state: "{{ ((response_forecast_daily['weather.meteoswiss'].forecast[1].temperature) + (response_forecast_daily['weather.meteoswiss'].forecast[1].templow)) /2}}"
+      - name: Tomorrow max temperature
+        unique_id: tomorrow_max_temperature
+        unit_of_measurement: °C
+        state: "{{ daily['weather.altdorf_ur'].forecast[1].temperature }}"
 ```
 
-You can also create a sensor that will have the list of hourly forecasts
-as an attribute you can consult:
+### Weather warnings
 
-```yaml
-# ...
-template:
-# ...
-  - trigger:
-    - platform: state
-      entity_id: weather.biasca_circolo_della_riviera_distretto_di_riviera_2
-    - platform: homeassistant
-      event: start
-    - platform: event
-      event_type: event_template_reloaded
-    action:
-      - service: weather.get_forecasts
-        data:
-          type: hourly
-        target:
-          entity_id: weather.biasca_circolo_della_riviera_distretto_di_riviera_2
-        response_variable: hourly
-    sensor:
-      - name: Wettervorhersage Biasca Stuendlich
-        unique_id: weather_forecast_biasca_hourly
-        state: "{{ now().isoformat() }}"
-        attributes:
-          forecast: "{{ hourly['weather.biasca_circolo_della_riviera_distretto_di_riviera_2'].forecast }}"
-```
+*Weather warning* (the most severe warning in force now) and *Weather warning
+next 24 hours* are `none`, `yellow`, `orange` or `red`.  Their `warnings`
+attribute lists each warning with its type (such as `wind`, `rain` or
+`thunderstorm`), level, start, end, region, headline and text in Home
+Assistant's language, and a `url` of MeteoAlarm's page of its region with the
+warning on a map; `types` lists just the types, for templates such as a Föhn
+warning (`wind` in Altdorf).
 
-That one is very useful to retract awnings and other smart home activities.
+Each warning covers a region between two altitudes, so a place gets the
+warnings of its region at its height: a ridge can be warned of wind while the
+village below is not.  MeteoSwiss's warnings currently stop at 3000 m, so
+summits above that get none.  The texts of warnings are not stored in the
+history, only their types.
 
-## Troubleshooting
-  
-In case of problem with the integration, please open an issue on
-[this repository](https://github.com/Rudd-O/homeassistant-meteoswiss)
-explaining the issue and attaching the logs in debug mode.
+### Föhn
 
-To obtain logs, activate the component debug log in your
-`configuration.yaml`, and restarting Home Assistant:
+* *Föhn pressure difference* (forecast device): the sea-level pressure south
+  of the Alps minus north of them, in hPa.  It rises hours before the Föhn
+  breaks through: on 20 October 2026 it passed 4 hPa at 06:30 UTC, and the Föhn
+  reached Altdorf at 12:30, at about 6 hPa.
+* *Föhn outlook* (forecast device): from that difference, `strong_south`,
+  `south` (likely), `none`, `north` or `strong_north` (north Föhn in Ticino).
+* *Föhn* (weather station): MeteoSwiss's Föhn index measured at the station,
+  `none`, `mixed` or `foehn`, for stations that have one.
 
-```YAML
-logger:
-  default: warning
-  logs:
-    # maybe more stuff here[...]
-    hamsclient.client: debug
-    hamsclientfork.client: debug
-    custom_components.meteoswiss: debug
-```
+The defaults are the classic pair Lugano and Zürich/Kloten, with Föhn likely
+from 4 hPa and strong from 8 hPa; all can be changed under *Configure*.
 
-## Upgrade notes / known issues
+### Climate normals
 
-* It used to be mandatory to select a real-time weather station during setup.
-  This step (the last setup step) is now optional — you can select no weather
-  station if you so desire (tracked in
-  [#6](https://github.com/Rudd-O/homeassistant-meteoswiss/issues/6)
-  [#5](https://github.com/Rudd-O/homeassistant-meteoswiss/issues/5)).
-* Users of older versions of this integration were not getting updates frequently
-  enough.  This should be fixed in the latest versions, with the proviso that
-  Home Assistant must be restarted after updating this integration.
-* Users of older versions of this integration may experience a problem whereby
-  the real-time weather sensors provided by the integration don't update,
-  and errors on the log appear frequently regarding this issue.  This is caused
-  by an older version of the code letting people configure precipitation stations
-  as if they were weather stations.  This is no longer possible, but if you
-  have this issue, you'll have to upgrade this integration, delete the configuration
-  and re-add it — the erroneous station no longer will appear as an option.
-* When you upgrade, a number of entities will be created, and a number of other
-  entities will be orphaned.  The recommended upgrade path is to delete the
-  existing integration, upgrade, restart Home Assistant, and re-add the integration.
-  If you don't do this, you will have to delete entities no longer supplied
-  by the integration.  This situation is a one-time thing.  The re-setup step
-  is necessary because the old integration did not provide unique IDs.
-* There is a migration step in the code that is supposed to migrate away
-  from `configuration.yaml` setup.  I have not tested it, but you should know
-  that this is deprecated and it will raise a repairs issue to remind you
-  to delete the old YAML configuration.
+With a weather station, these sensors compare it with its normals for
+1991–2020, computed from the station's own history (MeteoSwiss publishes its
+official normals only as maps):
 
-## Information sources
+* *High vs normal* and *Low vs normal*: today's highest and lowest temperature
+  so far against the normal for the date (the mean over 1991–2020 of a week
+  either side of it), in °C above or below.
+* *Month vs normal*: this month's mean temperature so far, in °C above or below.
+* *Month's rain vs normal* and *Month's sunshine vs normal*: this month so far,
+  in % of the normal for as many days.
+* *Record high for the date*, with its year, and the record low as attributes.
 
-Data comes from the MeteoSwiss official data sources.
-Forecasts are extracted from the MeteoSwiss API.
-Current conditions are from official data files.
+Days are UTC days, as in MeteoSwiss's data, so early in the morning today's
+high is still low.
 
-A primer on Swiss weather stations can be found at https://rudd-o.com/meteostations .
-Information on the provided values is available at
-[https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/info/VQHA80_en.txt](https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/info/VQHA80_en.txt).
+### Pollen
+
+One sensor per type of pollen (alder, ash, beech, birch, grasses, hazel and
+oak) with the latest hourly concentration in pollen/m³ at the chosen station,
+one of MeteoSwiss's 15.  They are measurements, not forecasts, and are
+unavailable when the station has reported nothing for six hours.
+
+## Download volumes
+
+Most data takes a few kilobytes per update, and all entries share the same
+downloads.  The exceptions are files MeteoSwiss only publishes for all of
+Switzerland at once:
+
+| Data | Download | Setting |
+|---|---|---|
+| Hourly temperatures | 33 MB every 3 hours, about 260 MB a day | *Hourly temperatures* (on by default) |
+| Freezing level | 33 MB every 3 hours, about 260 MB a day | *Freezing level* (on by default for mountains with hourly temperatures) |
+| Weather warnings | 800 kB at most every 30 minutes, about 37 MB a day | — |
+| Climate normals | 6 MB a week per station, plus 50 kB every 6 hours | *Climate normals* |
+
+On a metered connection, turn off *Hourly temperatures*: the hourly forecast
+then has no temperatures, and the snow and lowest-temperature sensors are
+unavailable.  Nothing is written to disk; downloads are kept in memory only as
+long as needed.
+
+## Data sources
+
+All data is from MeteoSwiss (Source: MeteoSwiss), under its
+[open data terms](https://opendatadocs.meteoswiss.ch/general/terms-of-use):
+
+* [Local forecasts](https://opendatadocs.meteoswiss.ch/e-forecast-data/e4-local-forecast-data)
+  of postal codes, stations and mountains, updated hourly.
+* [Automatic weather stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a1-automatic-weather-stations)
+  and [precipitation stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a2-automatic-precipitation-stations)
+  (SwissMetNet), for the current conditions, Föhn and climate normals.
+* [Pollen stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations).
+* Weather warnings, from MeteoSwiss's warnings as published by
+  [MeteoAlarm](https://meteoalarm.org) (EUMETNET).
+
+The daily chance of rain and gusts are the highest of the day.  Cloud cover
+combines MeteoSwiss's low, medium and high cloud forecasts, assuming the layers
+overlap at random; thin high cloud counts fully, so a sunny symbol can come
+with high cloud cover.  The measured values are described in the
+[parameter list](https://data.geo.admin.ch/ch.meteoschweiz.ogd-smn/ogd-smn_meta_parameters.csv).
 
 ### Privacy
 
-This integration uses:
+The integration contacts only `data.geo.admin.ch` (forecasts, measurements and
+the lists of places and stations) and `feeds.meteoalarm.org` (warnings).  Your
+location never leaves Home Assistant: the closest postal code, stations and
+warnings are found locally from those lists.
 
-* https://nominatim.openstreetmap.org to guess your post code
-* https://data.geo.admin.ch/ for current weather conditions
-* https://www.meteosuisse.admin.ch for forecast
+## Troubleshooting
 
-## Origins of this work
+Please report problems in the
+[issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with a debug
+log.  To get one, turn on debug logging in the entry's menu, or add this to
+`configuration.yaml` and restart:
 
-This was forked from https://github.com/websylv/homeassistant-meteoswiss because
-the original author is unresponsive and the original integration was
-broken beyond fixing.  Use this in your Home Assistant by deleting
-the original integration, then adding this as a custom HACS repo, and
-then reinstalling the integration through this repository.
+```yaml
+logger:
+  logs:
+    custom_components.meteoswiss: debug
+```
 
-### How to migrate away from websylv's integration
+## Development
 
-1. First remove any successfully-setup "Meteo Swiss" (note the space) integrations.
-2. Remove the integration itself from HACS.
-3. Remove the YAML config you might have been using before.
-3. Add this repository as a custom integration repo in HACS, then install it to your Home Assistant.  See above for installation instructions.
-4. Restart Home Assistant.
-4. Now you can add the integration in Devices & Settings.  See above for setup instructions.
+```bash
+pip install -r requirements_test.txt
+pytest
+ruff check
+```
+
+The tests run against in-memory copies of MeteoSwiss's files, so they need no
+network.  CI runs them, ruff, hassfest and the HACS checks on every push.
+
+## Credits
+
+* [websylv](https://github.com/websylv/homeassistant-meteoswiss) wrote the
+  original MeteoSwiss integration.
+* [Rudd-O (Manuel Amador)](https://github.com/Rudd-O/homeassistant-meteoswiss)
+  took it over, rewrote it with the setup flow, unique IDs, separate
+  precipitation stations and repair notices, and maintained it for years with
+  its contributors.
+* This version replaces the MeteoSwiss app API those used with MeteoSwiss open
+  data, and adds the hourly forecast, mountain forecasts, summaries, warnings,
+  pollen, Föhn and climate normals.
+
+Thanks to all of them, and to MeteoSwiss for publishing its data openly.

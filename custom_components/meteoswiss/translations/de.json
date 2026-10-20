@@ -6,15 +6,19 @@
         },
         "station_no_data": {
             "title": "MeteoSwiss-Wetterstation scheint nicht mehr verfügbar zu sein",
-            "description": "Die Echtzeit-Wetterstation, die MeteoSwiss verwendet ({station}), liefert keine Daten mehr.\n\nAktuell besteht die einzige Lösung darin, die MeteoSwiss-Integration zu entfernen und wieder hinzuzufügen und dabei eine neue Echtzeit-Wetterstation auszuwählen.\n\nBis diese Reparatur durchgeführt wurde, werden alle Echtzeit-Wettersensoren und -berichte dieser Station als nicht verfügbar angezeigt."
+            "description": "Die von MeteoSwiss verwendete Echtzeit-Wetterstation ({station}) liefert keine Daten mehr.\n\nUm eine andere Station zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin werden alle Echtzeit-Wettersensoren und -Meldungen dieser Station als nicht verfügbar angezeigt."
         },
         "postcode_no_data": {
             "title": "MeteoSwiss scheint keine Prognosen für diese Postleitzahl bereitzustellen",
-            "description": "Für die Postleitzahl {postcode} scheint keine Prognose verfügbar zu sein.\n\nAktuell besteht die einzige Lösung darin, die MeteoSwiss-Integration zu entfernen und wieder hinzuzufügen und dabei eine neue Postleitzahl auszuwählen.\n\nBis diese Reparatur durchgeführt wurde, wird die Prognose als nicht verfügbar angezeigt."
+            "description": "Für die Postleitzahl {postcode} scheint keine Prognose verfügbar zu sein.\n\nUm eine andere Postleitzahl zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
         },
         "improperly_configured": {
             "title": "MeteoSwiss-Integration ist nicht korrekt konfiguriert",
             "description": "Die MeteoSwiss-Integration mit der Eintrags-ID {entry_id} ist nicht korrekt konfiguriert.\n\nBitte entferne deinen Konfigurationseintrag und erstelle ihn erneut."
+        },
+        "point_no_data": {
+            "title": "MeteoSwiss bietet für einen Ort keine Prognose mehr an",
+            "description": "MeteoSwiss scheint für {name} keine Prognose mehr anzubieten.\n\nUm einen anderen Ort zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
         }
     },
     "config": {
@@ -25,13 +29,15 @@
         "error": {
             "cannot_query_address": "OpenStreetMap konnte die Adresse für deinen Standort nicht bestimmen; bitte gib die Informationen manuell ein",
             "cannot_query_postcode": "OpenStreetMap konnte die Postleitzahl für deinen Standort nicht bestimmen; bitte gib die Informationen manuell ein",
-            "lat": "Die angegebene Breitengrad-Koordinate liegt nicht zwischen -90 und 90 Grad",
-            "lon": "Die angegebene Längengrad-Koordinate liegt nicht zwischen -180 und 180 Grad",
+            "latitude_error": "Die angegebene Breitengrad-Koordinate liegt nicht zwischen -90 und 90 Grad",
+            "longitude_error": "Die angegebene Längengrad-Koordinate liegt nicht zwischen -180 und 180 Grad",
             "invalid_station_name": "Stationsname ist ungültig; bitte prüfe die Stationsliste unter {station_url}",
             "invalid_postcode": "Postleitzahl ist ungültig; diese Integration funktioniert nur mit Schweizer Postleitzahlen",
             "forecast_name_empty": "Der Prognose-Name darf nicht leer sein",
             "empty_name": "Der Anzeigename ist leer",
-            "update_interval_too_low": "Das Aktualisierungsintervall ist zu niedrig; es muss mindestens 1 Minute betragen"
+            "update_interval_too_low": "Das Aktualisierungsintervall ist zu niedrig; es muss mindestens 1 Minute betragen",
+            "cannot_query_points": "Die MeteoSwiss-Liste der Orte konnte nicht geladen werden; bitte später erneut versuchen",
+            "invalid_point": "Bitte einen Ort aus der Liste wählen"
         },
         "step": {
             "user": {
@@ -42,24 +48,195 @@
                 "description": "Bestätige deine geografische Position. Diese wird verwendet, um die nächstgelegene Echtzeit-Wetterstation zu bestimmen und deine Postleitzahl für Prognosen zu approximieren.",
                 "title": "Standort"
             },
+            "location": {
+                "title": "Prognose für",
+                "description": "Die Prognose einer Postleitzahl oder eines Bergs, einer Hütte oder eines Passes verwenden.",
+                "menu_options": {
+                    "user_two": "Postleitzahl",
+                    "mountain": "Berg, Hütte oder Pass"
+                }
+            },
             "user_two": {
                 "data": {
                     "postcode": "Postleitzahl",
                     "forecast_name": "Name des Prognose-(Wetter)-Entities",
-                    "update_interval": "Aktualisierungsintervall (Minuten)"
+                    "update_interval": "Aktualisierungsintervall (Minuten)",
+                    "hourly_temperature": "Stündliche Temperaturen"
                 },
                 "description": "Die Postleitzahl wird verwendet, um die 5-Tage-Prognose abzurufen. Der hier eingegebene Name wird für das Prognose-(Wetter)-Entity verwendet.",
-                "title": "Prognose"
+                "title": "Prognose",
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Die Nullgradgrenze ist eine eigene Einstellung. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde."
+                }
+            },
+            "mountain": {
+                "title": "Berg, Hütte oder Pass",
+                "description": "Die Orte sind nach Entfernung von deinem Standort sortiert, und ihre Prognosen gelten für die angegebene Höhe. Es werden nur die 100 nächsten aufgeführt. Ohne Station sind die angezeigten aktuellen Bedingungen die Prognose für die aktuelle Stunde.",
+                "data": {
+                    "point_id": "Ort",
+                    "forecast_name": "Name des Prognose-(Wetter)-Entities",
+                    "update_interval": "Aktualisierungsintervall (Minuten)",
+                    "hourly_temperature": "Stündliche Temperaturen und Nullgradgrenze"
+                },
+                "data_description": {
+                    "forecast_name": "Leer lassen, um den Namen des Orts zu verwenden.",
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz, je etwa 33 MB, die alle drei Stunden heruntergeladen werden (etwa 530 MB pro Tag, 16 GB pro Monat, gemeinsam mit deinen anderen MeteoSwiss-Prognosen). Bei einer volumenbegrenzten Verbindung ausschalten: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
+                }
             },
             "user_three": {
                 "data": {
                     "station": "Echtzeit-Wetterstation",
                     "real_time_name": "Echtzeit-Wetter-Entity-Namen",
                     "precipitation_station": "Echtzeit-Niederschlagsstation",
-                    "real_time_precipitation_name": "Echtzeit-Niederschlags-Entity-Namen"
+                    "real_time_precipitation_name": "Echtzeit-Niederschlags-Entity-Namen",
+                    "pollen_station": "Pollenstation"
                 },
                 "description": "Die Echtzeit-Wetter- und Niederschlagsstationen werden verwendet, um das aktuelle Wetter und den Niederschlag der Station abzurufen und als Sensoren bereitzustellen. Die Auswahl der ersten Option in der Liste deaktiviert die Echtzeit-Wettersensoren.\n\nWenn eine Wetterstation ausgewählt ist, wird das Feld für die Echtzeit-Entity-Namen verwendet, um die Echtzeit-(Sensor)-Entities zu benennen. Wenn keine Station ausgewählt ist, wird das Feld ignoriert.\n\nUnter {station_url} findest du die verfügbaren Echtzeitstationen.",
-                "title": "Echtzeit-Wetter- und Niederschlagsstationen"
+                "title": "Echtzeit-Wetter- und Niederschlagsstationen",
+                "data_description": {
+                    "pollen_station": "Pollenmessungen der nächsten der 15 Pollenstationen von MeteoSchweiz, als ein Sensor pro Pollenart. Die erste Option wählen, um keine zu verwenden."
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "MeteoSwiss-Optionen",
+                "description": "Einstellungen für diese Prognose.",
+                "data": {
+                    "hourly_temperature": "Stündliche Temperaturen",
+                    "foehn": "Föhnindex",
+                    "foehn_south_station": "Station südlich der Alpen",
+                    "foehn_north_station": "Station nördlich der Alpen",
+                    "foehn_threshold": "Föhn wahrscheinlich ab",
+                    "foehn_strong_threshold": "Starker Föhn ab",
+                    "freezing_level": "Nullgradgrenze",
+                    "climate_normals": "Klimanormwerte"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Die Nullgradgrenze ist eine eigene Einstellung. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde.",
+                    "foehn": "Sensoren für Föhn: der von MeteoSchweiz an der Wetterstation gemessene Föhnindex und eine Aussicht aus der Druckdifferenz über die Alpen, die Stunden vor dem Föhndurchbruch steigt.",
+                    "foehn_south_station": "Ihr Luftdruck auf Meereshöhe wird mit der Station nördlich der Alpen verglichen. Lugano ist die klassische Wahl.",
+                    "foehn_north_station": "Zürich/Kloten ist die klassische Wahl.",
+                    "foehn_threshold": "Druckdifferenz, ab der Föhn wahrscheinlich ist; etwa 4 hPa erreichen die nördlichen Täler wie in Altdorf. Für Nordföhn gleich, umgekehrt.",
+                    "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
+                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer weiteren Datei von 33 MB alle drei Stunden (etwa 260 MB pro Tag), die für alle deine MeteoSwiss-Prognosen einmal heruntergeladen wird; sie kostet also nichts zusätzlich, wenn eine davon sie schon hat.",
+                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 6 MB) wird einmal pro Woche heruntergeladen, die Tage dieses Jahres alle sechs Stunden."
+                }
+            }
+        },
+        "error": {
+            "same_foehn_station": "Bitte zwei verschiedene Stationen wählen",
+            "foehn_thresholds": "Die Schwelle für starken Föhn muss höher sein als die andere, und beide über 0"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "snow_tonight": {
+                "name": "Schnee heute Nacht"
+            },
+            "snow_next_24h": {
+                "name": "Schnee nächste 24 Stunden"
+            },
+            "snow_next_48h": {
+                "name": "Schnee nächste 48 Stunden"
+            },
+            "sunshine_tomorrow_midday": {
+                "name": "Sonnenschein morgen 9–15 Uhr"
+            },
+            "sunshine_tomorrow": {
+                "name": "Sonnenschein morgen"
+            },
+            "max_gust_tomorrow_midday": {
+                "name": "Stärkste Böe morgen 9–15 Uhr"
+            },
+            "precipitation_next_hour": {
+                "name": "Niederschlag nächste Stunde"
+            },
+            "precipitation_probability_next_hour": {
+                "name": "Regenwahrscheinlichkeit nächste Stunde"
+            },
+            "min_temperature_tonight": {
+                "name": "Tiefsttemperatur heute Nacht"
+            },
+            "pollen_alder": {
+                "name": "Erle"
+            },
+            "pollen_ash": {
+                "name": "Esche"
+            },
+            "pollen_beech": {
+                "name": "Buche"
+            },
+            "pollen_birch": {
+                "name": "Birke"
+            },
+            "pollen_grasses": {
+                "name": "Gräser"
+            },
+            "pollen_hazel": {
+                "name": "Hasel"
+            },
+            "pollen_oak": {
+                "name": "Eiche"
+            },
+            "weather_warning": {
+                "name": "Wetterwarnung",
+                "state": {
+                    "none": "Keine",
+                    "yellow": "Gelb",
+                    "orange": "Orange",
+                    "red": "Rot"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Wetterwarnung nächste 24 Stunden",
+                "state": {
+                    "none": "Keine",
+                    "yellow": "Gelb",
+                    "orange": "Orange",
+                    "red": "Rot"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Föhn-Druckdifferenz"
+            },
+            "foehn_outlook": {
+                "name": "Föhnaussicht",
+                "state": {
+                    "strong_north": "Starker Nordföhn",
+                    "north": "Nordföhn wahrscheinlich",
+                    "none": "Keiner",
+                    "south": "Südföhn wahrscheinlich",
+                    "strong_south": "Starker Südföhn"
+                }
+            },
+            "foehn": {
+                "name": "Föhn",
+                "state": {
+                    "none": "Kein Föhn",
+                    "mixed": "Gemischt",
+                    "foehn": "Föhn"
+                }
+            },
+            "high_vs_normal": {
+                "name": "Höchstwert gegenüber Norm"
+            },
+            "low_vs_normal": {
+                "name": "Tiefstwert gegenüber Norm"
+            },
+            "month_vs_normal": {
+                "name": "Monat gegenüber Norm"
+            },
+            "month_rain_vs_normal": {
+                "name": "Monatsniederschlag gegenüber Norm"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Monatssonnenschein gegenüber Norm"
+            },
+            "record_high": {
+                "name": "Rekordhöchstwert für das Datum"
             }
         }
     }

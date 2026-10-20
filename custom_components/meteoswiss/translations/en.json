@@ -6,15 +6,19 @@
         },
         "station_no_data": {
             "title": "MeteoSwiss weather station appears to be gone",
-            "description": "The real-time weather station MeteoSwiss is using ({station}) is no longer offering data.\n\nCurrently, the only repair possible involves removing and re-adding the MeteoSwiss integration, selecting a new real-time weather station.\n\nUntil this repair is made, all real-time weather sensors and reports coming from this station will show as unavailable."
+            "description": "The real-time weather station MeteoSwiss is using ({station}) is no longer offering data.\n\nTo choose another station, go to Settings → Devices & services → MeteoSwiss and select Reconfigure in the menu of this entry.\n\nUntil then, all real-time weather sensors and reports coming from this station will show as unavailable."
         },
         "postcode_no_data": {
             "title": "MeteoSwiss appears not to provide forecasts for postal code",
-            "description": "The postal code {postcode} does not appear to have any forecast available.\n\nCurrently, the only repair possible involves removing and re-adding the MeteoSwiss integration, selecting a new post code.\n\nUntil this repair is made, the forecast will show as unavailable."
+            "description": "The postal code {postcode} does not appear to have any forecast available.\n\nTo choose another postal code, go to Settings → Devices & services → MeteoSwiss and select Reconfigure in the menu of this entry.\n\nUntil then, the forecast will show as unavailable."
         },
         "improperly_configured": {
             "title": "MeteoSwiss integration improperly configured",
             "description": "The MeteoSwiss integration with entry ID {entry_id} is improperly configured.\n\nPlease remove your configuration entry and recreate it."
+        },
+        "point_no_data": {
+            "title": "MeteoSwiss no longer provides a forecast for a place",
+            "description": "MeteoSwiss does not appear to offer a forecast for {name} any more.\n\nTo choose another place, go to Settings → Devices & services → MeteoSwiss and select Reconfigure in the menu of this entry.\n\nUntil then, its forecast will show as unavailable."
         }
     },
     "config": {
@@ -23,15 +27,17 @@
             "unknown": "Unknown error: please retry later"
         },
         "error": {
-            "cannot_query_address": "OpenStreetMap refused to guess the address for your location; please enter the information manually",
-            "cannot_query_postcode": "OpenStreetMap refused to guess the postal code for your location; please enter the information manually",
-            "lat": "The supplied latitude does not fall between -90 y 90 degrees",
-            "lon": "The supplied longitude does not fall between -180 y 180 degrees",
+            "cannot_query_address": "The MeteoSwiss list of postal codes could not be loaded to guess your location's name; please enter the information manually",
+            "cannot_query_postcode": "The MeteoSwiss list of postal codes could not be loaded to guess your postal code; please enter the information manually",
+            "latitude_error": "The supplied latitude does not fall between -90 and 90 degrees",
+            "longitude_error": "The supplied longitude does not fall between -180 and 180 degrees",
             "invalid_station_name": "Station name is invalid; please check {station_url} for station list",
             "invalid_postcode": "Postal code is invalid; this integration only works with Swiss postal codes",
             "forecast_name_empty": "Forecast name cannot be empty",
             "empty_name": "The display name is empty",
-            "update_interval_too_low": "The update interval is too low; must be at least 1 minute"
+            "update_interval_too_low": "The update interval is too low; must be at least 1 minute",
+            "cannot_query_points": "The MeteoSwiss list of places could not be loaded; please try again later",
+            "invalid_point": "Choose a place from the list"
         },
         "step": {
             "user": {
@@ -42,24 +48,195 @@
                 "description": "Confirm your geographical position.  This will be used to guess the closest real-time weather station and approximate your postal code for forecasts.",
                 "title": "Location"
             },
+            "location": {
+                "title": "Forecast for",
+                "description": "Use the forecast of a postal code, or of a mountain, hut or pass.",
+                "menu_options": {
+                    "user_two": "Postal code",
+                    "mountain": "Mountain, hut or pass"
+                }
+            },
             "user_two": {
                 "data": {
                     "postcode": "Postal code",
                     "forecast_name": "Forecast (weather) entity name",
-                    "update_interval": "Update interval (minutes)"
+                    "update_interval": "Update interval (minutes)",
+                    "hourly_temperature": "Hourly temperatures"
                 },
-                "description": "The postal code is used to look up the 5-day forecast.  The name you enter here will be used for the forecast (weather) entity.",
-                "title": "Forecast"
+                "description": "The postal code is used to look up the nine-day forecast.  The name you enter here will be used for the forecast (weather) entity.",
+                "title": "Forecast",
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. The freezing level is a setting of its own. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
+                }
+            },
+            "mountain": {
+                "title": "Mountain, hut or pass",
+                "description": "Places are sorted by distance from your location, and their forecasts are for the altitude shown.  Only the 100 closest are listed.  Without a station, the current conditions shown are the forecast for the current hour.",
+                "data": {
+                    "point_id": "Place",
+                    "forecast_name": "Forecast (weather) entity name",
+                    "update_interval": "Update interval (minutes)",
+                    "hourly_temperature": "Hourly temperatures and freezing level"
+                },
+                "data_description": {
+                    "forecast_name": "Leave empty to use the name of the place.",
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures and the freezing level in files for all of Switzerland, of about 33 MB each, downloaded every three hours (about 530 MB a day, 16 GB a month, shared with your other MeteoSwiss forecasts). Turn this off on a metered connection: the forecast then has no hourly temperatures and there is no freezing level sensor."
+                }
             },
             "user_three": {
                 "data": {
                     "station": "Real-time weather station",
                     "real_time_name": "Real-time weather entity names",
                     "precipitation_station": "Real-time precipitation station",
-                    "real_time_precipitation_name": "Real-time precipitation entity names"
+                    "real_time_precipitation_name": "Real-time precipitation entity names",
+                    "pollen_station": "Pollen station"
                 },
                 "description": "The real-time weather and precipitation stations are used to look up the current weather and precipitation at the station and provide them as sensors.  Selecting the first option of the list disables real-time weather sensors.\n\nIf a weather station is selected, the real-time entity names field is used to name the real-time (sensor) entities.  If no station is chosen, the real-time entity names field is ignored.\n\n{station_url} lists the available real-time stations.",
-                "title": "Real-time weather and precipitation stations"
+                "title": "Real-time weather and precipitation stations",
+                "data_description": {
+                    "pollen_station": "Pollen measurements from the closest of MeteoSwiss's 15 pollen stations, as one sensor per type of pollen. Choose the first option for none."
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "MeteoSwiss options",
+                "description": "Settings for this forecast.",
+                "data": {
+                    "hourly_temperature": "Hourly temperatures",
+                    "foehn": "Föhn index",
+                    "foehn_south_station": "Station south of the Alps",
+                    "foehn_north_station": "Station north of the Alps",
+                    "foehn_threshold": "Föhn likely from",
+                    "foehn_strong_threshold": "Strong Föhn from",
+                    "freezing_level": "Freezing level",
+                    "climate_normals": "Climate normals"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. The freezing level is a setting of its own. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour.",
+                    "foehn": "Sensors for Föhn: MeteoSwiss's measured Föhn index at the weather station, and an outlook from the pressure difference across the Alps, which rises hours before the Föhn breaks through.",
+                    "foehn_south_station": "Its sea-level pressure is compared with the station north of the Alps. Lugano is the classic choice.",
+                    "foehn_north_station": "Zürich/Kloten is the classic choice.",
+                    "foehn_threshold": "Pressure difference from which Föhn is likely; about 4 hPa reaches the northern valleys, as in Altdorf. The same the other way round for north Föhn.",
+                    "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa.",
+                    "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in another 33 MB file every three hours (about 260 MB a day), downloaded once for all your MeteoSwiss forecasts, so it costs nothing more if one of them already has it.",
+                    "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 6 MB) is downloaded once a week, this year's days every six hours."
+                }
+            }
+        },
+        "error": {
+            "same_foehn_station": "Choose two different stations",
+            "foehn_thresholds": "The strong Föhn threshold must be higher than the other, and both above 0"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "snow_tonight": {
+                "name": "Snow tonight"
+            },
+            "snow_next_24h": {
+                "name": "Snow next 24 hours"
+            },
+            "snow_next_48h": {
+                "name": "Snow next 48 hours"
+            },
+            "sunshine_tomorrow_midday": {
+                "name": "Sunshine tomorrow 9–15"
+            },
+            "sunshine_tomorrow": {
+                "name": "Sunshine tomorrow"
+            },
+            "max_gust_tomorrow_midday": {
+                "name": "Strongest gust tomorrow 9–15"
+            },
+            "precipitation_next_hour": {
+                "name": "Precipitation next hour"
+            },
+            "precipitation_probability_next_hour": {
+                "name": "Chance of rain next hour"
+            },
+            "min_temperature_tonight": {
+                "name": "Lowest temperature tonight"
+            },
+            "pollen_alder": {
+                "name": "Alder"
+            },
+            "pollen_ash": {
+                "name": "Ash"
+            },
+            "pollen_beech": {
+                "name": "Beech"
+            },
+            "pollen_birch": {
+                "name": "Birch"
+            },
+            "pollen_grasses": {
+                "name": "Grasses"
+            },
+            "pollen_hazel": {
+                "name": "Hazel"
+            },
+            "pollen_oak": {
+                "name": "Oak"
+            },
+            "weather_warning": {
+                "name": "Weather warning",
+                "state": {
+                    "none": "None",
+                    "yellow": "Yellow",
+                    "orange": "Orange",
+                    "red": "Red"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Weather warning next 24 hours",
+                "state": {
+                    "none": "None",
+                    "yellow": "Yellow",
+                    "orange": "Orange",
+                    "red": "Red"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Föhn pressure difference"
+            },
+            "foehn_outlook": {
+                "name": "Föhn outlook",
+                "state": {
+                    "strong_north": "Strong north Föhn",
+                    "north": "North Föhn likely",
+                    "none": "None",
+                    "south": "South Föhn likely",
+                    "strong_south": "Strong south Föhn"
+                }
+            },
+            "foehn": {
+                "name": "Föhn",
+                "state": {
+                    "none": "None",
+                    "mixed": "Mixed",
+                    "foehn": "Föhn"
+                }
+            },
+            "high_vs_normal": {
+                "name": "High vs normal"
+            },
+            "low_vs_normal": {
+                "name": "Low vs normal"
+            },
+            "month_vs_normal": {
+                "name": "Month vs normal"
+            },
+            "month_rain_vs_normal": {
+                "name": "Month's rain vs normal"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Month's sunshine vs normal"
+            },
+            "record_high": {
+                "name": "Record high for the date"
             }
         }
     }

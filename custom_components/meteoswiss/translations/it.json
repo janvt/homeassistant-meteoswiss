@@ -6,15 +6,19 @@
         },
         "station_no_data": {
             "title": "La stazione meteorologica di MeteoSvizzera sembra essere andata perduta",
-            "description": "La stazione meteorologica di MeteoSvizzera utilizzando ({station}) non offre più dati.\\n\\nAttualmente, l'unico riparazione possibile prevede la rimozione e la riacquisizione dell'integrazione di MeteoSvizzera, selezionando una nuova stazione meteorologica in tempo reale.\\n\\nFino a che questa riparazione non sia effettuata, tutti i sensori e le relazioni meteorologici in tempo reale provenienti da questa stazione mostreranno come indisponibili."
+            "description": "La stazione meteorologica in tempo reale usata da MeteoSvizzera ({station}) non fornisce più dati.\n\nPer scegliere un'altra stazione, andare in Impostazioni → Dispositivi e servizi → MeteoSwiss e selezionare «Riconfigura» nel menu di questa voce.\n\nFino ad allora, tutti i sensori e i rapporti meteo in tempo reale di questa stazione risulteranno non disponibili."
         },
         "postcode_no_data": {
             "title": "MeteoSvizzera sembra non fornire previsioni per il codice di avviamento",
-            "description": "Il codice di avviamento {postcode} sembra non avere alcuna previsione disponibile.\n\nAttualmente, l'unica correzione possibile consiste nell'eliminare e riacquisire l'integrazione MeteoSvizzera, selezionando un nuovo codice di avviamento.\n\nFinché questa correzione non è stata eseguita, la previsione mostrerà come indisponibile."
+            "description": "Per il codice postale {postcode} non sembra disponibile alcuna previsione.\n\nPer scegliere un altro codice postale, andare in Impostazioni → Dispositivi e servizi → MeteoSwiss e selezionare «Riconfigura» nel menu di questa voce.\n\nFino ad allora, le previsioni risulteranno non disponibili."
         },
         "improperly_configured": {
             "title": "L'integrazione di MeteoSvizzera non è configurata correttamente",
             "description": "L'integrazione di MeteoSvizzera con ID di inserimento {entry_id} non è configurata correttamente.\\n\\nPer favore, rimuovi il tuo entry di configurazione e ricrearlo."
+        },
+        "point_no_data": {
+            "title": "MeteoSvizzera non fornisce più previsioni per un luogo",
+            "description": "MeteoSvizzera non sembra più offrire previsioni per {name}.\n\nPer scegliere un altro luogo, andare in Impostazioni → Dispositivi e servizi → MeteoSwiss e selezionare «Riconfigura» nel menu di questa voce.\n\nFino ad allora, le previsioni risulteranno non disponibili."
         }
     },
     "config": {
@@ -25,13 +29,15 @@
         "error": {
             "cannot_query_address": "OpenStreetMap rifiuta di indovinare l'indirizzo della tua posizione; per favore inserisci le informazioni manualmente",
             "cannot_query_postcode": "OpenStreetMap rifiuta di indovinare il codice postale della tua posizione; per favore inserisci le informazioni manualmente",
-            "lat": "La longitudine fornita non cade tra -90 e 90 gradi",
-            "lon": "La longitudine fornita non cade tra -180 e 180 gradi",
+            "latitude_error": "La latitudine fornita non cade tra -90 e 90 gradi",
+            "longitude_error": "La longitudine fornita non cade tra -180 e 180 gradi",
             "invalid_station_name": "Il nome della stazione è invalido; per favore controlla {station_url} per la lista delle stazioni",
             "invalid_postcode": "Il codice postale è invalido; questa integrazione funziona solo con i codici postali svizzeri",
             "forecast_name_empty": "Il nome del preavviso non può essere vuoto",
             "empty_name": "Il nome da visualizzare è vuoto",
-            "update_interval_too_low": "L'intervallo di aggiornamento è troppo basso; deve essere almeno 1 minuto"
+            "update_interval_too_low": "L'intervallo di aggiornamento è troppo basso; deve essere almeno 1 minuto",
+            "cannot_query_points": "Non è stato possibile caricare l'elenco dei luoghi di MeteoSvizzera; riprovare più tardi",
+            "invalid_point": "Scegliere un luogo dall'elenco"
         },
         "step": {
             "user": {
@@ -42,24 +48,195 @@
                 "description": "Conferma la tua posizione geografica. Questo verrà utilizzato per indovinare la stazione meteorologica in tempo reale più vicina e approssimare il codice postale per i preavvisi.",
                 "title": "Posizione"
             },
+            "location": {
+                "title": "Previsioni per",
+                "description": "Usare le previsioni di un codice postale, oppure di una montagna, una capanna o un passo.",
+                "menu_options": {
+                    "user_two": "Codice postale",
+                    "mountain": "Montagna, capanna o passo"
+                }
+            },
             "user_two": {
                 "data": {
                     "postcode": "Codice postale",
                     "forecast_name": "Nome dell'entità del preavviso (meteorologico)",
-                    "update_interval": "Intervallo di aggiornamento (minuti)"
+                    "update_interval": "Intervallo di aggiornamento (minuti)",
+                    "hourly_temperature": "Temperature orarie"
                 },
                 "description": "Il codice postale viene utilizzato per cercare il preavviso a 5 giorni. Il nome che inserisci qui verrà utilizzato per l'entità del preavviso.",
-                "title": "Preavviso"
+                "title": "Preavviso",
+                "data_description": {
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Lo zero termico è un'impostazione a sé. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                }
+            },
+            "mountain": {
+                "title": "Montagna, capanna o passo",
+                "description": "I luoghi sono ordinati per distanza dalla tua posizione e le loro previsioni valgono per l'altitudine indicata. Sono elencati solo i 100 più vicini. Senza stazione, le condizioni attuali mostrate sono le previsioni per l'ora corrente.",
+                "data": {
+                    "point_id": "Luogo",
+                    "forecast_name": "Nome dell'entità di previsione (meteo)",
+                    "update_interval": "Intervallo di aggiornamento (minuti)",
+                    "hourly_temperature": "Temperature orarie e limite dello zero termico"
+                },
+                "data_description": {
+                    "forecast_name": "Lasciare vuoto per usare il nome del luogo.",
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie e lo zero termico solo in file per tutta la Svizzera, di circa 33 MB ciascuno, scaricati ogni tre ore (circa 530 MB al giorno, 16 GB al mese, condivisi con le altre previsioni MeteoSvizzera). Disattivare l'opzione con una connessione a consumo: le previsioni non avranno temperature orarie e non ci sarà il sensore dello zero termico."
+                }
             },
             "user_three": {
                 "data": {
                     "station": "Stazione meteo in tempo reale",
                     "real_time_name": "Nomi di entità meteo in tempo reale",
                     "precipitation_station": "Stazione di precipitazioni in tempo reale",
-                    "real_time_precipitation_name": "Nomi di entità di precipitazioni in tempo reale"
+                    "real_time_precipitation_name": "Nomi di entità di precipitazioni in tempo reale",
+                    "pollen_station": "Stazione pollinica"
                 },
                 "description": "La stazione meteorologica in tempo reale viene utilizzata per cercare il meteo attuale alla stazione e fornire loro come sensori. Selezionando la prima opzione della lista, si disattiva i sensori di meteo in tempo reale.\\n\\nSe una stazione meteorologica è selezionata, il campo dei nomi delle entità in tempo reale viene utilizzato per denominare le entità in tempo reale (sensori). Se nessuna stazione è scelta, si ignora il campo dei nomi delle entità in tempo reale.\\n\\n{station_url} elenca le stazioni meteorologiche in tempo reale disponibili.",
-                "title": "Meteo in tempo reale"
+                "title": "Meteo in tempo reale",
+                "data_description": {
+                    "pollen_station": "Misure polliniche della più vicina delle 15 stazioni polliniche di MeteoSvizzera, con un sensore per tipo di polline. Scegliere la prima opzione per nessuna."
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Opzioni MeteoSvizzera",
+                "description": "Impostazioni di questa previsione.",
+                "data": {
+                    "hourly_temperature": "Temperature orarie",
+                    "foehn": "Indice di favonio",
+                    "foehn_south_station": "Stazione a sud delle Alpi",
+                    "foehn_north_station": "Stazione a nord delle Alpi",
+                    "foehn_threshold": "Favonio probabile da",
+                    "foehn_strong_threshold": "Favonio forte da",
+                    "freezing_level": "Zero termico",
+                    "climate_normals": "Norme climatiche"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Lo zero termico è un'impostazione a sé. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora.",
+                    "foehn": "Sensori per il favonio: l'indice di favonio misurato da MeteoSvizzera alla stazione meteo e una tendenza dalla differenza di pressione attraverso le Alpi, che sale ore prima che il favonio irrompa.",
+                    "foehn_south_station": "La sua pressione al livello del mare viene confrontata con la stazione a nord delle Alpi. Lugano è la scelta classica.",
+                    "foehn_north_station": "Zurigo/Kloten è la scelta classica.",
+                    "foehn_threshold": "Differenza di pressione da cui il favonio è probabile; circa 4 hPa raggiungono le valli del nord, come ad Altdorf. Lo stesso al contrario per il favonio da nord.",
+                    "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa.",
+                    "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un altro file di 33 MB ogni tre ore (circa 260 MB al giorno), scaricato una volta per tutte le previsioni MeteoSwiss: non costa nulla in più se una di esse lo ha già.",
+                    "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 6 MB) viene scaricata una volta alla settimana, i giorni di quest'anno ogni sei ore."
+                }
+            }
+        },
+        "error": {
+            "same_foehn_station": "Scegliere due stazioni diverse",
+            "foehn_thresholds": "La soglia del favonio forte deve essere più alta dell'altra, ed entrambe superiori a 0"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "snow_tonight": {
+                "name": "Neve stanotte"
+            },
+            "snow_next_24h": {
+                "name": "Neve prossime 24 ore"
+            },
+            "snow_next_48h": {
+                "name": "Neve prossime 48 ore"
+            },
+            "sunshine_tomorrow_midday": {
+                "name": "Sole domani 9–15"
+            },
+            "sunshine_tomorrow": {
+                "name": "Sole domani"
+            },
+            "max_gust_tomorrow_midday": {
+                "name": "Raffica più forte domani 9–15"
+            },
+            "precipitation_next_hour": {
+                "name": "Precipitazioni prossima ora"
+            },
+            "precipitation_probability_next_hour": {
+                "name": "Probabilità di pioggia prossima ora"
+            },
+            "min_temperature_tonight": {
+                "name": "Temperatura minima stanotte"
+            },
+            "pollen_alder": {
+                "name": "Ontano"
+            },
+            "pollen_ash": {
+                "name": "Frassino"
+            },
+            "pollen_beech": {
+                "name": "Faggio"
+            },
+            "pollen_birch": {
+                "name": "Betulla"
+            },
+            "pollen_grasses": {
+                "name": "Graminacee"
+            },
+            "pollen_hazel": {
+                "name": "Nocciolo"
+            },
+            "pollen_oak": {
+                "name": "Quercia"
+            },
+            "weather_warning": {
+                "name": "Allerta meteo",
+                "state": {
+                    "none": "Nessuna",
+                    "yellow": "Gialla",
+                    "orange": "Arancione",
+                    "red": "Rossa"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Allerta meteo prossime 24 ore",
+                "state": {
+                    "none": "Nessuna",
+                    "yellow": "Gialla",
+                    "orange": "Arancione",
+                    "red": "Rossa"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Differenza di pressione del favonio"
+            },
+            "foehn_outlook": {
+                "name": "Tendenza del favonio",
+                "state": {
+                    "strong_north": "Favonio da nord forte",
+                    "north": "Favonio da nord probabile",
+                    "none": "Nessuno",
+                    "south": "Favonio da sud probabile",
+                    "strong_south": "Favonio da sud forte"
+                }
+            },
+            "foehn": {
+                "name": "Favonio",
+                "state": {
+                    "none": "Nessuno",
+                    "mixed": "Misto",
+                    "foehn": "Favonio"
+                }
+            },
+            "high_vs_normal": {
+                "name": "Massima rispetto alla norma"
+            },
+            "low_vs_normal": {
+                "name": "Minima rispetto alla norma"
+            },
+            "month_vs_normal": {
+                "name": "Mese rispetto alla norma"
+            },
+            "month_rain_vs_normal": {
+                "name": "Pioggia del mese rispetto alla norma"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Sole del mese rispetto alla norma"
+            },
+            "record_high": {
+                "name": "Record di caldo per la data"
             }
         }
     }

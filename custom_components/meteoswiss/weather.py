@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import datetime
 import logging
-import pprint
-from typing import Any, cast
 
-from hamsclientfork.client import CurrentCondition
 from homeassistant.components.weather import (
+    ATTR_FORECAST_CLOUD_COVERAGE,
     ATTR_FORECAST_CONDITION,
     ATTR_FORECAST_NATIVE_PRECIPITATION,
     ATTR_FORECAST_NATIVE_TEMP,
     ATTR_FORECAST_NATIVE_TEMP_LOW,
+    ATTR_FORECAST_NATIVE_WIND_GUST_SPEED,
+    ATTR_FORECAST_NATIVE_WIND_SPEED,
+    ATTR_FORECAST_PRECIPITATION_PROBABILITY,
     ATTR_FORECAST_TIME,
+    ATTR_FORECAST_WIND_BEARING,
     Forecast,
     WeatherEntity,
     WeatherEntityFeature,
@@ -35,7 +37,6 @@ from custom_components.meteoswiss import (
 )
 from custom_components.meteoswiss.const import (
     CODE_TO_CONDITION_MAP,
-    CONF_FORECAST_NAME,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
@@ -44,10 +45,9 @@ from custom_components.meteoswiss.const import (
     DOMAIN,
     STATION_URL,
 )
+from custom_components.meteoswiss.ogd import HourlyForecast, current_hour
 
 _LOGGER = logging.getLogger(__name__)
-
-INVALID_FORECAST_VALUE = 32767
 
 
 async def async_setup_entry(
@@ -61,7 +61,7 @@ async def async_setup_entry(
 
 
 def condition_name_to_first_value(
-    condition: None | list[CurrentCondition], name: str
+    condition: None | list[dict[str, float | None]], name: str
 ) -> float | None:
     if not condition:
         # Real-time weather station provides no data.
@@ -117,6 +117,7 @@ class MeteoSwissWeather(
         super().__init__(coordinator)
         self._invalid_legacy_icon_logged = False
         self._attr_unique_id = "weather.%s" % integration_id
+        self._attr_device_info = coordinator.device_info
         self._attr_postcode = coordinator.data[CONF_POSTCODE]
         self._attr_station = coordinator.data[CONF_STATION]
         self._attr_weather_station = self._attr_station
@@ -126,8 +127,22 @@ class MeteoSwissWeather(
             CONF_REAL_TIME_PRECIPITATION_NAME
         ]
 
+        point = coordinator.data["point"]
+        # A summit has no station, so show the forecast for the current hour.
+        self._from_forecast = coordinator.is_mountain and not self._attr_station
         a = "Data provided by MeteoSwiss."
-        a += "  Forecasts from postal code %s." % (self._attr_postcode,)
+        if coordinator.is_mountain:
+            a += "  Forecasts for %s" % (point.name if point else "a mountain",)
+            if point and point.height is not None:
+                a += " (%.0f m)" % (point.height,)
+            a += "."
+            self._attr_extra_state_attributes = {
+                "elevation": point.height if point else None
+            }
+        else:
+            a += "  Forecasts from postal code %s." % (self._attr_postcode,)
+        if self._from_forecast:
+            a += "  Current conditions are forecast, not measured."
         if self._attr_weather_station:
             a += "  Real-time weather data from weather station %s (%s)." % (
                 self._attr_weather_station,
@@ -145,7 +160,8 @@ class MeteoSwissWeather(
             a += "  No real-time stations used by this weather entry."
         self._attr_attribution = a
 
-        self._attr_name = coordinator.data[CONF_FORECAST_NAME]
+        # Named after the device, which has the name of the forecast.
+        self._attr_name = None
         self.__set_data(coordinator.data)
 
     def __set_data(self, data: MeteoSwissClientResult) -> None:
@@ -159,11 +175,20 @@ class MeteoSwissWeather(
         self.__set_data(data)
         self.async_write_ha_state()
 
+    def _measured_or_forecast(
+        self, station_code: str, forecast_key: str
+    ) -> float | None:
+        """A station measurement, or the current hour's forecast for summits."""
+        if self._from_forecast:
+            current = self._current_hour()
+            return current[forecast_key] if current else None  # type: ignore[literal-required]
+        return condition_name_to_first_value(
+            self._condition_for_all_stations, station_code
+        )
+
     @property
     def native_temperature(self) -> float | None:
-        return condition_name_to_first_value(
-            self._condition_for_all_stations, "tre200s0"
-        )
+        return self._measured_or_forecast("tre200s0", "temperature")
 
     @property
     def native_pressure(self) -> float | None:
@@ -179,83 +204,73 @@ class MeteoSwissWeather(
 
     @property
     def native_wind_speed(self) -> float | None:
+        return self._measured_or_forecast("fu3010z0", "wind_speed")
+
+    @property
+    def native_wind_gust_speed(self) -> float | None:
+        return self._measured_or_forecast("fu3010z1", "wind_gust")
+
+    @property
+    def native_dew_point(self) -> float | None:
         return condition_name_to_first_value(
-            self._condition_for_all_stations, "fu3010z0"
+            self._condition_for_all_stations, "tde200s0"
         )
 
     @property
     def wind_bearing(self) -> float | None:
-        return condition_name_to_first_value(
-            self._condition_for_all_stations, "dkl010z0"
-        )
+        return self._measured_or_forecast("dkl010z0", "wind_bearing")
+
+    @property
+    def cloud_coverage(self) -> float | None:
+        # Stations do not measure clouds.
+        if not self._from_forecast:
+            return None
+        current = self._current_hour()
+        return current["cloud_coverage"] if current else None
+
+    def _current_hour(self) -> HourlyForecast | None:
+        """The forecast of the hour we are in."""
+        if not self._forecastData:
+            return None
+        now = datetime.datetime.now(datetime.timezone.utc)
+        return current_hour(self._forecastData["hourly"], now)
 
     @property
     def condition(self) -> str | None:
-        current_weather = self._forecastData["currentWeather"]
-        symbolId = current_weather.get("icon")
-        if symbolId in (None, INVALID_FORECAST_VALUE):
-            replacement = current_weather.get("iconV2")
-            if not self._invalid_legacy_icon_logged:
-                _LOGGER.warning(
-                    "MeteoSwiss returned invalid legacy current-weather icon %r; "
-                    "using iconV2 %r",
-                    symbolId,
-                    replacement,
-                )
-                self._invalid_legacy_icon_logged = True
-            symbolId = replacement
-        else:
-            self._invalid_legacy_icon_logged = False
-        try:
-            cond: str | None = (
-                str(CODE_TO_CONDITION_MAP.get(symbolId, ("", None))[0]) or None
-            )
-            if cond is None:
-                _LOGGER.error(
-                    "MeteoSwiss returned no recognized current-weather icon: %r",
-                    symbolId,
-                )
-                return STATE_UNAVAILABLE
-            _LOGGER.debug(
-                "Current symbol is %s, condition is: %s",
-                symbolId,
-                cond,
-            )
-            return cond
-        except TypeError as exc:
+        current = self._current_hour()
+        symbolId = current["symbol"] if current else None
+        cond = CODE_TO_CONDITION_MAP.get(symbolId, ("", None))[0] if symbolId else ""
+        if not cond:
             _LOGGER.error(
-                "Expected an int, not %r, to decide on the forecast icon: %s",
+                "MeteoSwiss returned no recognized current-weather symbol: %r",
                 symbolId,
-                exc,
             )
-            _LOGGER.error("Forecast data: %r", self._forecastData)
             return STATE_UNAVAILABLE
+        _LOGGER.debug("Current symbol is %s, condition is: %s", symbolId, cond)
+        return str(cond)
 
     def _daily_forecast(self) -> list[Forecast] | None:
         if not self._forecastData:
             return None
         fcdata_out: list[Forecast] = []
-        # Skip the first element - it's the forecast for the current day
-        try:
-            for forecast in self._forecastData["regionForecast"]:
-                data_out: Forecast = {
-                    ATTR_FORECAST_TIME: forecast["dayDate"],
-                    ATTR_FORECAST_NATIVE_TEMP_LOW: forecast["temperatureMin"],
-                    ATTR_FORECAST_NATIVE_TEMP: forecast["temperatureMax"],
-                    ATTR_FORECAST_CONDITION: str(
-                        CODE_TO_CONDITION_MAP.get(forecast["iconDay"], ("", None))[0]
-                    )
-                    or None,
-                    ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
-                }
-                fcdata_out.append(data_out)
-        except Exception as e:
-            _LOGGER.exception(
-                "Error while converting daily forecast: %s\nForecast data: %s",
-                e,
-                pprint.pformat(self._forecastData["regionForecast"]),
-            )
-            raise
+        for forecast in self._forecastData["daily"]:
+            symbol = forecast["symbol"]
+            data_out: Forecast = {
+                ATTR_FORECAST_TIME: forecast["date"],
+                ATTR_FORECAST_NATIVE_TEMP_LOW: forecast["temperature_min"],
+                ATTR_FORECAST_NATIVE_TEMP: forecast["temperature_max"],
+                ATTR_FORECAST_CONDITION: (
+                    str(CODE_TO_CONDITION_MAP.get(symbol, ("", None))[0]) or None
+                    if symbol
+                    else None
+                ),
+                ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast[
+                    "precipitation_probability"
+                ],
+                ATTR_FORECAST_NATIVE_WIND_GUST_SPEED: forecast["wind_gust"],
+            }
+            fcdata_out.append(data_out)
         _LOGGER.debug("Daily forecast has %d items", len(fcdata_out))
         return fcdata_out
 
@@ -263,33 +278,30 @@ class MeteoSwissWeather(
         if not self._forecastData:
             return None
         fcdata_out: list[Forecast] = []
-        # Skip the first element - it's the forecast for the current day
         now = datetime.datetime.now(datetime.timezone.utc)
-        forecast_data = self._forecastData["regionHourlyForecast"]
-        biggers = [f["time"] > now for f in forecast_data]
-        try:
-            idx = biggers.index(True)
-        except IndexError:
-            return fcdata_out
-        try:
-            for forecast in forecast_data[idx - 1 :]:
-                data_out: Forecast = {
-                    ATTR_FORECAST_TIME: forecast["time"]
-                    .isoformat("T")
-                    .partition("+")[0]
-                    + "Z",
-                    ATTR_FORECAST_NATIVE_TEMP_LOW: forecast["temperatureMin"],
-                    ATTR_FORECAST_NATIVE_TEMP: forecast["temperatureMax"],
-                    ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitationMax"],
-                }
-                fcdata_out.append(data_out)
-        except Exception as e:
-            _LOGGER.exception(
-                "Error while converting hourly forecast: %s\nForecast data: %s",
-                e,
-                pprint.pformat(self._forecastData["regionHourlyForecast"]),
-            )
-            raise
+        one_hour = datetime.timedelta(hours=1)
+        for forecast in self._forecastData["hourly"]:
+            if forecast["time"] + one_hour <= now:
+                continue
+            symbol = forecast["symbol"]
+            data_out: Forecast = {
+                ATTR_FORECAST_TIME: forecast["time"].isoformat(),
+                ATTR_FORECAST_CONDITION: (
+                    str(CODE_TO_CONDITION_MAP.get(symbol, ("", None))[0]) or None
+                    if symbol
+                    else None
+                ),
+                ATTR_FORECAST_NATIVE_TEMP: forecast["temperature"],
+                ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast[
+                    "precipitation_probability"
+                ],
+                ATTR_FORECAST_NATIVE_WIND_SPEED: forecast["wind_speed"],
+                ATTR_FORECAST_WIND_BEARING: forecast["wind_bearing"],
+                ATTR_FORECAST_NATIVE_WIND_GUST_SPEED: forecast["wind_gust"],
+                ATTR_FORECAST_CLOUD_COVERAGE: forecast["cloud_coverage"],
+            }
+            fcdata_out.append(data_out)
         _LOGGER.debug("Hourly forecast has %d items", len(fcdata_out))
         return fcdata_out
 

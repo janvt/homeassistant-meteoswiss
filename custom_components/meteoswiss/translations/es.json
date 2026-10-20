@@ -6,15 +6,19 @@
         },
         "station_no_data": {
             "title": "Una estación meteorológica de tiempo real parece estar ausente",
-            "description": "La estación de tiempo real que se usa en MeteoSwiss ({station}) parece ya no ofrecer datos.\n\nDe momento, la única reparación posible es remover esta integración y volver a agregarla, seleccionando una nueva estación meteorológica.\n\nHasta que esta reparación sea efectuada, sus sensores y el estado del tiempo actual aparecerán como no disponibles."
+            "description": "La estación meteorológica en tiempo real que usa MeteoSuiza ({station}) ya no ofrece datos.\n\nPara elegir otra estación, vaya a Ajustes → Dispositivos y servicios → MeteoSwiss y seleccione «Reconfigurar» en el menú de esta entrada.\n\nHasta entonces, todos los sensores e informes meteorológicos en tiempo real de esta estación aparecerán como no disponibles."
         },
         "postcode_no_data": {
             "title": "MeteoSwiss parece no proveer pronósticos para el código postal",
-            "description": "El código postal {postcode} no tiene ningún pronóstico disponible.\n\nDe momento, la única reparación posible es remover esta integración y volver a agregarla, seleccionando un nuevo código postal.\n\nHasta que esta reparación sea efectuada, el pronóstico aparecerá como no disponible."
+            "description": "No parece haber ninguna previsión disponible para el código postal {postcode}.\n\nPara elegir otro código postal, vaya a Ajustes → Dispositivos y servicios → MeteoSwiss y seleccione «Reconfigurar» en el menú de esta entrada.\n\nHasta entonces, la previsión aparecerá como no disponible."
         },
         "improperly_configured": {
             "title": "La integración MeteoSwiss no está correctamente configurada",
             "description": "La integración MeteoSwiss con ID {entry_id} no está correctamente configurada.\n\nPor favor elimine esa entrada de configuración y vuelva a recrearla."
+        },
+        "point_no_data": {
+            "title": "MeteoSuiza ya no ofrece la previsión de un lugar",
+            "description": "MeteoSuiza ya no parece ofrecer la previsión para {name}.\n\nPara elegir otro lugar, vaya a Ajustes → Dispositivos y servicios → MeteoSwiss y seleccione «Reconfigurar» en el menú de esta entrada.\n\nHasta entonces, su previsión aparecerá como no disponible."
         }
     },
     "config": {
@@ -25,13 +29,15 @@
         "error": {
             "cannot_query_address": "OpenStreetMap no pudo inferir su dirección; por favor entre la información manualmente",
             "cannot_query_postcode": "OpenStreetMap no pudo inferir su código postal; por favor entre la información manualmente",
-            "lat": "La latitud especificada no está entre -90 y 90 grados",
-            "lon": "La longitud especificada no está entre -180 y 180 grados",
+            "latitude_error": "La latitud especificada no está entre -90 y 90 grados",
+            "longitude_error": "La longitud especificada no está entre -180 y 180 grados",
             "invalid_station_name": "Estación inválida (deben ser 3 caracteres); verifique las estaciones aquí: {station_url}",
             "invalid_postcode": "Código postal incorrecto; esta integración sólo funciona con códigos postales suizos",
             "forecast_name_empty": "El nombre para el pronóstico no puede estar vacío",
             "empty_name": "El nombre para mostrar es inválido",
-            "update_interval_too_low": "La frecuencia de actualización es muy baja; debe ser mínimo un minuto"
+            "update_interval_too_low": "La frecuencia de actualización es muy baja; debe ser mínimo un minuto",
+            "cannot_query_points": "No se pudo cargar la lista de lugares de MeteoSuiza; inténtelo de nuevo más tarde",
+            "invalid_point": "Elija un lugar de la lista"
         },
         "step": {
             "user": {
@@ -42,24 +48,195 @@
                 "description": "Confirme su ubicación geográfica.  Esta información será usada para sugerir un código postal y una estación meteorológica adecuadas.",
                 "title": "Ubicación"
             },
+            "location": {
+                "title": "Previsión para",
+                "description": "Usar la previsión de un código postal, o de una montaña, un refugio o un puerto de montaña.",
+                "menu_options": {
+                    "user_two": "Código postal",
+                    "mountain": "Montaña, refugio o puerto"
+                }
+            },
             "user_two": {
                 "data": {
                     "postcode": "Código postal",
                     "forecast_name": "Nombre de la entidad de pronóstico (clima)",
-                    "update_interval": "Frecuencia de actualización en minutos"
+                    "update_interval": "Frecuencia de actualización en minutos",
+                    "hourly_temperature": "Temperaturas por hora"
                 },
                 "description": "El código postal se usa para obtener el pronóstico de los siguientos 5 días.  El nombre que usted suministre aquí se usará en el nombre de la entidad de pronóstico (clima).",
-                "title": "Pronóstico"
+                "title": "Pronóstico",
+                "data_description": {
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. La isoterma de cero grados es un ajuste aparte. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                }
+            },
+            "mountain": {
+                "title": "Montaña, refugio o puerto",
+                "description": "Los lugares están ordenados por distancia a su ubicación, y sus previsiones son para la altitud indicada. Solo se muestran los 100 más cercanos. Sin estación, las condiciones actuales mostradas son la previsión para la hora actual.",
+                "data": {
+                    "point_id": "Lugar",
+                    "forecast_name": "Nombre de la entidad de previsión (tiempo)",
+                    "update_interval": "Intervalo de actualización (minutos)",
+                    "hourly_temperature": "Temperaturas por hora e isoterma de cero grados"
+                },
+                "data_description": {
+                    "forecast_name": "Déjelo vacío para usar el nombre del lugar.",
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora y la isoterma de cero grados en archivos para toda Suiza, de unos 33 MB cada uno, que se descargan cada tres horas (unos 530 MB al día, 16 GB al mes, compartidos con sus otras previsiones de MeteoSuiza). Desactívelo en una conexión con datos limitados: la previsión no tendrá temperaturas por hora y no habrá sensor de la isoterma de cero grados."
+                }
             },
             "user_three": {
                 "data": {
                     "station": "Estación meteorológica en tiempo real",
                     "real_time_name": "Nombres de las entidades de la estación meteorológica",
                     "precipitation_station": "Estación de precipitación en tiempo real",
-                    "real_time_precipitation_name": "Nombres de las entidades de la estación de precipitación"
+                    "real_time_precipitation_name": "Nombres de las entidades de la estación de precipitación",
+                    "pollen_station": "Estación de polen"
                 },
                 "description": "The real-time weather station is used to look up the current weather at the station and provide them as sensors.  Selecting the first option of the list disables real-time weather sensors.\n\nIf a weather station is selected, the real-time entity names field is used to name the real-time (sensor) entities.  If no station is chosen, the real-time entity names field is ignored.\n\n{station_url} lists the available real-time weather stations.",
-                "title": "Estación meteorológica en tiempo real"
+                "title": "Estación meteorológica en tiempo real",
+                "data_description": {
+                    "pollen_station": "Mediciones de polen de la más cercana de las 15 estaciones de polen de MeteoSuiza, con un sensor por tipo de polen. Elija la primera opción para ninguna."
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Opciones de MeteoSuiza",
+                "description": "Ajustes de esta previsión.",
+                "data": {
+                    "hourly_temperature": "Temperaturas por hora",
+                    "foehn": "Índice de foehn",
+                    "foehn_south_station": "Estación al sur de los Alpes",
+                    "foehn_north_station": "Estación al norte de los Alpes",
+                    "foehn_threshold": "Foehn probable desde",
+                    "foehn_strong_threshold": "Foehn fuerte desde",
+                    "freezing_level": "Isoterma de cero grados",
+                    "climate_normals": "Normales climáticas"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. La isoterma de cero grados es un ajuste aparte. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora.",
+                    "foehn": "Sensores para el foehn: el índice de foehn medido por MeteoSuiza en la estación meteorológica y una tendencia a partir de la diferencia de presión a través de los Alpes, que sube horas antes de que irrumpa el foehn.",
+                    "foehn_south_station": "Su presión a nivel del mar se compara con la de la estación al norte de los Alpes. Lugano es la elección clásica.",
+                    "foehn_north_station": "Zúrich/Kloten es la elección clásica.",
+                    "foehn_threshold": "Diferencia de presión a partir de la cual el foehn es probable; unos 4 hPa llegan a los valles del norte, como en Altdorf. Igual en sentido contrario para el foehn del norte.",
+                    "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa.",
+                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en otro archivo de 33 MB cada tres horas (unos 260 MB al día), que se descarga una vez para todas sus previsiones de MeteoSwiss, así que no cuesta nada más si una de ellas ya la tiene.",
+                    "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 6 MB) se descarga una vez por semana, los días de este año cada seis horas."
+                }
+            }
+        },
+        "error": {
+            "same_foehn_station": "Elija dos estaciones distintas",
+            "foehn_thresholds": "El umbral del foehn fuerte debe ser mayor que el otro, y ambos superiores a 0"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "snow_tonight": {
+                "name": "Nieve esta noche"
+            },
+            "snow_next_24h": {
+                "name": "Nieve próximas 24 horas"
+            },
+            "snow_next_48h": {
+                "name": "Nieve próximas 48 horas"
+            },
+            "sunshine_tomorrow_midday": {
+                "name": "Sol mañana 9–15 h"
+            },
+            "sunshine_tomorrow": {
+                "name": "Sol mañana"
+            },
+            "max_gust_tomorrow_midday": {
+                "name": "Racha más fuerte mañana 9–15 h"
+            },
+            "precipitation_next_hour": {
+                "name": "Precipitación próxima hora"
+            },
+            "precipitation_probability_next_hour": {
+                "name": "Probabilidad de lluvia próxima hora"
+            },
+            "min_temperature_tonight": {
+                "name": "Temperatura mínima esta noche"
+            },
+            "pollen_alder": {
+                "name": "Aliso"
+            },
+            "pollen_ash": {
+                "name": "Fresno"
+            },
+            "pollen_beech": {
+                "name": "Haya"
+            },
+            "pollen_birch": {
+                "name": "Abedul"
+            },
+            "pollen_grasses": {
+                "name": "Gramíneas"
+            },
+            "pollen_hazel": {
+                "name": "Avellano"
+            },
+            "pollen_oak": {
+                "name": "Roble"
+            },
+            "weather_warning": {
+                "name": "Aviso meteorológico",
+                "state": {
+                    "none": "Ninguno",
+                    "yellow": "Amarillo",
+                    "orange": "Naranja",
+                    "red": "Rojo"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Aviso meteorológico próximas 24 horas",
+                "state": {
+                    "none": "Ninguno",
+                    "yellow": "Amarillo",
+                    "orange": "Naranja",
+                    "red": "Rojo"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Diferencia de presión del foehn"
+            },
+            "foehn_outlook": {
+                "name": "Tendencia del foehn",
+                "state": {
+                    "strong_north": "Foehn del norte fuerte",
+                    "north": "Foehn del norte probable",
+                    "none": "Ninguno",
+                    "south": "Foehn del sur probable",
+                    "strong_south": "Foehn del sur fuerte"
+                }
+            },
+            "foehn": {
+                "name": "Foehn",
+                "state": {
+                    "none": "Ninguno",
+                    "mixed": "Mixto",
+                    "foehn": "Foehn"
+                }
+            },
+            "high_vs_normal": {
+                "name": "Máxima respecto a lo normal"
+            },
+            "low_vs_normal": {
+                "name": "Mínima respecto a lo normal"
+            },
+            "month_vs_normal": {
+                "name": "Mes respecto a lo normal"
+            },
+            "month_rain_vs_normal": {
+                "name": "Lluvia del mes respecto a lo normal"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Sol del mes respecto a lo normal"
+            },
+            "record_high": {
+                "name": "Récord de calor para la fecha"
             }
         }
     }

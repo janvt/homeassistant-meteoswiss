@@ -1,2 +1,8 @@
 line-length = 88
+
+[lint]
 select = ["F", "E", "W", "I001"]
+
+[lint.per-file-ignores]
+# Contains a verbatim copy of the MeteoSwiss legend.
+"custom_components/meteoswiss/const.py" = ["E501", "W291"]

@@ -6,15 +6,19 @@
         },
         "station_no_data": {
             "title": "Værstatonen for MeteoSveits ser ut til å være gått",
-            "description": "Den sanntids værstasjonen MeteoSveits bruker ({station}) skiller ikke lenger ut data.\n\nFor tiden er det bare mulig å løse dette ved å fjerne og gjeninnføre MeteoSveits-integreringen, velge en ny sanntids værstasjon.\n\nIndtil dette løses, vil alle sanntids- og sensorenheter og rapporter som kommer fra denne stasjonen vises som uoppløselige."
+            "description": "Sanntids værstasjonen MeteoSwiss bruker ({station}) gir ikke lenger data.\n\nFor å velge en annen stasjon, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises alle sanntids værsensorer og rapporter fra denne stasjonen som utilgjengelige."
         },
         "postcode_no_data": {
             "title": "MeteoSveits viser ikke noen forutseigelser for postnummer",
-            "description": "Postnummer {postcode} ser ut til å ha ingen forutseigelser tilgjengelig.\n\nNåværende, den eneste reparasjon mulig består i å fjerne og gjeninnstille integreringen MeteoSveits, velge et nytt postnummer.\n\nInntil denne reparasjon er gjennomført, vil forutseigelser vise seg som uaktuell."
+            "description": "Det ser ikke ut til å finnes noe varsel for postnummeret {postcode}.\n\nFor å velge et annet postnummer, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises varselet som utilgjengelig."
         },
         "improperly_configured": {
             "title": "Integrasjonsfellet for MeteoSveits er ikke konfigurert korrekt",
             "description": "MeteoSveits-integreringen med entry ID {entry_id} er ikke konfigurert korrekt.\n\nVennligst fjern din konfigurasjon og skap den på nytt."
+        },
+        "point_no_data": {
+            "title": "MeteoSwiss gir ikke lenger varsel for et sted",
+            "description": "MeteoSwiss ser ikke lenger ut til å tilby varsel for {name}.\n\nFor å velge et annet sted, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises varselet som utilgjengelig."
         }
     },
     "config": {
@@ -25,13 +29,15 @@
         "error": {
             "cannot_query_address": "OpenStreetMap ne ønsket å gueß adresse for din lokasjon; skriv inn informasjonen selv",
             "cannot_query_postcode": "OpenStreetMap ne ønsket å gueß postnummer for din lokasjon; skriv inn informasjonen selv",
-            "lat": "Høyden er utenfor grensene -90 til 90 grader",
-            "lon": "Breddelsen er utenfor grensene -180 til 180 grader",
+            "latitude_error": "Breddegraden er utenfor grensene -90 til 90 grader",
+            "longitude_error": "Lengdegraden er utenfor grensene -180 til 180 grader",
             "invalid_station_name": "Stasjonsnavnet er ugyldig; vennligst sjekk {station_url} for stasjonsliste",
             "invalid_postcode": "Postnummeret er ugyldig. Denne integrasjonen fungerer bare med Sveits' postnummer",
             "forecast_name_empty": "Været navn kan ikke være tomt",
             "empty_name": "Visningsnavnet er tomt",
-            "update_interval_too_low": "Oppdateringsintervall er for lavt.  Må være minimum 1 minut"
+            "update_interval_too_low": "Oppdateringsintervall er for lavt.  Må være minimum 1 minut",
+            "cannot_query_points": "MeteoSwiss-listen over steder kunne ikke lastes; prøv igjen senere",
+            "invalid_point": "Velg et sted fra listen"
         },
         "step": {
             "user": {
@@ -42,24 +48,195 @@
                 "description": "Bevis din geografiske posisjon. Dette vil brukes til å gueß den nærmeste sanntids værstasjon og anner opp postnummer for prosjekter.",
                 "title": "Lokasjon"
             },
+            "location": {
+                "title": "Varsel for",
+                "description": "Bruk varselet for et postnummer, eller for et fjell, en hytte eller et pass.",
+                "menu_options": {
+                    "user_two": "Postnummer",
+                    "mountain": "Fjell, hytte eller pass"
+                }
+            },
             "user_two": {
                 "data": {
                     "postcode": "Postnummer",
                     "forecast_name": "Været navn (vær) enhetsnavn",
-                    "update_interval": "Oppdateringsintervall i minutter"
+                    "update_interval": "Oppdateringsintervall i minutter",
+                    "hourly_temperature": "Temperatur per time"
                 },
                 "description": "Postnummeret brukes til å lete opp 5-dagers værforslag. Navnet du skriver inn her, vil brukes for vær- (vær) enhetsnavn.",
-                "title": "Værforslag"
+                "title": "Værforslag",
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned), delt av alle MeteoSwiss-varslene dine. Nullgradersgrensen er en egen innstilling. Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen."
+                }
+            },
+            "mountain": {
+                "title": "Fjell, hytte eller pass",
+                "description": "Stedene er sortert etter avstand fra posisjonen din, og varslene gjelder for høyden som vises. Bare de 100 nærmeste vises. Uten stasjon er de nåværende forholdene som vises varselet for inneværende time.",
+                "data": {
+                    "point_id": "Sted",
+                    "forecast_name": "Navn på varselenheten (vær)",
+                    "update_interval": "Oppdateringsintervall (minutter)",
+                    "hourly_temperature": "Temperatur per time og nullgradersgrense"
+                },
+                "data_description": {
+                    "forecast_name": "La stå tomt for å bruke navnet på stedet.",
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time og nullgradersgrensen bare i filer for hele Sveits, på omtrent 33 MB hver, som lastes ned hver tredje time (omtrent 530 MB per dag, 16 GB per måned, delt med de andre MeteoSwiss-varslene dine). Slå dette av på en forbindelse med begrenset datamengde: varselet får da ingen temperatur per time, og det blir ingen sensor for nullgradersgrensen."
+                }
             },
             "user_three": {
                 "data": {
                     "station": "Sanntidsværstasjon",
                     "real_time_name": "Navn på sanntids- og vær-entiteter",
                     "precipitation_station": "Sanntids-nedbørstasjon",
-                    "real_time_precipitation_name": "Navn på sanntids- og nedbørs-entiteter"
+                    "real_time_precipitation_name": "Navn på sanntids- og nedbørs-entiteter",
+                    "pollen_station": "Pollenstasjon"
                 },
                 "description": "Sanntids værstatonen brukes til å lete opp aktuell været ved stasjonen og å gi disse som sensorer. Hvis du velger første alternativ i listen, deaktiverer dette sanntids- og sensorenheter.\\n\\nHvis en værstasjon blir valgt, brukes feltet for navn på sanntids- og sensorenheter til å navngi sanntids- (sensore) enheter. Hvis ingen stasjon blir valgt, ignoreres feltet for navn på sanntids- og sensorenheter.\\n\\n{station_url} viser listen over tillgjengelige sanntids værstationer.",
-                "title": "Sanntidsvær"
+                "title": "Sanntidsvær",
+                "data_description": {
+                    "pollen_station": "Pollenmålinger fra den nærmeste av MeteoSwiss' 15 pollenstasjoner, som én sensor per pollentype. Velg det første alternativet for ingen."
+                }
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "MeteoSwiss-alternativer",
+                "description": "Innstillinger for dette varselet.",
+                "data": {
+                    "hourly_temperature": "Temperatur per time",
+                    "foehn": "Føhnindeks",
+                    "foehn_south_station": "Stasjon sør for Alpene",
+                    "foehn_north_station": "Stasjon nord for Alpene",
+                    "foehn_threshold": "Føhn sannsynlig fra",
+                    "foehn_strong_threshold": "Sterk føhn fra",
+                    "freezing_level": "Nullgradersgrense",
+                    "climate_normals": "Klimanormaler"
+                },
+                "data_description": {
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits, så den koster en nedlasting på 33 MB hver tredje time (omtrent 260 MB per dag, 8 GB per måned), delt av alle MeteoSwiss-varslene dine. Nullgradersgrensen er en egen innstilling. Slå dette av på en forbindelse med begrenset datamengde: timesvarselet får da ingen temperaturer, og resten av varselet trenger bare noen få kilobyte i timen.",
+                    "foehn": "Sensorer for føhn: MeteoSwiss' målte føhnindeks ved værstasjonen, og et utsyn fra trykkforskjellen over Alpene, som stiger timer før føhnen bryter gjennom.",
+                    "foehn_south_station": "Lufttrykket ved havnivå sammenlignes med stasjonen nord for Alpene. Lugano er det klassiske valget.",
+                    "foehn_north_station": "Zürich/Kloten er det klassiske valget.",
+                    "foehn_threshold": "Trykkforskjell fra der føhn er sannsynlig; omtrent 4 hPa når dalene i nord, som i Altdorf. Det samme omvendt for nordføhn.",
+                    "foehn_strong_threshold": "Trykkforskjell fra der føhnen blåser kraftig; omtrent 8 hPa.",
+                    "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en annen fil på 33 MB hver tredje time (omtrent 260 MB per dag), som lastes ned én gang for alle MeteoSwiss-varslene dine, så den koster ikke noe ekstra hvis ett av dem allerede har den.",
+                    "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 6 MB) lastes ned én gang i uken, årets dager hver sjette time."
+                }
+            }
+        },
+        "error": {
+            "same_foehn_station": "Velg to forskjellige stasjoner",
+            "foehn_thresholds": "Terskelen for sterk føhn må være høyere enn den andre, og begge over 0"
+        }
+    },
+    "entity": {
+        "sensor": {
+            "snow_tonight": {
+                "name": "Snø i natt"
+            },
+            "snow_next_24h": {
+                "name": "Snø neste 24 timer"
+            },
+            "snow_next_48h": {
+                "name": "Snø neste 48 timer"
+            },
+            "sunshine_tomorrow_midday": {
+                "name": "Sol i morgen 9–15"
+            },
+            "sunshine_tomorrow": {
+                "name": "Sol i morgen"
+            },
+            "max_gust_tomorrow_midday": {
+                "name": "Sterkeste vindkast i morgen 9–15"
+            },
+            "precipitation_next_hour": {
+                "name": "Nedbør neste time"
+            },
+            "precipitation_probability_next_hour": {
+                "name": "Sjanse for regn neste time"
+            },
+            "min_temperature_tonight": {
+                "name": "Laveste temperatur i natt"
+            },
+            "pollen_alder": {
+                "name": "Or"
+            },
+            "pollen_ash": {
+                "name": "Ask"
+            },
+            "pollen_beech": {
+                "name": "Bøk"
+            },
+            "pollen_birch": {
+                "name": "Bjørk"
+            },
+            "pollen_grasses": {
+                "name": "Gress"
+            },
+            "pollen_hazel": {
+                "name": "Hassel"
+            },
+            "pollen_oak": {
+                "name": "Eik"
+            },
+            "weather_warning": {
+                "name": "Farevarsel",
+                "state": {
+                    "none": "Ingen",
+                    "yellow": "Gult",
+                    "orange": "Oransje",
+                    "red": "Rødt"
+                }
+            },
+            "weather_warning_next_24h": {
+                "name": "Farevarsel neste 24 timer",
+                "state": {
+                    "none": "Ingen",
+                    "yellow": "Gult",
+                    "orange": "Oransje",
+                    "red": "Rødt"
+                }
+            },
+            "foehn_pressure_difference": {
+                "name": "Føhn-trykkforskjell"
+            },
+            "foehn_outlook": {
+                "name": "Føhnutsikt",
+                "state": {
+                    "strong_north": "Sterk nordføhn",
+                    "north": "Nordføhn sannsynlig",
+                    "none": "Ingen",
+                    "south": "Sørføhn sannsynlig",
+                    "strong_south": "Sterk sørføhn"
+                }
+            },
+            "foehn": {
+                "name": "Føhn",
+                "state": {
+                    "none": "Ingen",
+                    "mixed": "Blandet",
+                    "foehn": "Føhn"
+                }
+            },
+            "high_vs_normal": {
+                "name": "Maksimum mot normalen"
+            },
+            "low_vs_normal": {
+                "name": "Minimum mot normalen"
+            },
+            "month_vs_normal": {
+                "name": "Måneden mot normalen"
+            },
+            "month_rain_vs_normal": {
+                "name": "Månedens nedbør mot normalen"
+            },
+            "month_sunshine_vs_normal": {
+                "name": "Månedens sol mot normalen"
+            },
+            "record_high": {
+                "name": "Varmerekord for datoen"
             }
         }
     }
