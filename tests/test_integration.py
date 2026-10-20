@@ -472,8 +472,8 @@ async def test_entries_share_the_large_downloads(hass, entry, fake_ogd, frozen_n
     await setup(hass, entry)
     await add_mountain(hass)
     zurich, bristen = (800500, 2), (864, 3)
-    # Each entry fetched when it was set up, as the other did not know about it.
-    assert fake_ogd.large_downloads["tre200h0"] == [{zurich}, {zurich, bristen}]
+    # Each entry fetched its point when it was set up.
+    assert fake_ogd.large_downloads["tre200h0"] == [{zurich}, {bristen}]
 
     # After that, one download serves both.
     fake_ogd.run = "202610201600"
@@ -849,7 +849,8 @@ async def test_a_postal_code_shares_the_mountains_freezing_level(
     fake_ogd.run = "202610201600"
     await refresh_after(hass, frozen_now, 4 * 60)
 
-    # One download for both, after each fetched once when set up.
+    # One read for both, after each read its point when set up.
+    assert fake_ogd.large_downloads["zprfr0hs"][:2] == [{(800500, 2)}, {(864, 3)}]
     assert fake_ogd.large_downloads["zprfr0hs"][2:] == [{(800500, 2), (864, 3)}]
 
 
