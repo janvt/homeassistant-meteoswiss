@@ -198,8 +198,7 @@ async def async_setup_entry(
             "The data update coordinator has no real-time precipitation station"
             + " configured — not providing precipitation sensor data."
         )
-    # The freezing level comes with the hourly temperatures.
-    if c.is_mountain and c.hourly_temperature:
+    if c.freezing_level:
         async_add_entities([MeteoSwissFreezingLevelSensor(entry.entry_id, c)], True)
     async_add_entities(
         [MeteoSwissSummarySensor(entry.entry_id, c, d) for d in SUMMARIES], True

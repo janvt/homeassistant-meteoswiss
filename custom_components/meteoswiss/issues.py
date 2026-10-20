@@ -9,6 +9,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import issue_registry as ir
 
 from custom_components.meteoswiss.const import (
+    CONF_FREEZING_LEVEL,
+    CONF_HOURLY_TEMPERATURE,
     CONF_POINT_ID,
     CONF_POINT_TYPE,
     CONF_POSTCODE,
@@ -16,6 +18,7 @@ from custom_components.meteoswiss.const import (
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
+    DEFAULT_HOURLY_TEMPERATURE,
     DOMAIN,
 )
 from custom_components.meteoswiss.ogd import POINT_TYPE_POI, POINT_TYPE_POSTCODE
@@ -33,6 +36,21 @@ def no_forecast_issue_id(
     if point_type == POINT_TYPE_POI:
         return f"point_{point_id}_provides_no_forecast_{DOMAIN}"
     return f"{postcode}_provides_no_forecast_{DOMAIN}"
+
+
+def freezing_level_setting(data: Mapping[str, Any], options: Mapping[str, Any]) -> bool:
+    """Whether an entry downloads the freezing level (another 33 MB file).
+
+    By default only mountains with hourly temperatures do, as before the
+    setting existed; postal codes can turn it on.
+    """
+    if CONF_FREEZING_LEVEL in options:
+        return bool(options[CONF_FREEZING_LEVEL])
+    hourly = options.get(
+        CONF_HOURLY_TEMPERATURE,
+        data.get(CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE),
+    )
+    return bool(hourly) and data.get(CONF_POINT_TYPE) == POINT_TYPE_POI
 
 
 @callback

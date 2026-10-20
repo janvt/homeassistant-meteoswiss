@@ -45,6 +45,7 @@ from custom_components.meteoswiss.const import (
 from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.issues import (
     async_delete_issues,
+    freezing_level_setting,
     no_forecast_issue_id,
     station_issue_id,
 )
@@ -150,6 +151,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             CONF_HOURLY_TEMPERATURE,
             entry.data.get(CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE),
         ),
+        freezing_level=freezing_level_setting(entry.data, entry.options),
         forecast_name=entry.data.get(CONF_FORECAST_NAME, name),
         weather_station=entry.data.get(CONF_STATION, None),
         real_time_weather_station_name=entry.data.get(CONF_REAL_TIME_NAME, None),
@@ -250,6 +252,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         precipitation_station: str | None,
         real_time_precipitation_station_name: str | None,
         pollen_station: str | None = None,
+        freezing_level: bool = False,
         foehn: dict[str, Any] | None = None,
     ) -> None:
         """Initialize."""
@@ -290,6 +293,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
         self.precipitation_station = precipitation_station
         self.pollen_station = pollen_station
+        self.freezing_level = freezing_level
         # The Föhn settings (see const.FOEHN_DEFAULTS), or None.
         self.foehn = foehn if foehn and foehn[CONF_FOEHN] else None
         # Looked up with the first update, for the name of its device.
@@ -433,11 +437,12 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
     @property
     def _large_parameters(self) -> set[str]:
         """The large files this entry needs, which are only fetched on request."""
-        if not self.hourly_temperature:
-            return set()
-        if self.is_mountain:
-            return {HOURLY_TEMPERATURE, FREEZING_LEVEL}
-        return {HOURLY_TEMPERATURE}
+        parameters = set()
+        if self.hourly_temperature:
+            parameters.add(HOURLY_TEMPERATURE)
+        if self.freezing_level:
+            parameters.add(FREEZING_LEVEL)
+        return parameters
 
     @property
     def _no_forecast_issue_id(self) -> str:

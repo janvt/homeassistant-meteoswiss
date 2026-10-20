@@ -66,7 +66,7 @@
                 "description": "The postal code is used to look up the nine-day forecast.  The name you enter here will be used for the forecast (weather) entity.",
                 "title": "Forecast",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. Mountain forecasts also download the freezing level, another file of the same size. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. The freezing level is a setting of its own. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour."
                 }
             },
             "mountain": {
@@ -110,15 +110,17 @@
                     "foehn_south_station": "Station south of the Alps",
                     "foehn_north_station": "Station north of the Alps",
                     "foehn_threshold": "Föhn likely from",
-                    "foehn_strong_threshold": "Strong Föhn from"
+                    "foehn_strong_threshold": "Strong Föhn from",
+                    "freezing_level": "Freezing level"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. Mountain forecasts also download the freezing level, another file of the same size. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour.",
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland, so they cost a 33 MB download every three hours (about 260 MB a day, 8 GB a month), shared by all your MeteoSwiss forecasts. The freezing level is a setting of its own. Turn this off on a metered connection: the hourly forecast then has no temperatures, and the rest of the forecast needs only a few kilobytes an hour.",
                     "foehn": "Sensors for Föhn: MeteoSwiss's measured Föhn index at the weather station, and an outlook from the pressure difference across the Alps, which rises hours before the Föhn breaks through.",
                     "foehn_south_station": "Its sea-level pressure is compared with the station north of the Alps. Lugano is the classic choice.",
                     "foehn_north_station": "Zürich/Kloten is the classic choice.",
                     "foehn_threshold": "Pressure difference from which Föhn is likely; about 4 hPa reaches the northern valleys, as in Altdorf. The same the other way round for north Föhn.",
-                    "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa."
+                    "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa.",
+                    "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in another 33 MB file every three hours (about 260 MB a day), downloaded once for all your MeteoSwiss forecasts, so it costs nothing more if one of them already has it."
                 }
             }
         },

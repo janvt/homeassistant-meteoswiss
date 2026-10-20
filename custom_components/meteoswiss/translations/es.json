@@ -66,7 +66,7 @@
                 "description": "El código postal se usa para obtener el pronóstico de los siguientos 5 días.  El nombre que usted suministre aquí se usará en el nombre de la entidad de pronóstico (clima).",
                 "title": "Pronóstico",
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. Las previsiones de montaña también descargan la isoterma de cero grados, otro archivo del mismo tamaño. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. La isoterma de cero grados es un ajuste aparte. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora."
                 }
             },
             "mountain": {
@@ -110,15 +110,17 @@
                     "foehn_south_station": "Estación al sur de los Alpes",
                     "foehn_north_station": "Estación al norte de los Alpes",
                     "foehn_threshold": "Foehn probable desde",
-                    "foehn_strong_threshold": "Foehn fuerte desde"
+                    "foehn_strong_threshold": "Foehn fuerte desde",
+                    "freezing_level": "Isoterma de cero grados"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. Las previsiones de montaña también descargan la isoterma de cero grados, otro archivo del mismo tamaño. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora.",
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza, por lo que cuestan una descarga de 33 MB cada tres horas (unos 260 MB al día, 8 GB al mes), compartida por todas sus previsiones de MeteoSuiza. La isoterma de cero grados es un ajuste aparte. Desactívelo en una conexión con datos limitados: la previsión por hora no tendrá temperaturas, y el resto de la previsión solo necesita unos pocos kilobytes por hora.",
                     "foehn": "Sensores para el foehn: el índice de foehn medido por MeteoSuiza en la estación meteorológica y una tendencia a partir de la diferencia de presión a través de los Alpes, que sube horas antes de que irrumpa el foehn.",
                     "foehn_south_station": "Su presión a nivel del mar se compara con la de la estación al norte de los Alpes. Lugano es la elección clásica.",
                     "foehn_north_station": "Zúrich/Kloten es la elección clásica.",
                     "foehn_threshold": "Diferencia de presión a partir de la cual el foehn es probable; unos 4 hPa llegan a los valles del norte, como en Altdorf. Igual en sentido contrario para el foehn del norte.",
-                    "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa."
+                    "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa.",
+                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en otro archivo de 33 MB cada tres horas (unos 260 MB al día), que se descarga una vez para todas sus previsiones de MeteoSwiss, así que no cuesta nada más si una de ellas ya la tiene."
                 }
             }
         },

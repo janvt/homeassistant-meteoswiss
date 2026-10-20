@@ -638,6 +638,7 @@ async def test_foehn_options_have_sane_defaults(hass, entry):
 
     assert defaults(result) == {
         "hourly_temperature": True,
+        "freezing_level": False,  # a postal code
         "foehn": True,
         "foehn_south_station": "LUG",
         "foehn_north_station": "KLO",
@@ -678,3 +679,25 @@ async def test_foehn_options_are_saved(hass, entry):
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["foehn_north_station"] == "SMA"
     assert entry.options["foehn_threshold"] == 5.0
+
+
+@pytest.mark.parametrize(
+    ("data", "options", "shown"),
+    [
+        ({"point_type": 3, "hourly_temperature": True}, {}, True),
+        ({"point_type": 3, "hourly_temperature": False}, {}, False),
+        (
+            {"point_type": 3, "hourly_temperature": True},
+            {"freezing_level": False},
+            False,
+        ),
+        ({}, {"freezing_level": True}, True),
+    ],
+)
+async def test_the_freezing_level_setting(hass, entry_data, data, options, shown):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, **data}, options=options)
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert defaults(result)["freezing_level"] is shown

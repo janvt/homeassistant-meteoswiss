@@ -130,7 +130,9 @@ Now you are ready to add one or more instances of the integration.
   for that altitude.  No station is suggested, as summits rarely have one
   nearby; without a station, the weather entity shows the forecast for the
   current hour as its current conditions.  With hourly temperatures turned on,
-  a *freezing level* sensor shows the forecast height of the 0 °C line.  Add
+  a *freezing level* sensor shows the forecast height of the 0 °C line;
+  postal codes can have it too, under *Configure* (another 33 MB file every
+  three hours, shared with the mountains that have it).  Add
   the integration once more for each place you want a forecast for.
 
 - Your task is done and your integration is working.  The forecast and each

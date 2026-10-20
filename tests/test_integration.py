@@ -809,3 +809,44 @@ async def test_foehn_without_recent_pressure(hass, entry_data, monkeypatch):
 
     assert foehn_state(hass, entry, "foehn_pressure_difference").state == "unavailable"
     assert foehn_state(hass, entry, "foehn_outlook").state == "unavailable"
+
+
+async def test_no_freezing_level_for_a_postal_code_by_default(hass, entry, fake_ogd):
+    await setup(hass, entry)
+
+    assert "zprfr0hs" not in fake_ogd.large_downloads
+    assert not er.async_get(hass).async_get_entity_id(
+        "sensor", DOMAIN, f"sensor.{entry.entry_id}-freezing_level"
+    )
+
+
+async def test_freezing_level_for_a_postal_code(hass, entry_data, fake_ogd):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data=entry_data, options={"freezing_level": True}
+    )
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    state = hass.states.get(
+        entity_id(hass, "sensor", f"sensor.{entry.entry_id}-freezing_level")
+    )
+    assert state.state == "2900.0"
+    assert state.attributes["friendly_name"] == "Zurich Freezing level"
+    assert fake_ogd.large_downloads["zprfr0hs"] == [{(800500, 2)}]
+
+
+async def test_a_postal_code_shares_the_mountains_freezing_level(
+    hass, entry_data, fake_ogd, frozen_now
+):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data=entry_data, options={"freezing_level": True}
+    )
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+    await add_mountain(hass)
+
+    fake_ogd.run = "202610201600"
+    await refresh_after(hass, frozen_now, 4 * 60)
+
+    # One download for both, after each fetched once when set up.
+    assert fake_ogd.large_downloads["zprfr0hs"][2:] == [{(800500, 2), (864, 3)}]

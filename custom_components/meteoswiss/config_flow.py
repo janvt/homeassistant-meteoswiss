@@ -28,6 +28,7 @@ from custom_components.meteoswiss.const import (
     CONF_FOEHN_STRONG_THRESHOLD,
     CONF_FOEHN_THRESHOLD,
     CONF_FORECAST_NAME,
+    CONF_FREEZING_LEVEL,
     CONF_HOURLY_TEMPERATURE,
     CONF_LAT,
     CONF_LON,
@@ -48,7 +49,10 @@ from custom_components.meteoswiss.const import (
     STATION_URL,
     USER_AGENT,
 )
-from custom_components.meteoswiss.issues import async_delete_issues
+from custom_components.meteoswiss.issues import (
+    async_delete_issues,
+    freezing_level_setting,
+)
 from custom_components.meteoswiss.ogd import (
     POINT_TYPE_POI,
     POINT_TYPE_POSTCODE,
@@ -711,6 +715,7 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
             CONF_HOURLY_TEMPERATURE: entry.data.get(
                 CONF_HOURLY_TEMPERATURE, DEFAULT_HOURLY_TEMPERATURE
             ),
+            CONF_FREEZING_LEVEL: freezing_level_setting(entry.data, entry.options),
             **FOEHN_DEFAULTS,
             **entry.options,
         }
@@ -750,6 +755,7 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     required(CONF_HOURLY_TEMPERATURE): bool,
+                    required(CONF_FREEZING_LEVEL): bool,
                     required(CONF_FOEHN): bool,
                     required(CONF_FOEHN_SOUTH): SelectSelector(
                         SelectSelectorConfig(

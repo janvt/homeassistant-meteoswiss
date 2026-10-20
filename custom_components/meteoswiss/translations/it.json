@@ -66,7 +66,7 @@
                 "description": "Il codice postale viene utilizzato per cercare il preavviso a 5 giorni. Il nome che inserisci qui verrà utilizzato per l'entità del preavviso.",
                 "title": "Preavviso",
                 "data_description": {
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Le previsioni per le montagne scaricano anche lo zero termico, un altro file della stessa dimensione. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Lo zero termico è un'impostazione a sé. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora."
                 }
             },
             "mountain": {
@@ -110,15 +110,17 @@
                     "foehn_south_station": "Stazione a sud delle Alpi",
                     "foehn_north_station": "Stazione a nord delle Alpi",
                     "foehn_threshold": "Favonio probabile da",
-                    "foehn_strong_threshold": "Favonio forte da"
+                    "foehn_strong_threshold": "Favonio forte da",
+                    "freezing_level": "Zero termico"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Le previsioni per le montagne scaricano anche lo zero termico, un altro file della stessa dimensione. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora.",
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera: costano quindi un download di 33 MB ogni tre ore (circa 260 MB al giorno, 8 GB al mese), condiviso da tutte le tue previsioni MeteoSvizzera. Lo zero termico è un'impostazione a sé. Disattivare l'opzione con una connessione a consumo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede solo pochi kilobyte all'ora.",
                     "foehn": "Sensori per il favonio: l'indice di favonio misurato da MeteoSvizzera alla stazione meteo e una tendenza dalla differenza di pressione attraverso le Alpi, che sale ore prima che il favonio irrompa.",
                     "foehn_south_station": "La sua pressione al livello del mare viene confrontata con la stazione a nord delle Alpi. Lugano è la scelta classica.",
                     "foehn_north_station": "Zurigo/Kloten è la scelta classica.",
                     "foehn_threshold": "Differenza di pressione da cui il favonio è probabile; circa 4 hPa raggiungono le valli del nord, come ad Altdorf. Lo stesso al contrario per il favonio da nord.",
-                    "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa."
+                    "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa.",
+                    "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un altro file di 33 MB ogni tre ore (circa 260 MB al giorno), scaricato una volta per tutte le previsioni MeteoSwiss: non costa nulla in più se una di esse lo ha già."
                 }
             }
         },
