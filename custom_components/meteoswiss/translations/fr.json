@@ -22,11 +22,11 @@
         },
         "ranges_ignored": {
             "title": "Prévisions MeteoSuisse en pause",
-            "description": "Les serveurs de MeteoSuisse ne peuvent pas envoyer actuellement la seule partie des prévisions pour votre lieu. Plutôt que de télécharger bien plus que d'habitude, les prévisions sont mises en pause et réessayées toutes les heures. Les mesures et les alertes météo continuent de fonctionner, et cet avis disparaît de lui-même."
+            "description": "Les serveurs de MeteoSuisse ne peuvent pas envoyer actuellement la seule partie des prévisions pour votre lieu. Plutôt que de télécharger bien plus que d'habitude, les prévisions sont mises en pause et réessayées toutes les heures. Les mesures et les alertes météo continuent de fonctionner. Si cela dure, cherchez une mise à jour de l'intégration. Cet avis disparaît de lui-même."
         },
-        "whole_downloads": {
-            "title": "Les prévisions MeteoSuisse utilisent plus de données que d'habitude",
-            "description": "MeteoSuisse semble avoir changé la façon dont il publie ses prévisions : l'intégration télécharge donc plus que d'habitude pour les tenir à jour. Tout continue de fonctionner. Une mise à jour de l'intégration réduira à nouveau la consommation ; avec une connexion à volume limité, vous pouvez désactiver d'ici là les températures horaires sous Configurer. Cet avis disparaît de lui-même."
+        "high_usage": {
+            "title": "MeteoSuisse utilise plus de données que nécessaire",
+            "description": "L'intégration MeteoSuisse a téléchargé bien plus que d'habitude au cours du dernier jour ({usage} Mo). C'est en général que MeteoSuisse a changé la façon dont il publie ses prévisions. Mettez à jour l'intégration : une correction est probablement disponible. Cet avis disparaît de lui-même."
         }
     },
     "config": {

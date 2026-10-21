@@ -9,6 +9,7 @@ Source: MeteoSwiss.
 from __future__ import annotations
 
 import asyncio
+import collections
 import csv
 import datetime
 import io
@@ -90,9 +91,9 @@ COMPRESSED_SHARE = 0.17
 # A cold start costs the head and then walking the blocks: about this much
 # more than the head alone, at most.
 COLD_START_SHARE = 1.25
-# Whole downloads of files that could not be searched are counted over this
-# long, for the repair notice when they keep happening.
-WHOLE_DOWNLOADS_PERIOD = datetime.timedelta(hours=24)
+# What was downloaded is counted over this long, for the repair notice when
+# it is far more than usual.
+USAGE_PERIOD = datetime.timedelta(hours=24)
 # Station measurements and the latest run are shared by entries this long.
 STATION_CACHE_SECONDS = 60
 RUN_CACHE = datetime.timedelta(minutes=5)
@@ -586,6 +587,8 @@ class MeteoSwissOGD:
         ] = {}
         # When files were downloaded whole because they could not be searched.
         self._whole_downloads: list[float] = []
+        # When each response came, and what it cost in bytes.
+        self._received: collections.deque[tuple[float, int]] = collections.deque()
         # Whether the server sent a whole file when asked for part of it, the
         # last time it was.
         self.ranges_ignored = False
@@ -624,8 +627,10 @@ class MeteoSwissOGD:
                     # Not read: it is the whole file.
                     self.ranges_ignored = response.status != 206
                     if self.ranges_ignored:
+                        self._count(response, 0)
                         raise RangesIgnoredError(f"{url} was sent whole")
                 body = await response.read()
+                self._count(response, len(body))
                 total = len(body)
                 content_range = response.headers.get("Content-Range", "")
                 if "/" in content_range:
@@ -649,9 +654,11 @@ class MeteoSwissOGD:
                 url, headers=headers, timeout=REQUEST_TIMEOUT
             ) as response:
                 if response.status == 304 and validators:
+                    self._count(response, 0)
                     return None
                 response.raise_for_status()
                 body = await response.read()
+                self._count(response, len(body))
                 self._validators[url] = (
                     response.headers.get("ETag"),
                     response.headers.get("Last-Modified"),
@@ -667,6 +674,7 @@ class MeteoSwissOGD:
             async with self._session.head(
                 url, headers=headers, timeout=REQUEST_TIMEOUT
             ) as response:
+                self._count(response, 0)
                 response.raise_for_status()
                 return int(response.headers["Content-Length"])
         except (aiohttp.ClientError, asyncio.TimeoutError, KeyError, ValueError):
@@ -948,6 +956,7 @@ class MeteoSwissOGD:
                 async with self._session.head(
                     url, headers=self._headers, timeout=REQUEST_TIMEOUT
                 ) as response:
+                    self._count(response, 0)
                     # Files that do not exist (yet) are answered with 403.
                     if response.status in (403, 404):
                         continue
@@ -1137,9 +1146,23 @@ class MeteoSwissOGD:
     def whole_downloads(self) -> int:
         """How many files were downloaded whole lately, as they could not be
         searched (not those that were cheaper whole)."""
-        since = time.monotonic() - WHOLE_DOWNLOADS_PERIOD.total_seconds()
+        since = time.monotonic() - USAGE_PERIOD.total_seconds()
         self._whole_downloads = [t for t in self._whole_downloads if t >= since]
         return len(self._whole_downloads)
+
+    def _count(self, response: aiohttp.ClientResponse, body: int) -> None:
+        """Remember what a response cost, as transferred if it can be told."""
+        raw = getattr(response.content, "total_raw_bytes", None)
+        size = raw if isinstance(raw, int) else body
+        self._received.append((time.monotonic(), REQUEST_OVERHEAD + size))
+
+    @property
+    def downloaded(self) -> int:
+        """Bytes downloaded from MeteoSwiss in the last USAGE_PERIOD."""
+        since = time.monotonic() - USAGE_PERIOD.total_seconds()
+        while self._received and self._received[0][0] < since:
+            self._received.popleft()
+        return sum(size for _, size in self._received)
 
     async def _learn_blocks(self, url: str, budget: _Budget):
         """Read the first block of a file for the order of the points.
@@ -1427,6 +1450,7 @@ class MeteoSwissOGD:
                         collect(prefix, data[:cut], offset)
                     tail = data[cut:]
                     offset += cut
+                self._count(response, offset + len(tail))
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
         for prefix in needles:

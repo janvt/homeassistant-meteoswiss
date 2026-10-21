@@ -22,11 +22,11 @@
         },
         "ranges_ignored": {
             "title": "MeteoSchweiz-Prognose pausiert",
-            "description": "Die Server von MeteoSchweiz können derzeit nicht nur den Teil der Prognose für deinen Ort senden. Statt viel mehr als üblich herunterzuladen, wird die Prognose pausiert und jede Stunde neu versucht. Messwerte und Unwetterwarnungen funktionieren weiter, und dieser Hinweis verschwindet von selbst."
+            "description": "Die Server von MeteoSchweiz können derzeit nicht nur den Teil der Prognose für deinen Ort senden. Statt viel mehr als üblich herunterzuladen, wird die Prognose pausiert und jede Stunde neu versucht. Messwerte und Unwetterwarnungen funktionieren weiter. Hält das an, such nach einem Update der Integration. Dieser Hinweis verschwindet von selbst."
         },
-        "whole_downloads": {
-            "title": "MeteoSchweiz-Prognose braucht mehr Daten als üblich",
-            "description": "MeteoSchweiz scheint geändert zu haben, wie die Prognose veröffentlicht wird, deshalb lädt die Integration mehr als üblich herunter, um sie aktuell zu halten. Alles funktioniert weiter. Ein Update der Integration senkt den Verbrauch wieder; bei einer volumenbegrenzten Verbindung kannst du bis dahin unter Konfigurieren die stündlichen Temperaturen ausschalten. Dieser Hinweis verschwindet von selbst."
+        "high_usage": {
+            "title": "MeteoSchweiz braucht mehr Daten als nötig",
+            "description": "Die MeteoSchweiz-Integration hat am letzten Tag viel mehr als üblich heruntergeladen ({usage} MB). Meist hat MeteoSchweiz geändert, wie die Prognose veröffentlicht wird. Aktualisiere die Integration: Eine Korrektur ist wahrscheinlich verfügbar. Dieser Hinweis verschwindet von selbst."
         }
     },
     "config": {

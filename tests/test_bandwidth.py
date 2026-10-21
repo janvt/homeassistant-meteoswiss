@@ -402,3 +402,19 @@ class TestFilesOrderedByPlace:
         assert rows == {}  # rather than another whole file the same day
         assert all(r is not None for m, _, r in session.requests if m == "GET")
         assert session.transferred() <= 100_000
+
+
+async def test_what_is_downloaded_is_counted_for_a_day(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(ogd.time, "monotonic", lambda: clock[0])
+    files = {url("p", RUNS[0]): by_place("p", 0), url("t", RUNS[0]): by_time("t", 0)}
+    session = FakeSession(files)
+    client = MeteoSwissOGD(session, "tests")  # type: ignore[arg-type]
+
+    await client._point_values(url("p", RUNS[0]), point(MIDDLE))
+    await client.get_hourly_rows([point(MIDDLE)], RUNS[0], "t")
+
+    # Each response with its headers, as the server sent it.
+    assert client.downloaded == session.transferred(ogd.REQUEST_OVERHEAD)
+    clock[0] += ogd.USAGE_PERIOD.total_seconds() + 1
+    assert client.downloaded == 0

@@ -240,10 +240,9 @@ a few MB extra.
 
 If MeteoSwiss changes how it publishes its files, the integration may have to
 download them whole until it is updated: **at worst several hundred MB a
-day**.  A repair notice tells you when that happens, and the forecast is
-paused rather than downloaded whole every hour if the servers stop sending
-parts of files.  The integration is checked against MeteoSwiss's files every
-day, so such changes are noticed quickly.
+day**.  It is checked against MeteoSwiss's files twice a day, so such changes
+are noticed and fixed quickly; and if it downloads far more than usual, a
+repair notice asks you to update it.
 
 On a metered connection, turn off *Hourly temperatures* under *Configure*:
 the hourly forecast then has no temperatures, and the snow and

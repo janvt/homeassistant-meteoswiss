@@ -22,11 +22,11 @@
         },
         "ranges_ignored": {
             "title": "MeteoSwiss forecast paused",
-            "description": "MeteoSwiss's servers currently cannot send just the part of the forecast for your place. Rather than downloading far more than usual, the forecast is paused and tried again every hour. Measurements and weather warnings keep working, and this notice goes away by itself."
+            "description": "MeteoSwiss's servers currently cannot send just the part of the forecast for your place. Rather than downloading far more than usual, the forecast is paused and tried again every hour. Measurements and weather warnings keep working. If this lasts, check for an update of the integration. This notice goes away by itself."
         },
-        "whole_downloads": {
-            "title": "MeteoSwiss forecast uses more data than usual",
-            "description": "MeteoSwiss seems to have changed how it publishes its forecast, so the integration downloads more than usual to keep it up to date. Everything keeps working. An update of the integration will bring the usage back down; on a metered connection, you can turn off Hourly temperatures under Configure meanwhile. This notice goes away by itself."
+        "high_usage": {
+            "title": "MeteoSwiss uses more data than it should",
+            "description": "The MeteoSwiss integration downloaded far more than usual in the last day ({usage} MB). This usually means MeteoSwiss changed how it publishes its forecast. Update the integration: a fix is likely available. This notice goes away by itself."
         }
     },
     "config": {

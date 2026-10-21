@@ -46,9 +46,9 @@ from custom_components.meteoswiss.const import (
 )
 from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.issues import (
+    HIGH_USAGE_ISSUE,
     RANGES_IGNORED_ISSUE,
-    WHOLE_DOWNLOADS_ISSUE,
-    WHOLE_DOWNLOADS_NOTICE,
+    USAGE_NOTICE_PER_ENTRY,
     async_delete_issues,
     freezing_level_setting,
     no_forecast_issue_id,
@@ -421,12 +421,19 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
     @callback
     def _async_update_download_issues(self) -> None:
-        """Tell the user while MeteoSwiss's files cannot be read as usual."""
-        ignored = self.client.ranges_ignored
-        whole = not ignored and self.client.whole_downloads >= WHOLE_DOWNLOADS_NOTICE
-        for issue_id, key, active in (
-            (RANGES_IGNORED_ISSUE, "ranges_ignored", ignored),
-            (WHOLE_DOWNLOADS_ISSUE, "whole_downloads", whole),
+        """Tell the user to update while MeteoSwiss's files cost far more than
+        they should, which means MeteoSwiss changed something."""
+        entries = len(self.hass.config_entries.async_loaded_entries(DOMAIN))
+        downloaded = self.client.downloaded
+        high = downloaded > USAGE_NOTICE_PER_ENTRY * max(1, entries)
+        for issue_id, key, active, placeholders in (
+            (RANGES_IGNORED_ISSUE, "ranges_ignored", self.client.ranges_ignored, {}),
+            (
+                HIGH_USAGE_ISSUE,
+                "high_usage",
+                high,
+                {"usage": str(round(downloaded / 1024 / 1024))},
+            ),
         ):
             if active:
                 ir.async_create_issue(
@@ -437,6 +444,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                     is_persistent=False,
                     severity=IssueSeverity.WARNING,
                     translation_key=key,
+                    translation_placeholders=placeholders,
                 )
             else:
                 ir.async_delete_issue(self.hass, DOMAIN, issue_id)

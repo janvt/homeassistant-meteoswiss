@@ -22,11 +22,11 @@
         },
         "ranges_ignored": {
             "title": "Previsioni MeteoSvizzera in pausa",
-            "description": "I server di MeteoSvizzera al momento non possono inviare solo la parte delle previsioni per la tua località. Invece di scaricare molto più del solito, le previsioni vengono messe in pausa e riprovate ogni ora. Le misure e le allerte meteo continuano a funzionare, e questo avviso scompare da solo."
+            "description": "I server di MeteoSvizzera al momento non possono inviare solo la parte delle previsioni per la tua località. Invece di scaricare molto più del solito, le previsioni vengono messe in pausa e riprovate ogni ora. Le misure e le allerte meteo continuano a funzionare. Se dura, cerca un aggiornamento dell'integrazione. Questo avviso scompare da solo."
         },
-        "whole_downloads": {
-            "title": "Le previsioni MeteoSvizzera usano più dati del solito",
-            "description": "Sembra che MeteoSvizzera abbia cambiato il modo in cui pubblica le previsioni, quindi l'integrazione scarica più del solito per tenerle aggiornate. Tutto continua a funzionare. Un aggiornamento dell'integrazione ridurrà di nuovo il consumo; con una connessione a consumo, nel frattempo puoi disattivare le temperature orarie in Configura. Questo avviso scompare da solo."
+        "high_usage": {
+            "title": "MeteoSvizzera usa più dati del necessario",
+            "description": "L'integrazione MeteoSvizzera ha scaricato molto più del solito nell'ultimo giorno ({usage} MB). Di solito significa che MeteoSvizzera ha cambiato il modo in cui pubblica le previsioni. Aggiorna l'integrazione: è probabile che sia disponibile una correzione. Questo avviso scompare da solo."
         }
     },
     "config": {

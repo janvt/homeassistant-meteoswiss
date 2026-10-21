@@ -914,19 +914,25 @@ async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_
     assert fake_ogd.climate_calls == 2
 
 
-async def test_a_notice_while_the_files_are_downloaded_whole(
+async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(
     hass, entry, fake_ogd, frozen_now
 ):
     await setup(hass, entry)
-    assert issues(hass) == set()
-
-    fake_ogd.whole_downloads = 3
+    # A busy day is fine.
+    fake_ogd.downloaded = 30 * 1024 * 1024
     fake_ogd.run = "202610201300"
     await refresh_after(hass, frozen_now, 60)
-    assert issues(hass) == {"whole_downloads_meteoswiss"}
+    assert issues(hass) == set()
 
-    fake_ogd.whole_downloads = 0
+    fake_ogd.downloaded = 300 * 1024 * 1024
     fake_ogd.run = "202610201400"
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == {"high_usage_meteoswiss"}
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "high_usage_meteoswiss")
+    assert issue.translation_placeholders == {"usage": "300"}
+
+    fake_ogd.downloaded = 0
+    fake_ogd.run = "202610201500"
     await refresh_after(hass, frozen_now, 60)
     assert issues(hass) == set()
 

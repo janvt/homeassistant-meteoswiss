@@ -25,10 +25,10 @@ from custom_components.meteoswiss.ogd import POINT_TYPE_POI, POINT_TYPE_POSTCODE
 
 # Shared by all entries: about how MeteoSwiss's files are read.
 RANGES_IGNORED_ISSUE = f"ranges_ignored_{DOMAIN}"
-WHOLE_DOWNLOADS_ISSUE = f"whole_downloads_{DOMAIN}"
-# Files downloaded whole in a day, as they could not be searched, from which
-# the user is told.
-WHOLE_DOWNLOADS_NOTICE = 3
+HIGH_USAGE_ISSUE = f"high_usage_{DOMAIN}"
+# Downloads from MeteoSwiss in a day, per entry, from which the user is told
+# to update: about four times the usual, which no normal use reaches.
+USAGE_NOTICE_PER_ENTRY = 40 * 1024 * 1024
 
 
 def station_issue_id(station: str, name_key: str) -> str:

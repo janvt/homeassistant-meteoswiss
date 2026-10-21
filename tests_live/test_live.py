@@ -175,6 +175,10 @@ async def test_forecast(http, client, counting, places, latest_run):
         within_budget("forecast", "next run", transferred, whole, len(places))
     # Nothing downloaded whole for lack of a way to search it.
     assert client.whole_downloads == 0 and not client.ranges_ignored
+    # What the integration counts for its repair notice is what was sent: the
+    # first two runs, and the last one with the reads for the comparison.
+    sent = costs[0][1] + costs[1][1] + counting.transferred
+    assert abs(client.downloaded - sent) < 0.1 * sent
 
 
 async def test_station_files_are_fetched_only_when_they_changed(
