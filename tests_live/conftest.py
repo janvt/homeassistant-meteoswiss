@@ -116,7 +116,7 @@ def counting(http):
 
 @pytest.fixture
 def client(counting):
-    return MeteoSwissOGD(counting, USER_AGENT, save_data=True)  # type: ignore[arg-type]
+    return MeteoSwissOGD(counting, USER_AGENT)  # type: ignore[arg-type]
 
 
 @pytest.fixture

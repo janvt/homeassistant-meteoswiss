@@ -32,7 +32,6 @@ CONF_UPDATE_INTERVAL = "update_interval"
 CONF_HOURLY_TEMPERATURE = "hourly_temperature"
 CONF_FREEZING_LEVEL = "freezing_level"
 CONF_CLIMATE_NORMALS = "climate_normals"
-CONF_SAVE_DATA = "save_data"
 CONF_FOEHN = "foehn"
 CONF_FOEHN_SOUTH = "foehn_south_station"
 CONF_FOEHN_NORTH = "foehn_north_station"
@@ -44,7 +43,6 @@ CONF_LON = "longitude"
 DEFAULT_UPDATE_INTERVAL = 5
 DEFAULT_HOURLY_TEMPERATURE = True
 DEFAULT_CLIMATE_NORMALS = True
-DEFAULT_SAVE_DATA = False
 # The Föhn outlook compares the sea-level pressure (QFF) south and north of the
 # Alps.  Lugano and Zürich-Kloten are the classic pair; from about 4 hPa more
 # in the south, Föhn reaches the northern valleys, and at about 8 hPa it blows

@@ -35,12 +35,10 @@ from custom_components.meteoswiss.const import (
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
-    CONF_SAVE_DATA,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
     DEFAULT_CLIMATE_NORMALS,
     DEFAULT_HOURLY_TEMPERATURE,
-    DEFAULT_SAVE_DATA,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     FOEHN_DEFAULTS,
@@ -145,11 +143,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         )
         hass.data[DATA_DOWNLOADS] = SharedDownloads(hass.data[DATA_CLIENT])
         hass.data[DATA_ALERTS] = MeteoAlarm(async_get_clientsession(hass), USER_AGENT)
-    # Shared, so on for all entries if any asks for it.
-    hass.data[DATA_CLIENT].save_data = any(
-        e.options.get(CONF_SAVE_DATA, DEFAULT_SAVE_DATA)
-        for e in hass.config_entries.async_entries(DOMAIN)
-    )
     coordinator = MeteoSwissDataUpdateCoordinator(
         hass,
         entry,
@@ -432,13 +425,11 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
     @callback
     def _async_update_download_issues(self) -> None:
-        """Tell the user to update while saving data costs far more than it
-        should, which means MeteoSwiss changed something."""
+        """Tell the user to update while MeteoSwiss's files cost far more than
+        they should, which means MeteoSwiss changed something."""
         entries = len(self.hass.config_entries.async_loaded_entries(DOMAIN))
         downloaded = self.client.downloaded
-        if self.client.save_data and downloaded > USAGE_NOTICE_PER_ENTRY * max(
-            1, entries
-        ):
+        if downloaded > USAGE_NOTICE_PER_ENTRY * max(1, entries):
             ir.async_create_issue(
                 self.hass,
                 DOMAIN,

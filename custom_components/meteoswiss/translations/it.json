@@ -70,7 +70,7 @@
                 "description": "Il codice postale viene utilizzato per cercare il preavviso a 5 giorni. Il nome che inserisci qui verrà utilizzato per l'entità del preavviso.",
                 "title": "Preavviso",
                 "data_description": {
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera (33 MB). Viene scaricato ogni tre ore: circa 260 MB al giorno, o circa 4 MB con «Risparmia dati». Lo zero termico è un'impostazione a sé. Disattivare l'opzione per risparmiare anche questo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede circa 1 MB all'ora."
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera (33 MB). Ne vengono lette solo le righe della tua località: circa 0,5 MB ogni tre ore, 4 MB al giorno. Lo zero termico è un'impostazione a sé. Disattivare l'opzione per risparmiare anche questo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede circa 1 MB all'ora."
                 }
             },
             "mountain": {
@@ -84,7 +84,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Lasciare vuoto per usare il nome del luogo.",
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie e lo zero termico solo in file per tutta la Svizzera (33 MB ciascuno). Vengono scaricati ogni tre ore: circa 520 MB al giorno per entrambi, o circa 8 MB con «Risparmia dati» in «Configura». Disattivare l'opzione per risparmiarli: le previsioni non avranno temperature orarie e non ci sarà il sensore dello zero termico."
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie e lo zero termico solo in file per tutta la Svizzera (33 MB ciascuno). Ne vengono lette solo le righe di questa località: circa 0,5 MB ciascuno ogni tre ore, 8 MB al giorno per entrambi. Disattivare l'opzione per risparmiarli: le previsioni non avranno temperature orarie e non ci sarà il sensore dello zero termico."
                 }
             },
             "user_three": {
@@ -116,19 +116,17 @@
                     "foehn_threshold": "Favonio probabile da",
                     "foehn_strong_threshold": "Favonio forte da",
                     "freezing_level": "Zero termico",
-                    "climate_normals": "Norme climatiche",
-                    "save_data": "Risparmia dati"
+                    "climate_normals": "Norme climatiche"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera (33 MB). Viene scaricato ogni tre ore: circa 260 MB al giorno, o circa 4 MB con «Risparmia dati». Lo zero termico è un'impostazione a sé. Disattivare l'opzione per risparmiare anche questo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede circa 1 MB all'ora.",
+                    "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera (33 MB). Ne vengono lette solo le righe della tua località: circa 0,5 MB ogni tre ore, 4 MB al giorno. Lo zero termico è un'impostazione a sé. Disattivare l'opzione per risparmiare anche questo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede circa 1 MB all'ora.",
                     "foehn": "Sensori per il favonio: l'indice di favonio misurato da MeteoSvizzera alla stazione meteo e una tendenza dalla differenza di pressione attraverso le Alpi, che sale ore prima che il favonio irrompa.",
                     "foehn_south_station": "La sua pressione al livello del mare viene confrontata con la stazione a nord delle Alpi. Lugano è la scelta classica.",
                     "foehn_north_station": "Zurigo/Kloten è la scelta classica.",
                     "foehn_threshold": "Differenza di pressione da cui il favonio è probabile; circa 4 hPa raggiungono le valli del nord, come ad Altdorf. Lo stesso al contrario per il favonio da nord.",
                     "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa.",
-                    "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un file per tutta la Svizzera (33 MB), scaricato ogni tre ore: circa 260 MB al giorno, o circa 4 MB con «Risparmia dati».",
-                    "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 1,4 MB) viene scaricata all'avvio di Home Assistant e poi solo controllata una volta alla settimana; i giorni di quest'anno ogni sei ore.",
-                    "save_data": "Per connessioni a consumo. Legge solo la parte dei grandi file di MeteoSvizzera che riguarda la tua località invece di scaricarli interi: da 20 a 60 MB al giorno invece di circa 300 MB. Dipende da come MeteoSvizzera organizza i file; se cambiano, può servire un aggiornamento dell'integrazione, e un avviso di riparazione te lo segnala. Vale per tutte le previsioni MeteoSvizzera."
+                    "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un file per tutta la Svizzera (33 MB), di cui vengono lette solo le righe di questa località: circa 0,5 MB ogni tre ore, 4 MB al giorno.",
+                    "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 1,4 MB) viene scaricata all'avvio di Home Assistant e poi solo controllata una volta alla settimana; i giorni di quest'anno ogni sei ore."
                 }
             }
         },

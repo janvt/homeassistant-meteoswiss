@@ -41,12 +41,10 @@ from custom_components.meteoswiss.const import (
     CONF_PRECIPITATION_STATION,
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
-    CONF_SAVE_DATA,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
     DEFAULT_CLIMATE_NORMALS,
     DEFAULT_HOURLY_TEMPERATURE,
-    DEFAULT_SAVE_DATA,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     FOEHN_DEFAULTS,
@@ -721,7 +719,6 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
             ),
             CONF_FREEZING_LEVEL: freezing_level_setting(entry.data, entry.options),
             CONF_CLIMATE_NORMALS: DEFAULT_CLIMATE_NORMALS,
-            CONF_SAVE_DATA: DEFAULT_SAVE_DATA,
             **FOEHN_DEFAULTS,
             **entry.options,
         }
@@ -792,7 +789,6 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
                             mode=NumberSelectorMode.BOX,
                         )
                     ),
-                    required(CONF_SAVE_DATA): bool,
                 }
             ),
             errors=errors,

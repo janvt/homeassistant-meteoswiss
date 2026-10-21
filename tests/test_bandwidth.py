@@ -1,5 +1,4 @@
-"""How much reading the forecast files costs with Save data, in requests and
-bytes.
+"""How much reading the forecast files costs, in requests and bytes.
 
 The files here are laid out like MeteoSwiss's, a third of their size: 2,000
 places, values of varying length that change a little from run to run.  Each
@@ -95,7 +94,7 @@ class TestHourlyFilesOrderedByTime:
     def setup(self, runs=RUNS, **kw):
         files = {url("t", run): by_time("t", n, **kw) for n, run in enumerate(runs)}
         session = FakeSession(files)
-        return MeteoSwissOGD(session, "tests", save_data=True), session, files  # type: ignore[arg-type]
+        return MeteoSwissOGD(session, "tests"), session, files  # type: ignore[arg-type]
 
     @pytest.mark.parametrize("key", [FIRST, MIDDLE, LAST])
     async def test_cold_start(self, key):
@@ -227,7 +226,7 @@ class TestDailyFilesOrderedByTime:
             for n, run in enumerate(RUNS)
         }
         session = FakeSession(files)
-        return MeteoSwissOGD(session, "tests", save_data=True), session, files  # type: ignore[arg-type]
+        return MeteoSwissOGD(session, "tests"), session, files  # type: ignore[arg-type]
 
     @pytest.mark.parametrize("key", [FIRST, MIDDLE, LAST])
     async def test_cold_start_and_normal_operation(self, key):
@@ -293,7 +292,7 @@ class TestServerThatIgnoresRanges:
         }
         session = FakeSession(files)
         session.ignore_ranges = True
-        client = MeteoSwissOGD(session, "tests", save_data=True)  # type: ignore[arg-type]
+        client = MeteoSwissOGD(session, "tests")  # type: ignore[arg-type]
 
         rows = await client._point_values(url("p", RUNS[0]), point(MIDDLE))
         assert rows == expected(files[url("p", RUNS[0])], MIDDLE)
@@ -323,7 +322,7 @@ class TestFilesOrderedByPlace:
             url("p", run): by_place("p", n, stamps=stamps) for n, run in enumerate(runs)
         }
         session = FakeSession(files)
-        return MeteoSwissOGD(session, "tests", save_data=True), session, files  # type: ignore[arg-type]
+        return MeteoSwissOGD(session, "tests"), session, files  # type: ignore[arg-type]
 
     @pytest.mark.parametrize("key", [FIRST, MIDDLE, LAST])
     async def test_cold_start(self, key):
@@ -392,7 +391,7 @@ async def test_what_is_downloaded_is_counted_for_a_day(monkeypatch):
     monkeypatch.setattr(ogd.time, "monotonic", lambda: clock[0])
     files = {url("p", RUNS[0]): by_place("p", 0), url("t", RUNS[0]): by_time("t", 0)}
     session = FakeSession(files)
-    client = MeteoSwissOGD(session, "tests", save_data=True)  # type: ignore[arg-type]
+    client = MeteoSwissOGD(session, "tests")  # type: ignore[arg-type]
 
     await client._point_values(url("p", RUNS[0]), point(MIDDLE))
     await client.get_hourly_rows([point(MIDDLE)], RUNS[0], "t")
@@ -407,22 +406,9 @@ async def test_rows_longer_than_expected_are_read_to_their_end(monkeypatch):
     # As if MeteoSwiss forecast much further ahead.
     monkeypatch.setattr(ogd, "ROW_SPAN", 1024)
     files = {url("p", RUNS[0]): by_place("p", 0)}
-    client = MeteoSwissOGD(FakeSession(files), "tests", save_data=True)  # type: ignore[arg-type]
+    client = MeteoSwissOGD(FakeSession(files), "tests")  # type: ignore[arg-type]
 
     rows = await client._point_values(url("p", RUNS[0]), point(MIDDLE))
 
     assert rows == expected(files[url("p", RUNS[0])], MIDDLE)
     assert len(rows) == len(HOURS)
-
-
-async def test_without_save_data_files_ordered_by_time_are_downloaded_whole():
-    files = {url("t", RUNS[0]): by_time("t", 0)}
-    session = FakeSession(files)
-    client = MeteoSwissOGD(session, "tests")  # type: ignore[arg-type]
-
-    rows = await client.get_hourly_rows([point(FIRST), point(LAST)], RUNS[0], "t")
-
-    assert rows[FIRST] == expected(files[url("t", RUNS[0])], FIRST)
-    assert rows[LAST] == expected(files[url("t", RUNS[0])], LAST)
-    # Its size, then the file once for all places.
-    assert [(m, r) for m, _, r in session.requests] == [("HEAD", None), ("GET", None)]

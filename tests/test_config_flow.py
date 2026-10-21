@@ -645,7 +645,6 @@ async def test_foehn_options_have_sane_defaults(hass, entry):
         "foehn_north_station": "KLO",
         "foehn_threshold": 4.0,
         "foehn_strong_threshold": 8.0,
-        "save_data": False,
     }
 
 

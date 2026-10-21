@@ -1,7 +1,6 @@
 """The real servers: what reading them relies on, and what it costs.
 
-Each test reads the forecast as the integration does with Save data on,
-compares the values
+Each test reads the forecast as the integration does, compares the values
 with the whole files, and checks its cost against what downloading the whole
 files instead would cost (the fallback, and what versions before 2.0.0b9 did):
 for each case, the share in BUDGET, of the whole files' size as transferred.

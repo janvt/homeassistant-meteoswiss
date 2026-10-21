@@ -70,7 +70,7 @@
                 "description": "Die Postleitzahl wird verwendet, um die 5-Tage-Prognose abzurufen. Der hier eingegebene Name wird für das Prognose-(Wetter)-Entity verwendet.",
                 "title": "Prognose",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Sie wird alle drei Stunden heruntergeladen: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde."
                 }
             },
             "mountain": {
@@ -84,7 +84,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Leer lassen, um den Namen des Orts zu verwenden.",
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz (je 33 MB). Sie werden alle drei Stunden heruntergeladen: für beide etwa 520 MB pro Tag, mit «Daten sparen» unter «Konfigurieren» etwa 8 MB. Ausschalten, um das zu sparen: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz (je 33 MB). Daraus werden nur die Zeilen dieses Orts gelesen: je etwa 0,5 MB alle drei Stunden, für beide 8 MB pro Tag. Ausschalten, um das zu sparen: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
                 }
             },
             "user_three": {
@@ -116,19 +116,17 @@
                     "foehn_threshold": "Föhn wahrscheinlich ab",
                     "foehn_strong_threshold": "Starker Föhn ab",
                     "freezing_level": "Nullgradgrenze",
-                    "climate_normals": "Klimanormwerte",
-                    "save_data": "Daten sparen"
+                    "climate_normals": "Klimanormwerte"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Sie wird alle drei Stunden heruntergeladen: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde.",
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde.",
                     "foehn": "Sensoren für Föhn: der von MeteoSchweiz an der Wetterstation gemessene Föhnindex und eine Aussicht aus der Druckdifferenz über die Alpen, die Stunden vor dem Föhndurchbruch steigt.",
                     "foehn_south_station": "Ihr Luftdruck auf Meereshöhe wird mit der Station nördlich der Alpen verglichen. Lugano ist die klassische Wahl.",
                     "foehn_north_station": "Zürich/Kloten ist die klassische Wahl.",
                     "foehn_threshold": "Druckdifferenz, ab der Föhn wahrscheinlich ist; etwa 4 hPa erreichen die nördlichen Täler wie in Altdorf. Für Nordföhn gleich, umgekehrt.",
                     "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
-                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), die alle drei Stunden heruntergeladen wird: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB.",
-                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden.",
-                    "save_data": "Für Verbindungen mit Datenlimit. Liest aus den grossen Dateien von MeteoSchweiz nur den Teil für deinen Ort, statt sie ganz herunterzuladen: 20 bis 60 MB statt etwa 300 MB pro Tag. Das hängt davon ab, wie MeteoSchweiz die Dateien aufbaut; ändert sich das, kann ein Update der Integration nötig sein, und ein Reparaturhinweis sagt es dir. Gilt für alle MeteoSchweiz-Prognosen."
+                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), aus der nur die Zeilen dieses Orts gelesen werden: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag.",
+                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden."
                 }
             }
         },

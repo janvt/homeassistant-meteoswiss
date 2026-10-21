@@ -915,22 +915,10 @@ async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_
     assert fake_ogd.climate_calls == 2
 
 
-async def test_no_notice_about_downloads_without_save_data(
-    hass, entry, fake_ogd, frozen_now
-):
-    await setup(hass, entry)
-    assert not fake_ogd.instances[-1].save_data
-    fake_ogd.downloaded = 300 * 1024 * 1024
-    await refresh_after(hass, frozen_now, 60)
-    assert issues(hass) == set()
-
-
 async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(
     hass, entry, fake_ogd, frozen_now
 ):
-    hass.config_entries.async_update_entry(entry, options={"save_data": True})
     await setup(hass, entry)
-    assert fake_ogd.instances[-1].save_data
     # A busy day is fine.
     fake_ogd.downloaded = 30 * 1024 * 1024
     fake_ogd.run = "202610201300"
