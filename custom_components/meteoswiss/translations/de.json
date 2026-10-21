@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
                     "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), die alle drei Stunden heruntergeladen wird: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB.",
                     "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden.",
-                    "save_data": "Für Verbindungen mit Datenlimit. Liest aus den grossen Dateien von MeteoSchweiz nur den Teil für deinen Ort, statt sie ganz herunterzuladen: 10 bis 50 MB statt etwa 300 MB pro Tag. Das hängt davon ab, wie MeteoSchweiz die Dateien aufbaut; ändert sich das, kann ein Update der Integration nötig sein, und ein Reparaturhinweis sagt es dir. Gilt für alle MeteoSchweiz-Prognosen."
+                    "save_data": "Für Verbindungen mit Datenlimit. Liest aus den grossen Dateien von MeteoSchweiz nur den Teil für deinen Ort, statt sie ganz herunterzuladen: 20 bis 60 MB statt etwa 300 MB pro Tag. Das hängt davon ab, wie MeteoSchweiz die Dateien aufbaut; ändert sich das, kann ein Update der Integration nötig sein, und ein Reparaturhinweis sagt es dir. Gilt für alle MeteoSchweiz-Prognosen."
                 }
             }
         },

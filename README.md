@@ -236,12 +236,12 @@ unavailable when the station has reported nothing for six hours.
 MeteoSwiss publishes its forecast as large files covering all of
 Switzerland.  With the default settings the integration downloads **about
 300 MB a day**, most of it the hourly temperatures, a 33 MB file downloaded
-every three hours.  Further places add a few MB each, as they share the large
-files.
+every three hours.  Each further place adds about 12 MB, as the large files are
+shared.
 
 On a metered connection, turn on **Save data** under *Configure*.  The
 integration then reads only the part of the large files for your place:
-**10 to 50 MB a day**, depending on how many weather warnings there are.  This
+**20 to 60 MB a day**, depending on how many weather warnings there are.  This
 relies on how MeteoSwiss lays out its files.  If that changes, it downloads
 the files whole rather than stop working, and a repair notice asks you to
 update the integration.  It is checked against MeteoSwiss's files twice a day,

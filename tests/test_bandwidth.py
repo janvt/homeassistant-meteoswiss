@@ -345,25 +345,21 @@ class TestFilesOrderedByPlace:
 
         rows = await client._point_values(url("p", RUNS[2]), point(key))
 
+        # A binary search each run, as when cold: nothing to go wrong.
         assert rows == expected(files[url("p", RUNS[2])], key)
-        assert len(session.requests) <= 3
-        assert session.transferred() <= 20_000
+        assert len(session.requests) <= 16
+        assert session.transferred() <= 50_000
 
     async def test_several_places(self):
         keys = [FIRST, PLACES[400], MIDDLE, PLACES[1500], LAST]
         client, session, files = self.setup()
-        for run in RUNS[:2]:
-            for key in keys:
-                await client._point_values(url("p", run), point(key))
-        session.clear()
 
         for key in keys:
-            rows = await client._point_values(url("p", RUNS[2]), point(key))
-            assert rows == expected(files[url("p", RUNS[2])], key)
+            rows = await client._point_values(url("p", RUNS[0]), point(key))
+            assert rows == expected(files[url("p", RUNS[0])], key)
 
-        # Each place where it was, the file's size asked for once at most.
-        assert len(session.requests) <= 2 * len(keys) + 1
-        assert session.transferred() <= 20_000 * len(keys)
+        assert len(session.requests) <= 16 * len(keys)
+        assert session.transferred() <= 50_000 * len(keys)
 
     async def test_a_place_not_in_the_file_is_not_looked_for_in_the_whole_file(self):
         client, session, _ = self.setup()
@@ -374,42 +370,21 @@ class TestFilesOrderedByPlace:
         assert all(r is not None for _, _, r in session.requests)
         assert session.transferred() <= 100_000
 
-    async def test_places_in_an_unknown_order(self):
+    async def test_places_in_an_unknown_order_are_read_from_the_whole_file(self):
         shuffled = list(PLACES)
         random.Random(3).shuffle(shuffled)
         client, session, files = self.setup()
-        body = files[url("p", RUNS[0])] = by_place("p", 0, order=tuple(shuffled))
+        for n, run in enumerate(RUNS[:2]):
+            files[url("p", run)] = by_place("p", n, order=tuple(shuffled))
 
-        rows = await client._point_values(url("p", RUNS[0]), point(MIDDLE))
+        for run in RUNS[:2]:
+            session.clear()
+            rows = await client._point_values(url("p", run), point(MIDDLE))
 
-        # Found in the whole file, after two binary searches that failed.
-        assert rows == expected(body, MIDDLE)
-        assert session.transferred() <= len(body) + 100_000
-
-        # The next runs look where it was, which needs no order.
-        files[url("p", RUNS[1])] = by_place("p", 1, order=tuple(shuffled))
-        session.clear()
-        rows = await client._point_values(url("p", RUNS[1]), point(MIDDLE))
-        assert rows == expected(files[url("p", RUNS[1])], MIDDLE)
-        assert len(session.requests) <= 3
-        assert session.transferred() <= 20_000
-
-    async def test_a_place_lost_in_an_unknown_order_is_read_whole_once_a_day(self):
-        shuffled = list(PLACES)
-        random.Random(4).shuffle(shuffled)
-        client, session, files = self.setup()
-        files[url("p", RUNS[0])] = by_place("p", 0, order=tuple(shuffled))
-        # Entirely different the next run, so where it was says nothing.
-        random.Random(5).shuffle(shuffled)
-        files[url("p", RUNS[1])] = by_place("p", 1, order=tuple(shuffled))
-        await client._point_values(url("p", RUNS[0]), point(MIDDLE))
-        session.clear()
-
-        rows = await client._point_values(url("p", RUNS[1]), point(MIDDLE))
-
-        assert rows == {}  # rather than another whole file the same day
-        assert all(r is not None for m, _, r in session.requests if m == "GET")
-        assert session.transferred() <= 100_000
+            # After the binary searches that failed, every run.
+            assert rows == expected(files[url("p", run)], MIDDLE)
+            assert session.transferred() <= len(files[url("p", run)]) + 100_000
+        assert client.whole_downloads == 2
 
 
 async def test_what_is_downloaded_is_counted_for_a_day(monkeypatch):

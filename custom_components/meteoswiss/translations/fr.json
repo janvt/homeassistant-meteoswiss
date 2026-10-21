@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Différence de pression à partir de laquelle le fœhn souffle fort ; environ 8 hPa.",
                     "freezing_level": "Un capteur pour l'altitude prévue de l'isotherme zéro degré. MeteoSuisse la publie dans un fichier pour toute la Suisse (33 Mo), téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ».",
                     "climate_normals": "Capteurs comparant aujourd'hui et ce mois à la station météo avec ses normes 1991–2020, calculées à partir de la série de mesures de la station, et le record pour la date. La série (environ 1,4 Mo) est téléchargée au démarrage de Home Assistant, puis seulement vérifiée une fois par semaine ; les jours de cette année toutes les six heures.",
-                    "save_data": "Pour les connexions limitées. Ne lit que la partie des gros fichiers de MeteoSuisse qui concerne votre lieu au lieu de les télécharger en entier : 10 à 50 Mo par jour au lieu d'environ 300 Mo. Cela dépend de la façon dont MeteoSuisse organise ses fichiers ; s'ils changent, une mise à jour de l'intégration peut être nécessaire, et un avis de réparation vous le signale. S'applique à toutes les prévisions MeteoSuisse."
+                    "save_data": "Pour les connexions limitées. Ne lit que la partie des gros fichiers de MeteoSuisse qui concerne votre lieu au lieu de les télécharger en entier : 20 à 60 Mo par jour au lieu d'environ 300 Mo. Cela dépend de la façon dont MeteoSuisse organise ses fichiers ; s'ils changent, une mise à jour de l'intégration peut être nécessaire, et un avis de réparation vous le signale. S'applique à toutes les prévisions MeteoSuisse."
                 }
             }
         },

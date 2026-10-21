@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Trykkforskjell fra der føhnen blåser kraftig; omtrent 8 hPa.",
                     "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en fil for hele Sveits (33 MB), som lastes ned hver tredje time: omtrent 260 MB per dag, eller omtrent 4 MB med «Spar data».",
                     "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 1,4 MB) lastes ned når Home Assistant starter, og sjekkes deretter bare for endringer én gang i uken; årets dager hver sjette time.",
-                    "save_data": "For forbindelser med datagrense. Leser bare den delen av MeteoSwiss' store filer som gjelder stedet ditt, i stedet for å laste dem ned hele: 10 til 50 MB per dag i stedet for omtrent 300 MB. Det avhenger av hvordan MeteoSwiss bygger opp filene; endres de, kan det trengs en oppdatering av integrasjonen, og et reparasjonsvarsel sier fra. Gjelder alle MeteoSwiss-varsler."
+                    "save_data": "For forbindelser med datagrense. Leser bare den delen av MeteoSwiss' store filer som gjelder stedet ditt, i stedet for å laste dem ned hele: 20 til 60 MB per dag i stedet for omtrent 300 MB. Det avhenger av hvordan MeteoSwiss bygger opp filene; endres de, kan det trengs en oppdatering av integrasjonen, og et reparasjonsvarsel sier fra. Gjelder alle MeteoSwiss-varsler."
                 }
             }
         },

@@ -40,10 +40,10 @@ BUDGET = {
     # as learning its layout would cost as much; a request per day after that.
     ("daily", "cold"): 1.1,
     ("daily", "next run"): 0.15,
-    # All 14 files of a run (about 380 MB): a binary search in each when
-    # cold, a request or two each after that.
+    # All 14 files of a run (about 380 MB): a binary search in each, every
+    # run.
     ("forecast", "cold"): 0.005,
-    ("forecast", "next run"): 0.0015,
+    ("forecast", "next run"): 0.005,
 }
 
 
@@ -164,9 +164,10 @@ async def test_forecast(http, client, counting, places, latest_run):
             assert await client._point_values(file, place) == whole_rows(body, place)
     cold, *warm = costs
     within_budget("forecast", "cold", cold[1], whole, len(places))
-    for requests, transferred in warm:
-        # A request or two per file, more when a file changed much.
-        assert requests <= 70 * len(places)
+    for requests, transferred in costs:
+        # A binary search of about 16 requests in each file ordered by place.
+        assert requests <= 250 * len(places)
+    for _, transferred in warm:
         within_budget("forecast", "next run", transferred, whole, len(places))
     # Nothing downloaded whole for lack of a way to search it.
     assert client.whole_downloads == 0 and not client.ranges_ignored

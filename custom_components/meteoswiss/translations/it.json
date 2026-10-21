@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa.",
                     "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un file per tutta la Svizzera (33 MB), scaricato ogni tre ore: circa 260 MB al giorno, o circa 4 MB con «Risparmia dati».",
                     "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 1,4 MB) viene scaricata all'avvio di Home Assistant e poi solo controllata una volta alla settimana; i giorni di quest'anno ogni sei ore.",
-                    "save_data": "Per connessioni a consumo. Legge solo la parte dei grandi file di MeteoSvizzera che riguarda la tua località invece di scaricarli interi: da 10 a 50 MB al giorno invece di circa 300 MB. Dipende da come MeteoSvizzera organizza i file; se cambiano, può servire un aggiornamento dell'integrazione, e un avviso di riparazione te lo segnala. Vale per tutte le previsioni MeteoSvizzera."
+                    "save_data": "Per connessioni a consumo. Legge solo la parte dei grandi file di MeteoSvizzera che riguarda la tua località invece di scaricarli interi: da 20 a 60 MB al giorno invece di circa 300 MB. Dipende da come MeteoSvizzera organizza i file; se cambiano, può servire un aggiornamento dell'integrazione, e un avviso di riparazione te lo segnala. Vale per tutte le previsioni MeteoSvizzera."
                 }
             }
         },

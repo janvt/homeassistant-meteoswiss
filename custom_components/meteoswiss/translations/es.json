@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa.",
                     "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en un archivo para toda Suiza (33 MB), descargado cada tres horas: unos 260 MB al día, o unos 4 MB con «Ahorrar datos».",
                     "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 1,4 MB) se descarga al iniciar Home Assistant y después solo se comprueba una vez por semana; los días de este año cada seis horas.",
-                    "save_data": "Para conexiones con datos limitados. Lee solo la parte de los grandes archivos de MeteoSuiza que corresponde a su lugar en vez de descargarlos enteros: de 10 a 50 MB al día en vez de unos 300 MB. Depende de cómo MeteoSuiza organiza sus archivos; si cambian, puede hacer falta una actualización de la integración, y un aviso de reparación se lo indica. Se aplica a todas las previsiones de MeteoSuiza."
+                    "save_data": "Para conexiones con datos limitados. Lee solo la parte de los grandes archivos de MeteoSuiza que corresponde a su lugar en vez de descargarlos enteros: de 20 a 60 MB al día en vez de unos 300 MB. Depende de cómo MeteoSuiza organiza sus archivos; si cambian, puede hacer falta una actualización de la integración, y un aviso de reparación se lo indica. Se aplica a todas las previsiones de MeteoSuiza."
                 }
             }
         },

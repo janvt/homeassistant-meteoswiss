@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa.",
                     "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in a file for all of Switzerland (33 MB), downloaded every three hours: about 260 MB a day, or about 4 MB with Save data.",
                     "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 1.4 MB) is downloaded when Home Assistant starts, then only checked for changes once a week; this year's days every six hours.",
-                    "save_data": "For metered connections. Reads only the part of MeteoSwiss's large files for your place instead of downloading them whole: 10 to 50 MB a day instead of about 300 MB. It relies on how MeteoSwiss lays out its files, so when they change an update of the integration may be needed; a repair notice tells you. Applies to all MeteoSwiss forecasts."
+                    "save_data": "For metered connections. Reads only the part of MeteoSwiss's large files for your place instead of downloading them whole: 20 to 60 MB a day instead of about 300 MB. It relies on how MeteoSwiss lays out its files, so when they change an update of the integration may be needed; a repair notice tells you. Applies to all MeteoSwiss forecasts."
                 }
             }
         },
