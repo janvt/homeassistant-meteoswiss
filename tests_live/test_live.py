@@ -205,8 +205,11 @@ async def test_warnings_are_checked_by_size(counting):
     now = datetime.datetime.now(datetime.timezone.utc)
     await meteoalarm.get_warnings(46.88, 8.64, 450, "en", now)
     counting.clear()
+    later = now + alerts.FEED_CHECK
+    if any(now < e.expires <= later for e in meteoalarm._entries or []):
+        pytest.skip("a warning runs out meanwhile, so the feed is fetched")
 
-    await meteoalarm.get_warnings(46.88, 8.64, 450, "en", now + alerts.FEED_MIN_AGE)
+    await meteoalarm.get_warnings(46.88, 8.64, 450, "en", later)
 
     whole = await whole_cost(counting.session, alerts.FEED_URL)
     record("warnings", "a check", counting.requests, counting.transferred, whole)

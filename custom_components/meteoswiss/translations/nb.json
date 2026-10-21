@@ -20,10 +20,6 @@
             "title": "MeteoSwiss gir ikke lenger varsel for et sted",
             "description": "MeteoSwiss ser ikke lenger ut til å tilby varsel for {name}.\n\nFor å velge et annet sted, gå til Innstillinger → Enheter og tjenester → MeteoSwiss og velg «Rekonfigurer» i menyen til denne oppføringen.\n\nInntil da vises varselet som utilgjengelig."
         },
-        "ranges_ignored": {
-            "title": "MeteoSwiss-varselet er satt på pause",
-            "description": "MeteoSwiss sine servere kan for øyeblikket ikke sende bare den delen av varselet som gjelder stedet ditt. I stedet for å laste ned mye mer enn vanlig, settes varselet på pause og prøves på nytt hver time. Målinger og farevarsler fungerer fortsatt. Varer dette, se etter en oppdatering av integrasjonen. Dette varselet forsvinner av seg selv."
-        },
         "high_usage": {
             "title": "MeteoSwiss bruker mer data enn nødvendig",
             "description": "MeteoSwiss-integrasjonen lastet ned mye mer enn vanlig det siste døgnet ({usage} MB). Det betyr som regel at MeteoSwiss har endret hvordan varselet publiseres. Oppdater integrasjonen: en retting er sannsynligvis tilgjengelig. Dette varselet forsvinner av seg selv."
@@ -74,7 +70,7 @@
                 "description": "Postnummeret brukes til å lete opp 5-dagers værforslag. Navnet du skriver inn her, vil brukes for vær- (vær) enhetsnavn.",
                 "title": "Værforslag",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Bare radene for stedet ditt leses fra den: omtrent 0,5 MB hver tredje time, 4 MB per dag. Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 150 kB i timen."
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Bare radene for stedet ditt leses fra den: omtrent 0,4 MB i timen, 10 MB per dag. Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 150 kB i timen."
                 }
             },
             "mountain": {
@@ -88,7 +84,7 @@
                 },
                 "data_description": {
                     "forecast_name": "La stå tomt for å bruke navnet på stedet.",
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time og nullgradersgrensen bare i filer for hele Sveits (33 MB hver). Bare radene for dette stedet leses fra dem: omtrent 0,5 MB hver hver tredje time, 8 MB per dag for begge. Slå dette av for å spare det: varselet får da ingen temperatur per time, og det blir ingen sensor for nullgradersgrensen."
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time og nullgradersgrensen bare i filer for hele Sveits (33 MB hver). Bare radene for dette stedet leses fra dem: omtrent 0,4 MB hver i timen, 20 MB per dag for begge. Slå dette av for å spare det: varselet får da ingen temperatur per time, og det blir ingen sensor for nullgradersgrensen."
                 }
             },
             "user_three": {
@@ -123,13 +119,13 @@
                     "climate_normals": "Klimanormaler"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Bare radene for stedet ditt leses fra den: omtrent 0,5 MB hver tredje time, 4 MB per dag. Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 150 kB i timen.",
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Bare radene for stedet ditt leses fra den: omtrent 0,4 MB i timen, 10 MB per dag. Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 150 kB i timen.",
                     "foehn": "Sensorer for føhn: MeteoSwiss' målte føhnindeks ved værstasjonen, og et utsyn fra trykkforskjellen over Alpene, som stiger timer før føhnen bryter gjennom.",
                     "foehn_south_station": "Lufttrykket ved havnivå sammenlignes med stasjonen nord for Alpene. Lugano er det klassiske valget.",
                     "foehn_north_station": "Zürich/Kloten er det klassiske valget.",
                     "foehn_threshold": "Trykkforskjell fra der føhn er sannsynlig; omtrent 4 hPa når dalene i nord, som i Altdorf. Det samme omvendt for nordføhn.",
                     "foehn_strong_threshold": "Trykkforskjell fra der føhnen blåser kraftig; omtrent 8 hPa.",
-                    "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en fil for hele Sveits (33 MB), der bare radene for dette stedet leses: omtrent 0,5 MB hver tredje time, 4 MB per dag.",
+                    "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en fil for hele Sveits (33 MB), der bare radene for dette stedet leses: omtrent 0,4 MB i timen, 10 MB per dag.",
                     "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 1,4 MB) lastes ned når Home Assistant starter, og sjekkes deretter bare for endringer én gang i uken; årets dager hver sjette time."
                 }
             }

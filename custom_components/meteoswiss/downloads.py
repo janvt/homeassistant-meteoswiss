@@ -3,17 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import datetime
 import logging
 
 from custom_components.meteoswiss.ogd import MeteoSwissOGD, OGDError, Point
 
 _LOGGER = logging.getLogger(__name__)
-
-# Reading a point's rows takes a couple of hundred requests of the files of
-# about 33 MB each, so they are read at most this often rather than for every
-# (hourly) forecast run.
-REFRESH_INTERVAL = datetime.timedelta(hours=3)
 
 
 class SharedDownloads:
@@ -24,9 +18,8 @@ class SharedDownloads:
         self._lock = asyncio.Lock()
         # The point and parameters each entry needs, by entry ID.
         self._wanted: dict[str, tuple[Point, frozenset[str]]] = {}
-        # By parameter: the rows of each point downloaded, and when.
+        # By parameter: the rows of each point downloaded, and of which run.
         self._rows: dict[str, dict[tuple[int, int], dict[str, str]]] = {}
-        self._fetched: dict[str, datetime.datetime] = {}
         self._runs: dict[str, str] = {}
 
     def register(self, owner: str, point: Point, parameters: set[str]) -> None:
@@ -36,17 +29,16 @@ class SharedDownloads:
         self._wanted.pop(owner, None)
 
     async def get(
-        self, point: Point, parameter: str, run: str, now: datetime.datetime
+        self, point: Point, parameter: str, run: str
     ) -> dict[str, str] | None:
-        """The rows of a point, reading the file if they are old or missing.
+        """The rows of a point, reading the file of a new run or if missing.
 
         A failed read keeps the previous rows, if any.
         """
         async with self._lock:
             rows = self._rows.get(parameter, {})
-            fetched = self._fetched.get(parameter)
             try:
-                if fetched is None or now - fetched >= REFRESH_INTERVAL:
+                if self._runs.get(parameter) != run:
                     points = {
                         p.key: p
                         for p, parameters in self._wanted.values()
@@ -56,7 +48,6 @@ class SharedDownloads:
                     self._rows[parameter] = await self._client.get_hourly_rows(
                         list(points.values()), run, parameter
                     )
-                    self._fetched[parameter] = now
                     self._runs[parameter] = run
                     _LOGGER.debug(
                         "%s for run %s obtained for %d points",

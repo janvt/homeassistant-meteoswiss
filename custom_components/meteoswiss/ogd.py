@@ -172,8 +172,8 @@ class UnknownPostcodeError(UnknownPointError):
 class RangesIgnoredError(OGDError):
     """The server sends whole files when asked for part of them.
 
-    The forecast is then not read at all: it would mean downloading several
-    hundred megabytes an hour.
+    The files are then downloaded whole instead: several hundred megabytes an
+    hour, but the forecast keeps working.
     """
 
 
@@ -623,8 +623,14 @@ class MeteoSwissOGD:
                 response.raise_for_status()
                 if byte_range:
                     # Not read: it is the whole file.
-                    self.ranges_ignored = response.status != 206
-                    if self.ranges_ignored:
+                    ignored = response.status != 206
+                    if ignored and not self.ranges_ignored:
+                        _LOGGER.warning(
+                            "MeteoSwiss sends whole files when asked for part of "
+                            "them; downloading them whole until it no longer does"
+                        )
+                    self.ranges_ignored = ignored
+                    if ignored:
                         self._count(response, 0)
                         raise RangesIgnoredError(f"{url} was sent whole")
                 body = await response.read()
@@ -966,6 +972,13 @@ class MeteoSwissOGD:
 
     async def _point_values(self, url: str, point: Point) -> dict[str, str]:
         """Timestamp to value of one point in a forecast file."""
+        try:
+            return await self._searched_point_values(url, point)
+        except RangesIgnoredError:
+            self._note_whole_download()
+            return (await self._whole_file_rows(url, [point], None))[point.key]
+
+    async def _searched_point_values(self, url: str, point: Point) -> dict[str, str]:
         prefix = f"{point.point_id};{point.point_type};"
         parameter = _parameter(url)
         if parameter in self._by_time:
@@ -1523,16 +1536,22 @@ class MeteoSwissOGD:
                 lo = mid
             else:
                 hi = mid
-        end = min(hi + ROW_SPAN, total)
-        chunk, _ = await self._get(url, (lo, end - 1))
+        span = ROW_SPAN
+        while True:
+            end = min(hi + span, total)
+            chunk, _ = await self._get(url, (lo, end - 1))
+            lines = chunk.split(b"\n")
+            if lo > 0:
+                lines = lines[1:]  # starts mid-line
+            if end < total:
+                lines = lines[:-1]  # ends mid-line
+            keys = [order(*k) for line in lines if (k := _key(line))]
+            # Again, further, while the point's rows run to the end.
+            if end == total or not keys or keys[-1] != target:
+                break
+            span *= 2
         self._remember_offset(url, point, chunk, lo, prefix, total)
-        lines = chunk.split(b"\n")
-        if lo > 0:
-            lines = lines[1:]  # starts mid-line
-        if end < total:
-            lines = lines[:-1]  # ends mid-line
         rows = _rows_with_prefix(b"\n".join(lines).decode("latin-1"), prefix)
-        keys = [order(*k) for line in lines if (k := _key(line))]
         in_order = (
             bool(keys)
             and keys == sorted(keys)
@@ -1547,10 +1566,15 @@ class MeteoSwissOGD:
         """The rows of several points in a large file ordered by time.
 
         Such a file (about 33 MB) is read block by block, a couple of hundred
-        requests for each point, so it is fetched separately from (and less
-        often than) the rest of the forecast.
+        requests for each point, so it is fetched once for all entries rather
+        than with the rest of each entry's forecast.
         """
-        return await self._blocked_rows(self._run_url(run, parameter), points)
+        url = self._run_url(run, parameter)
+        try:
+            return await self._blocked_rows(url, points)
+        except RangesIgnoredError:
+            self._note_whole_download()
+            return await self._whole_file_rows(url, points, None)
 
     async def get_forecast(
         self,

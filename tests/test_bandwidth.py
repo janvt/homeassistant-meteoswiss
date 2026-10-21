@@ -285,7 +285,7 @@ class TestDailyFilesOrderedByTime:
 
 
 class TestServerThatIgnoresRanges:
-    async def test_the_reading_stops_at_the_first_whole_file(self):
+    async def test_the_files_are_downloaded_whole_instead(self):
         files = {
             url("p", RUNS[0]): by_place("p", 0),
             url("t", RUNS[0]): by_time("t", 0),
@@ -294,19 +294,24 @@ class TestServerThatIgnoresRanges:
         session.ignore_ranges = True
         client = MeteoSwissOGD(session, "tests")  # type: ignore[arg-type]
 
-        with pytest.raises(ogd.RangesIgnoredError):
-            await client._point_values(url("p", RUNS[0]), point(MIDDLE))
-        with pytest.raises(ogd.RangesIgnoredError):
-            await client.get_hourly_rows([point(MIDDLE)], RUNS[0], "t")
+        rows = await client._point_values(url("p", RUNS[0]), point(MIDDLE))
+        assert rows == expected(files[url("p", RUNS[0])], MIDDLE)
+        hourly = await client.get_hourly_rows([point(MIDDLE)], RUNS[0], "t")
+        assert hourly[MIDDLE] == expected(files[url("t", RUNS[0])], MIDDLE)
 
         assert client.ranges_ignored
-        # One request each, not read; and the size of the hourly file.
-        assert [m for m, _, _ in session.requests] == ["GET", "HEAD", "GET"]
+        assert client.whole_downloads == 2
+        # Each file once whole, after a range that was sent whole and not read.
+        assert session.count("GET", url("p", RUNS[0])) == 2
+        assert session.count("GET", url("t", RUNS[0])) == 2
+        assert client.downloaded < 1.1 * sum(len(f) for f in files.values())
 
         session.ignore_ranges = False
+        session.clear()
         rows = await client._point_values(url("p", RUNS[0]), point(MIDDLE))
         assert rows == expected(files[url("p", RUNS[0])], MIDDLE)
         assert not client.ranges_ignored
+        assert all(r is not None for _, _, r in session.requests)
 
 
 class TestFilesOrderedByPlace:
@@ -420,3 +425,15 @@ async def test_what_is_downloaded_is_counted_for_a_day(monkeypatch):
     assert client.downloaded == session.transferred(ogd.REQUEST_OVERHEAD)
     clock[0] += ogd.USAGE_PERIOD.total_seconds() + 1
     assert client.downloaded == 0
+
+
+async def test_rows_longer_than_expected_are_read_to_their_end(monkeypatch):
+    # As if MeteoSwiss forecast much further ahead.
+    monkeypatch.setattr(ogd, "ROW_SPAN", 1024)
+    files = {url("p", RUNS[0]): by_place("p", 0)}
+    client = MeteoSwissOGD(FakeSession(files), "tests")  # type: ignore[arg-type]
+
+    rows = await client._point_values(url("p", RUNS[0]), point(MIDDLE))
+
+    assert rows == expected(files[url("p", RUNS[0])], MIDDLE)
+    assert len(rows) == len(HOURS)

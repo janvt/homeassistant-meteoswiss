@@ -23,11 +23,10 @@ _LOGGER = logging.getLogger(__name__)
 FEED_URL = "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-switzerland"
 # The feed is up to about 800 kB (8 kB per warning), uncompressed, and the
 # server supports neither ETags nor ranges.  So, once for all entries, it is
-# fetched again only when a warning in it has run out (it may have been
-# extended), or it is this old; or, once it is at least FEED_MIN_AGE old, when
-# its size changed, which is checked at most every FEED_CHECK.  A change that
-# keeps the size exactly is missed until FEED_MAX_AGE.  At most every 30
-# minutes, as before checking the size, so it never costs more than that did.
+# fetched again when its size changed, which is checked every FEED_CHECK; when
+# a warning in it has run out (it may have been extended), or it is this old;
+# and, as a change to a warning may keep the size exactly, every FEED_MIN_AGE
+# while it lists warnings.
 FEED_MIN_AGE = datetime.timedelta(minutes=30)
 FEED_CHECK = datetime.timedelta(minutes=5)
 FEED_MAX_AGE = datetime.timedelta(hours=3)
@@ -250,9 +249,9 @@ class MeteoAlarm:
             self._fetched < e.expires <= now for e in self._entries
         ):
             return True
-        if age < FEED_MIN_AGE or (
-            self._checked is not None and abs(now - self._checked) < FEED_CHECK
-        ):
+        if age >= FEED_MIN_AGE and any(e.expires > now for e in self._entries):
+            return True
+        if self._checked is not None and abs(now - self._checked) < FEED_CHECK:
             return False
         self._checked = now
         size = await self._feed_size()

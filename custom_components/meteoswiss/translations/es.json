@@ -20,10 +20,6 @@
             "title": "MeteoSuiza ya no ofrece la previsión de un lugar",
             "description": "MeteoSuiza ya no parece ofrecer la previsión para {name}.\n\nPara elegir otro lugar, vaya a Ajustes → Dispositivos y servicios → MeteoSwiss y seleccione «Reconfigurar» en el menú de esta entrada.\n\nHasta entonces, su previsión aparecerá como no disponible."
         },
-        "ranges_ignored": {
-            "title": "Previsión de MeteoSuiza en pausa",
-            "description": "Los servidores de MeteoSuiza no pueden enviar ahora solo la parte de la previsión para su lugar. En lugar de descargar mucho más de lo habitual, la previsión se pausa y se vuelve a intentar cada hora. Las mediciones y los avisos meteorológicos siguen funcionando. Si esto dura, busque una actualización de la integración. Este aviso desaparece solo."
-        },
         "high_usage": {
             "title": "MeteoSuiza usa más datos de los necesarios",
             "description": "La integración de MeteoSuiza descargó mucho más de lo habitual en el último día ({usage} MB). Suele significar que MeteoSuiza ha cambiado la forma en que publica su previsión. Actualice la integración: probablemente ya hay una corrección. Este aviso desaparece solo."
@@ -74,7 +70,7 @@
                 "description": "El código postal se usa para obtener el pronóstico de los siguientos 5 días.  El nombre que usted suministre aquí se usará en el nombre de la entidad de pronóstico (clima).",
                 "title": "Pronóstico",
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza (33 MB). Solo se leen las filas de su lugar: unos 0,5 MB cada tres horas, 4 MB al día. La isoterma de cero grados es un ajuste aparte. Desactívelo para ahorrar también eso: la previsión por hora no tendrá temperaturas, y el resto de la previsión necesita unos 150 kB por hora."
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza (33 MB). Solo se leen las filas de su lugar: unos 0,4 MB por hora, 10 MB al día. La isoterma de cero grados es un ajuste aparte. Desactívelo para ahorrar también eso: la previsión por hora no tendrá temperaturas, y el resto de la previsión necesita unos 150 kB por hora."
                 }
             },
             "mountain": {
@@ -88,7 +84,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Déjelo vacío para usar el nombre del lugar.",
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora y la isoterma de cero grados en archivos para toda Suiza (33 MB cada uno). Solo se leen las filas de este lugar: unos 0,5 MB cada uno cada tres horas, 8 MB al día entre los dos. Desactívelo para ahorrarlo: la previsión no tendrá temperaturas por hora y no habrá sensor de la isoterma de cero grados."
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora y la isoterma de cero grados en archivos para toda Suiza (33 MB cada uno). Solo se leen las filas de este lugar: unos 0,4 MB cada uno por hora, 20 MB al día entre los dos. Desactívelo para ahorrarlo: la previsión no tendrá temperaturas por hora y no habrá sensor de la isoterma de cero grados."
                 }
             },
             "user_three": {
@@ -123,13 +119,13 @@
                     "climate_normals": "Normales climáticas"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza (33 MB). Solo se leen las filas de su lugar: unos 0,5 MB cada tres horas, 4 MB al día. La isoterma de cero grados es un ajuste aparte. Desactívelo para ahorrar también eso: la previsión por hora no tendrá temperaturas, y el resto de la previsión necesita unos 150 kB por hora.",
+                    "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza (33 MB). Solo se leen las filas de su lugar: unos 0,4 MB por hora, 10 MB al día. La isoterma de cero grados es un ajuste aparte. Desactívelo para ahorrar también eso: la previsión por hora no tendrá temperaturas, y el resto de la previsión necesita unos 150 kB por hora.",
                     "foehn": "Sensores para el foehn: el índice de foehn medido por MeteoSuiza en la estación meteorológica y una tendencia a partir de la diferencia de presión a través de los Alpes, que sube horas antes de que irrumpa el foehn.",
                     "foehn_south_station": "Su presión a nivel del mar se compara con la de la estación al norte de los Alpes. Lugano es la elección clásica.",
                     "foehn_north_station": "Zúrich/Kloten es la elección clásica.",
                     "foehn_threshold": "Diferencia de presión a partir de la cual el foehn es probable; unos 4 hPa llegan a los valles del norte, como en Altdorf. Igual en sentido contrario para el foehn del norte.",
                     "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa.",
-                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en un archivo para toda Suiza (33 MB), del que solo se leen las filas de este lugar: unos 0,5 MB cada tres horas, 4 MB al día.",
+                    "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en un archivo para toda Suiza (33 MB), del que solo se leen las filas de este lugar: unos 0,4 MB por hora, 10 MB al día.",
                     "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 1,4 MB) se descarga al iniciar Home Assistant y después solo se comprueba una vez por semana; los días de este año cada seis horas."
                 }
             }

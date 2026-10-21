@@ -20,10 +20,6 @@
             "title": "MeteoSwiss bietet für einen Ort keine Prognose mehr an",
             "description": "MeteoSwiss scheint für {name} keine Prognose mehr anzubieten.\n\nUm einen anderen Ort zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
         },
-        "ranges_ignored": {
-            "title": "MeteoSchweiz-Prognose pausiert",
-            "description": "Die Server von MeteoSchweiz können derzeit nicht nur den Teil der Prognose für deinen Ort senden. Statt viel mehr als üblich herunterzuladen, wird die Prognose pausiert und jede Stunde neu versucht. Messwerte und Unwetterwarnungen funktionieren weiter. Hält das an, such nach einem Update der Integration. Dieser Hinweis verschwindet von selbst."
-        },
         "high_usage": {
             "title": "MeteoSchweiz braucht mehr Daten als nötig",
             "description": "Die MeteoSchweiz-Integration hat am letzten Tag viel mehr als üblich heruntergeladen ({usage} MB). Meist hat MeteoSchweiz geändert, wie die Prognose veröffentlicht wird. Aktualisiere die Integration: Eine Korrektur ist wahrscheinlich verfügbar. Dieser Hinweis verschwindet von selbst."
@@ -74,7 +70,7 @@
                 "description": "Die Postleitzahl wird verwendet, um die 5-Tage-Prognose abzurufen. Der hier eingegebene Name wird für das Prognose-(Wetter)-Entity verwendet.",
                 "title": "Prognose",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 150 kB pro Stunde."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,4 MB pro Stunde, 10 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 150 kB pro Stunde."
                 }
             },
             "mountain": {
@@ -88,7 +84,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Leer lassen, um den Namen des Orts zu verwenden.",
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz (je 33 MB). Daraus werden nur die Zeilen dieses Orts gelesen: je etwa 0,5 MB alle drei Stunden, für beide 8 MB pro Tag. Ausschalten, um das zu sparen: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz (je 33 MB). Daraus werden nur die Zeilen dieses Orts gelesen: je etwa 0,4 MB pro Stunde, für beide 20 MB pro Tag. Ausschalten, um das zu sparen: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
                 }
             },
             "user_three": {
@@ -123,13 +119,13 @@
                     "climate_normals": "Klimanormwerte"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 150 kB pro Stunde.",
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,4 MB pro Stunde, 10 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 150 kB pro Stunde.",
                     "foehn": "Sensoren für Föhn: der von MeteoSchweiz an der Wetterstation gemessene Föhnindex und eine Aussicht aus der Druckdifferenz über die Alpen, die Stunden vor dem Föhndurchbruch steigt.",
                     "foehn_south_station": "Ihr Luftdruck auf Meereshöhe wird mit der Station nördlich der Alpen verglichen. Lugano ist die klassische Wahl.",
                     "foehn_north_station": "Zürich/Kloten ist die klassische Wahl.",
                     "foehn_threshold": "Druckdifferenz, ab der Föhn wahrscheinlich ist; etwa 4 hPa erreichen die nördlichen Täler wie in Altdorf. Für Nordföhn gleich, umgekehrt.",
                     "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
-                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), aus der nur die Zeilen dieses Orts gelesen werden: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag.",
+                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), aus der nur die Zeilen dieses Orts gelesen werden: etwa 0,4 MB pro Stunde, 10 MB pro Tag.",
                     "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden."
                 }
             }

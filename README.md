@@ -234,20 +234,17 @@ unavailable when the station has reported nothing for six hours.
 
 MeteoSwiss publishes its forecast as large files covering all of
 Switzerland.  The integration reads only the part for your place, so in
-normal use one entry with the default settings downloads **about 10 MB a
-day**, and each further place about 7 MB more.  Starting Home Assistant costs
-a few MB extra.
+normal use one entry with the default settings downloads **about 15 MB a
+day**, and each further place about 13 MB more.  Starting Home Assistant costs
+a few MB extra, and days with weather warnings anywhere in Switzerland up to
+about 40 MB more.
 
-If MeteoSwiss changes how it publishes its files, the integration may have to
-download them whole until it is updated: **at worst several hundred MB a
-day**.  It is checked against MeteoSwiss's files twice a day, so such changes
-are noticed and fixed quickly; and if it downloads far more than usual, a
-repair notice asks you to update it.
-
-On a metered connection, turn off *Hourly temperatures* under *Configure*:
-the hourly forecast then has no temperatures, and the snow and
-lowest-temperature sensors are unavailable, but most of the worst case goes
-away.
+If MeteoSwiss changes how it publishes its files, or your network does not
+let partial downloads through, the integration downloads the files whole
+rather than stop working: **at worst several GB a day**.  It is checked
+against MeteoSwiss's files twice a day, so changes on MeteoSwiss's side are
+noticed and fixed quickly; and if it downloads far more than usual, a repair
+notice asks you to update it.
 
 ## Data sources
 

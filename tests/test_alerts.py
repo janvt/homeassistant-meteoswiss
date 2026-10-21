@@ -177,51 +177,60 @@ class TestGetWarnings:
         warnings = await meteoalarm.get_warnings(46.88, 8.64, height, "en", NOW)
         assert bool(warnings) is warned
 
-    async def test_the_feed_is_fetched_again_only_when_its_size_changed(self):
-        files = {alerts.FEED_URL: feed(WIND), "https://cap.test/wind": details()}
+    async def test_without_warnings_the_feed_is_fetched_when_its_size_changed(self):
+        files = {alerts.FEED_URL: feed()}
         meteoalarm, session = client(files)
         minutes = datetime.timedelta(minutes=1)
-
-        # Not even its size for half an hour.
-        for later in (0, 10, 29):
-            await meteoalarm.get_warnings(*ALTDORF, "en", NOW + later * minutes)
-        assert [r[:2] for r in session.requests] == [
-            ("GET", alerts.FEED_URL),
-            ("GET", "https://cap.test/wind"),
-        ]
+        await meteoalarm.get_warnings(*ALTDORF, "en", NOW)
         session.clear()
 
-        # Then its size every 5 minutes, and the same means unchanged.
-        for later in (31, 33, 37, 41):
+        # Its size every 5 minutes, and the same means unchanged.
+        for later in (1, 5, 7, 11, 35, 41):
             await meteoalarm.get_warnings(*ALTDORF, "en", NOW + later * minutes)
-        assert [r[:2] for r in session.requests] == [
-            ("HEAD", alerts.FEED_URL),
-            ("HEAD", alerts.FEED_URL),
-        ]
+        assert [r[:2] for r in session.requests] == [("HEAD", alerts.FEED_URL)] * 4
         session.clear()
 
-        files[alerts.FEED_URL] = feed(WIND, entry("rain", URI, NOW, NOW + 9 * HOUR))
+        files[alerts.FEED_URL] = feed(entry("rain", URI, NOW, NOW + 9 * HOUR))
         files["https://cap.test/rain"] = details(kind="10; rain")
         warnings = await meteoalarm.get_warnings(*ALTDORF, "en", NOW + 47 * minutes)
         assert [r[:2] for r in session.requests] == [
             ("HEAD", alerts.FEED_URL),
             ("GET", alerts.FEED_URL),
-            # A warning's details only once.
             ("GET", "https://cap.test/rain"),
         ]
-        assert [w["type"] for w in warnings] == ["wind", "rain"]
+        assert [w["type"] for w in warnings] == ["rain"]
 
-    async def test_the_feed_is_fetched_at_most_every_half_hour(self):
+    async def test_with_warnings_the_feed_is_fetched_every_half_hour(self):
         files = {alerts.FEED_URL: feed(WIND), "https://cap.test/wind": details()}
         meteoalarm, session = client(files)
         minutes = datetime.timedelta(minutes=1)
+        await meteoalarm.get_warnings(*ALTDORF, "en", NOW)
+        # Extended, in a feed of the same size.
+        files[alerts.FEED_URL] = feed(
+            entry("wind", URI, NOW - 5 * HOUR, NOW + 11 * HOUR)
+        )
+        assert len(files[alerts.FEED_URL]) == len(feed(WIND))
+        session.clear()
 
-        # Even if it changes all the time.
-        for later in range(0, 24 * 60, 5):
-            files[alerts.FEED_URL] = feed(WIND, "<!--" + "x" * later + "-->")
+        for later in (10, 29):
+            await meteoalarm.get_warnings(*ALTDORF, "en", NOW + later * minutes)
+        assert session.count("GET") == 0
+        warnings = await meteoalarm.get_warnings(*ALTDORF, "en", NOW + 31 * minutes)
+
+        # A warning's details only once.
+        assert session.count("GET") == 1
+        assert [w["expires"] for w in warnings] == [NOW + 11 * HOUR]
+
+    async def test_the_feed_is_fetched_as_often_as_it_changes(self):
+        files = {alerts.FEED_URL: feed()}
+        meteoalarm, session = client(files)
+        minutes = datetime.timedelta(minutes=1)
+
+        for later in range(0, 60, 5):
+            files[alerts.FEED_URL] = feed("<!--" + "x" * later + "-->")
             await meteoalarm.get_warnings(*ALTDORF, "en", NOW + later * minutes)
 
-        assert session.count("GET", alerts.FEED_URL) <= 48
+        assert session.count("GET", alerts.FEED_URL) == 12
 
     async def test_the_feed_is_fetched_when_a_warning_runs_out(self):
         files = {

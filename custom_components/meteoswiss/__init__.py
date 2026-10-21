@@ -48,7 +48,6 @@ from custom_components.meteoswiss.const import (
 from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.issues import (
     HIGH_USAGE_ISSUE,
-    RANGES_IGNORED_ISSUE,
     USAGE_NOTICE_PER_ENTRY,
     async_delete_issues,
     freezing_level_setting,
@@ -405,9 +404,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             run = await self.client.latest_run(now)
             if self._forecast is None or self._forecast["run"] != run:
                 large = {
-                    parameter: await self.downloads.get(
-                        self._point, parameter, run, now
-                    )
+                    parameter: await self.downloads.get(self._point, parameter, run)
                     for parameter in self._large_parameters
                 }
                 self._forecast = await self.client.get_forecast(
@@ -430,29 +427,21 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         they should, which means MeteoSwiss changed something."""
         entries = len(self.hass.config_entries.async_loaded_entries(DOMAIN))
         downloaded = self.client.downloaded
-        high = downloaded > USAGE_NOTICE_PER_ENTRY * max(1, entries)
-        for issue_id, key, active, placeholders in (
-            (RANGES_IGNORED_ISSUE, "ranges_ignored", self.client.ranges_ignored, {}),
-            (
+        if downloaded > USAGE_NOTICE_PER_ENTRY * max(1, entries):
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
                 HIGH_USAGE_ISSUE,
-                "high_usage",
-                high,
-                {"usage": str(round(downloaded / 1024 / 1024))},
-            ),
-        ):
-            if active:
-                ir.async_create_issue(
-                    self.hass,
-                    DOMAIN,
-                    issue_id,
-                    is_fixable=False,
-                    is_persistent=False,
-                    severity=IssueSeverity.WARNING,
-                    translation_key=key,
-                    translation_placeholders=placeholders,
-                )
-            else:
-                ir.async_delete_issue(self.hass, DOMAIN, issue_id)
+                is_fixable=False,
+                is_persistent=False,
+                severity=IssueSeverity.WARNING,
+                translation_key="high_usage",
+                translation_placeholders={
+                    "usage": str(round(downloaded / 1024 / 1024))
+                },
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, HIGH_USAGE_ISSUE)
 
     @property
     def device_info(self) -> DeviceInfo:

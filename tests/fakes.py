@@ -281,10 +281,8 @@ class FakeOGD:
     large_downloads: dict[str, list[set[tuple[int, int]]]] = {}
     # When set, large downloads wait for it, like a slow connection.
     download_gate: asyncio.Event | None = None
-    # Like MeteoSwissOGD's: bytes downloaded lately, and whether the server
-    # ignores ranges.
+    # Like MeteoSwissOGD's: bytes downloaded lately.
     downloaded = 0
-    ranges_ignored = False
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
@@ -305,7 +303,6 @@ class FakeOGD:
         cls.download_gate = None
         cls.hours = 12
         cls.downloaded = 0
-        cls.ranges_ignored = False
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
