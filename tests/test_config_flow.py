@@ -640,6 +640,7 @@ async def test_foehn_options_have_sane_defaults(hass, entry):
         "hourly_temperature": True,
         "freezing_level": False,  # a postal code
         "climate_normals": True,
+        "radar": False,
         "foehn": True,
         "foehn_south_station": "LUG",
         "foehn_north_station": "KLO",

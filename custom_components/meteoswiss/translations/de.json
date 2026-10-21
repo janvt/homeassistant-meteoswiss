@@ -116,7 +116,8 @@
                     "foehn_threshold": "Föhn wahrscheinlich ab",
                     "foehn_strong_threshold": "Starker Föhn ab",
                     "freezing_level": "Nullgradgrenze",
-                    "climate_normals": "Klimanormwerte"
+                    "climate_normals": "Klimanormwerte",
+                    "radar": "Radar"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde.",
@@ -126,7 +127,8 @@
                     "foehn_threshold": "Druckdifferenz, ab der Föhn wahrscheinlich ist; etwa 4 hPa erreichen die nördlichen Täler wie in Altdorf. Für Nordföhn gleich, umgekehrt.",
                     "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
                     "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), aus der nur die Zeilen dieses Orts gelesen werden: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag.",
-                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden."
+                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden.",
+                    "radar": "Sensoren für Regen und Hagel jetzt an diesem Ort, vom Wetterradar von MeteoSchweiz, alle 5 Minuten: schneller und näher als die Niederschlagsstation, etwa um Fenster zu schliessen. Lädt 15 bis 35 MB pro Tag herunter, für alle Orte zusammen."
                 }
             }
         },
@@ -241,6 +243,15 @@
             },
             "record_high": {
                 "name": "Rekordhöchstwert für das Datum"
+            },
+            "radar_rain_rate": {
+                "name": "Radar Regenintensität"
+            },
+            "radar_hail_probability": {
+                "name": "Radar Hagelwahrscheinlichkeit"
+            },
+            "radar_hail_size": {
+                "name": "Radar Hagelkorngrösse"
             }
         }
     }

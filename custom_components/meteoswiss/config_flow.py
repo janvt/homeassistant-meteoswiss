@@ -39,12 +39,14 @@ from custom_components.meteoswiss.const import (
     CONF_POSTCODE,
     CONF_PRECIPITATION_NAME,
     CONF_PRECIPITATION_STATION,
+    CONF_RADAR,
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
     DEFAULT_CLIMATE_NORMALS,
     DEFAULT_HOURLY_TEMPERATURE,
+    DEFAULT_RADAR,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     FOEHN_DEFAULTS,
@@ -719,6 +721,7 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
             ),
             CONF_FREEZING_LEVEL: freezing_level_setting(entry.data, entry.options),
             CONF_CLIMATE_NORMALS: DEFAULT_CLIMATE_NORMALS,
+            CONF_RADAR: DEFAULT_RADAR,
             **FOEHN_DEFAULTS,
             **entry.options,
         }
@@ -760,6 +763,7 @@ class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
                     required(CONF_HOURLY_TEMPERATURE): bool,
                     required(CONF_FREEZING_LEVEL): bool,
                     required(CONF_CLIMATE_NORMALS): bool,
+                    required(CONF_RADAR): bool,
                     required(CONF_FOEHN): bool,
                     required(CONF_FOEHN_SOUTH): SelectSelector(
                         SelectSelectorConfig(

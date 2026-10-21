@@ -7,7 +7,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
 
-from .fakes import NOW, FakeMeteoAlarm, FakeOGD
+from .fakes import NOW, FakeMeteoAlarm, FakeOGD, FakeRadar
 
 
 @pytest.fixture(autouse=True)
@@ -20,10 +20,12 @@ def fake_ogd():
     """Replace the OGD client everywhere with one that never hits the network."""
     FakeOGD.reset()
     FakeMeteoAlarm.reset()
+    FakeRadar.reset()
     with (
         patch("custom_components.meteoswiss.MeteoSwissOGD", FakeOGD),
         patch("custom_components.meteoswiss.config_flow.MeteoSwissOGD", FakeOGD),
         patch("custom_components.meteoswiss.MeteoAlarm", FakeMeteoAlarm),
+        patch("custom_components.meteoswiss.Radar", FakeRadar),
     ):
         yield FakeOGD
 

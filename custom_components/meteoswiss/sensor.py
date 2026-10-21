@@ -20,6 +20,7 @@ from homeassistant.const import (
     UnitOfSpeed,
     UnitOfTemperature,
     UnitOfTime,
+    UnitOfVolumetricFlux,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -29,6 +30,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from custom_components.meteoswiss import (
     MeteoSwissConfigEntry,
     MeteoSwissDataUpdateCoordinator,
+    MeteoSwissRadarCoordinator,
     climate,
     foehn,
     summaries,
@@ -61,6 +63,11 @@ from custom_components.meteoswiss.ogd import (
     HourlyForecast,
     StationType,
     current_hour,
+)
+from custom_components.meteoswiss.radar import (
+    HAIL_PROBABILITY,
+    HAIL_SIZE,
+    RAIN_RATE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -230,6 +237,13 @@ async def async_setup_entry(
                 for kind in POLLEN_PARAMETERS
             ],
             True,
+        )
+    if c.radar is not None:
+        async_add_entities(
+            [
+                MeteoSwissRadarSensor(entry.entry_id, c, c.radar, d)
+                for d in RADAR_SENSORS
+            ]
         )
 
 
@@ -637,6 +651,74 @@ class MeteoSwissSummarySensor(
         return self.entity_description.value(
             forecast["hourly"], datetime.now(timezone.utc)
         )
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+
+RADAR_SENSORS = (
+    SensorEntityDescription(
+        key=RAIN_RATE,
+        translation_key="radar_rain_rate",
+        device_class=SensorDeviceClass.PRECIPITATION_INTENSITY,
+        native_unit_of_measurement=UnitOfVolumetricFlux.MILLIMETERS_PER_HOUR,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    SensorEntityDescription(
+        key=HAIL_PROBABILITY,
+        translation_key="radar_hail_probability",
+        icon="mdi:weather-hail",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+    ),
+    SensorEntityDescription(
+        key=HAIL_SIZE,
+        translation_key="radar_hail_size",
+        icon="mdi:weather-hail",
+        device_class=SensorDeviceClass.DISTANCE,
+        native_unit_of_measurement=UnitOfLength.MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+    ),
+)
+
+
+class MeteoSwissRadarSensor(
+    CoordinatorEntity[MeteoSwissRadarCoordinator], SensorEntity
+):
+    """Rain or hail now at the place, from the weather radar."""
+
+    _attr_has_entity_name = True
+    # A new time every 5 minutes, which the history need not keep.
+    _unrecorded_attributes = frozenset({"time"})
+
+    def __init__(
+        self,
+        integration_id: str,
+        coordinator: MeteoSwissDataUpdateCoordinator,
+        radar: MeteoSwissRadarCoordinator,
+        description: SensorEntityDescription,
+    ) -> None:
+        super().__init__(radar)
+        self.entity_description = description
+        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
+        self._attr_device_info = coordinator.device_info
+
+    def _reading(self) -> tuple[float | None, datetime] | None:
+        return (self.coordinator.data or {}).get(self.entity_description.key)
+
+    @property
+    def native_value(self) -> float | None:
+        reading = self._reading()
+        return reading[0] if reading else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, typing.Any]:
+        reading = self._reading()
+        return {"time": reading[1].isoformat()} if reading else {}
 
     @property
     def available(self) -> bool:

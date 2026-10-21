@@ -18,7 +18,13 @@ from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
 
-from .fakes import FOEHN_PRESSURES, NOW, STATION_MEASUREMENTS, make_warning
+from .fakes import (
+    FOEHN_PRESSURES,
+    NOW,
+    STATION_MEASUREMENTS,
+    FakeRadar,
+    make_warning,
+)
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
@@ -950,3 +956,42 @@ async def test_what_entries_share_lasts_until_the_last_is_unloaded(hass, entry):
     assert await hass.config_entries.async_unload(mountain.entry_id)
     for key in (DATA_CLIENT, DATA_DOWNLOADS, DATA_ALERTS):
         assert key not in hass.data
+
+
+RADAR_KEYS = ("rain_rate", "hail_probability", "hail_size")
+
+
+async def test_no_radar_unless_turned_on(hass, entry):
+    await setup(hass, entry)
+
+    for key in RADAR_KEYS:
+        assert not er.async_get(hass).async_get_entity_id(
+            "sensor", DOMAIN, f"sensor.{entry.entry_id}-{key}"
+        )
+    assert FakeRadar.calls == []
+
+
+async def test_radar_sensors(hass, entry, frozen_now):
+    hass.config_entries.async_update_entry(entry, options={"radar": True})
+    FakeRadar.readings = {
+        "rain_rate": (2.5, NOW),
+        "hail_probability": (0.0, NOW),
+        "hail_size": None,  # no recent image
+    }
+    await setup(hass, entry)
+
+    states = {
+        key: hass.states.get(
+            entity_id(hass, "sensor", f"sensor.{entry.entry_id}-{key}")
+        )
+        for key in RADAR_KEYS
+    }
+    assert states["rain_rate"].state == "2.5"
+    assert states["rain_rate"].attributes["unit_of_measurement"] == "mm/h"
+    assert states["hail_probability"].state == "0.0"
+    assert states["hail_size"].state == "unavailable"
+    # At the forecast's place, every minute.
+    assert FakeRadar.calls == [(47.3875, 8.521)]
+    FakeRadar.readings = {**FakeRadar.readings, "rain_rate": (0.0, NOW)}
+    await refresh_after(hass, frozen_now, 1)
+    assert hass.states.get(states["rain_rate"].entity_id).state == "0.0"

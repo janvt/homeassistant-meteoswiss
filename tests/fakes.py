@@ -431,3 +431,22 @@ class FakeMeteoAlarm:
         if self.error:
             raise self.error
         return [w for w in self.warnings if w["expires"] > now]
+
+
+class FakeRadar:
+    """Replacement for Radar with fixed readings."""
+
+    readings: dict = {}
+    calls: list = []
+
+    def __init__(self, session, user_agent) -> None:
+        pass
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.readings = {}
+        cls.calls = []
+
+    async def get(self, lat, lon, now):
+        FakeRadar.calls.append((lat, lon))
+        return dict(self.readings)
