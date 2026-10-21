@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.util.hass_dict import HassKey
 
 from custom_components.meteoswiss.alerts import AlertError, MeteoAlarm, WeatherWarning
 from custom_components.meteoswiss.const import (
@@ -80,9 +81,11 @@ UPDATE_TIMEOUT = 60
 # The client keeps a station's history for longer; this is how often to ask.
 CLIMATE_CHECK_INTERVAL = datetime.timedelta(hours=1)
 # Shared by all entries.
-DATA_CLIENT = f"{DOMAIN}_client"
-DATA_ALERTS = f"{DOMAIN}_alerts"
-DATA_DOWNLOADS = f"{DOMAIN}_downloads"
+DATA_CLIENT: HassKey[MeteoSwissOGD] = HassKey(f"{DOMAIN}_client")
+DATA_ALERTS: HassKey[MeteoAlarm] = HassKey(f"{DOMAIN}_alerts")
+DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}_downloads")
+
+type MeteoSwissConfigEntry = ConfigEntry[MeteoSwissDataUpdateCoordinator]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
@@ -102,9 +105,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    hass.data.setdefault(DOMAIN, {})
-
+async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -> bool:
     _LOGGER.debug("Current configuration: %s", entry.data)
     name = entry.data.get(
         CONF_FORECAST_NAME,
@@ -176,7 +177,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     await hass.config_entries.async_forward_entry_setups(
         entry,
@@ -196,7 +197,7 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(
         entry,
@@ -204,10 +205,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-        downloads: SharedDownloads = hass.data[DATA_DOWNLOADS]
-        downloads.unregister(entry.entry_id)
-        if not hass.data[DOMAIN]:
+        hass.data[DATA_DOWNLOADS].unregister(entry.entry_id)
+        others = [
+            e
+            for e in hass.config_entries.async_loaded_entries(DOMAIN)
+            if e.entry_id != entry.entry_id
+        ]
+        if not others:
+            # The last entry: what was downloaded for all of them can go.
             hass.data.pop(DATA_DOWNLOADS)
             hass.data.pop(DATA_CLIENT)
             hass.data.pop(DATA_ALERTS)

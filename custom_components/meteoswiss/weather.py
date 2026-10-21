@@ -20,7 +20,6 @@ from homeassistant.components.weather import (
     WeatherEntity,
     WeatherEntityFeature,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     STATE_UNAVAILABLE,
     UnitOfPressure,
@@ -33,6 +32,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.meteoswiss import (
     MeteoSwissClientResult,
+    MeteoSwissConfigEntry,
     MeteoSwissDataUpdateCoordinator,
 )
 from custom_components.meteoswiss.const import (
@@ -42,7 +42,6 @@ from custom_components.meteoswiss.const import (
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
-    DOMAIN,
     STATION_URL,
 )
 from custom_components.meteoswiss.ogd import HourlyForecast, current_hour
@@ -52,11 +51,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MeteoSwissConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up weather entity."""
-    c: MeteoSwissDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    c = entry.runtime_data
     async_add_entities([MeteoSwissWeather(entry.entry_id, c)], True)
 
 
