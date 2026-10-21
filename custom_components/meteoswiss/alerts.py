@@ -21,15 +21,9 @@ import aiohttp
 _LOGGER = logging.getLogger(__name__)
 
 FEED_URL = "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-switzerland"
-# The feed is up to about 800 kB (8 kB per warning), uncompressed, and the
-# server supports neither ETags nor ranges.  So, once for all entries, it is
-# fetched again when its size changed, which is checked every FEED_CHECK; when
-# a warning in it has run out (it may have been extended), or it is this old;
-# and, as a change to a warning may keep the size exactly, every FEED_MIN_AGE
-# while it lists warnings.
-FEED_MIN_AGE = datetime.timedelta(minutes=30)
-FEED_CHECK = datetime.timedelta(minutes=5)
-FEED_MAX_AGE = datetime.timedelta(hours=3)
+# The feed is about 800 kB and cannot be fetched conditionally, so it is
+# fetched at most this often, once for all entries.
+FEED_CACHE = datetime.timedelta(minutes=30)
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=60)
 
 ATOM = "{http://www.w3.org/2005/Atom}"
@@ -213,8 +207,6 @@ class MeteoAlarm:
         self._headers = {"User-Agent": user_agent}
         self._entries: list[_Entry] | None = None
         self._fetched: datetime.datetime | None = None
-        self._checked: datetime.datetime | None = None
-        self._size: int | None = None
         self._details: dict[str, _Details | None] = {}
         self._lock = asyncio.Lock()
 
@@ -228,43 +220,17 @@ class MeteoAlarm:
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise AlertError(f"Cannot fetch {url}: {exc}") from exc
 
-    async def _feed_size(self) -> int | None:
-        """The size of the feed, None if it cannot be had."""
-        try:
-            async with self._session.head(
-                FEED_URL, headers=self._headers, timeout=REQUEST_TIMEOUT
-            ) as response:
-                response.raise_for_status()
-                return int(response.headers["Content-Length"])
-        except (aiohttp.ClientError, asyncio.TimeoutError, KeyError, ValueError):
-            return None
-
-    async def _feed_changed(self, now: datetime.datetime) -> bool:
-        """Whether the feed must be fetched again."""
-        if self._entries is None or self._fetched is None:
-            return True
-        # abs(): the clock may have been set back.
-        age = abs(now - self._fetched)
-        if age >= FEED_MAX_AGE or any(
-            self._fetched < e.expires <= now for e in self._entries
-        ):
-            return True
-        if age >= FEED_MIN_AGE and any(e.expires > now for e in self._entries):
-            return True
-        if self._checked is not None and abs(now - self._checked) < FEED_CHECK:
-            return False
-        self._checked = now
-        size = await self._feed_size()
-        return size is None or size != self._size
-
     async def _current_entries(self, now: datetime.datetime) -> list[_Entry]:
         async with self._lock:
-            if await self._feed_changed(now):
+            # abs(): the clock may have been set back.
+            if (
+                self._entries is None
+                or self._fetched is None
+                or abs(now - self._fetched) >= FEED_CACHE
+            ):
                 try:
-                    body = await self._get(FEED_URL)
-                    self._entries = parse_feed(body)
-                    self._size = len(body)
-                    self._fetched = self._checked = now
+                    self._entries = parse_feed(await self._get(FEED_URL))
+                    self._fetched = now
                     # Details are only kept for the warnings still listed.
                     listed = {e.identifier for e in self._entries}
                     self._details = {

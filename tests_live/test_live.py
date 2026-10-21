@@ -1,6 +1,7 @@
 """The real servers: what reading them relies on, and what it costs.
 
-Each test reads the forecast as the integration does, compares the values
+Each test reads the forecast as the integration does with Save data on,
+compares the values
 with the whole files, and checks its cost against what downloading the whole
 files instead would cost (the fallback, and what versions before 2.0.0b9 did):
 for each case, the share in BUDGET, of the whole files' size as transferred.
@@ -12,8 +13,6 @@ its budget: see .github/workflows/live.yaml, which runs them twice a day.
 """
 
 from __future__ import annotations
-
-import datetime
 
 import pytest
 
@@ -79,13 +78,9 @@ async def test_the_servers_support_what_the_reading_relies_on(http, latest_run):
         station, headers={**headers, "If-None-Match": etag}
     ) as response:
         assert response.status in (304, 200)  # 200 if a new row came just now
-    # The size of the warnings feed is its length.
-    async with http.head(alerts.FEED_URL, headers=headers) as response:
-        size = int(response.headers["Content-Length"])
+    # The warnings feed.
     async with http.get(alerts.FEED_URL, headers=headers) as response:
-        feed = await response.read()
-    assert abs(len(feed) - size) < 50 * KB  # it may have changed in between
-    assert alerts.parse_feed(feed) is not None
+        assert alerts.parse_feed(await response.read()) is not None
 
 
 @pytest.mark.parametrize("parameter", ["tre200h0", "zprfr0hs"])
@@ -198,20 +193,3 @@ async def test_station_files_are_fetched_only_when_they_changed(
     )
     record("station ALT", "3 updates", counting.requests, counting.transferred, whole)
     assert 304 in statuses  # a new row comes only every 10 minutes
-
-
-async def test_warnings_are_checked_by_size(counting):
-    meteoalarm = alerts.MeteoAlarm(counting, USER_AGENT)  # type: ignore[arg-type]
-    now = datetime.datetime.now(datetime.timezone.utc)
-    await meteoalarm.get_warnings(46.88, 8.64, 450, "en", now)
-    counting.clear()
-    later = now + alerts.FEED_CHECK
-    if any(now < e.expires <= later for e in meteoalarm._entries or []):
-        pytest.skip("a warning runs out meanwhile, so the feed is fetched")
-
-    await meteoalarm.get_warnings(46.88, 8.64, 450, "en", later)
-
-    whole = await whole_cost(counting.session, alerts.FEED_URL)
-    record("warnings", "a check", counting.requests, counting.transferred, whole)
-    assert [e.method for e in counting.log][:1] == ["HEAD"]
-    assert counting.log[0].bytes < 2 * KB

@@ -70,7 +70,7 @@
                 "description": "Le code postal est utilisé pour consulter les prévisions météo à 5 jours. Le nom que vous entrez ici sera utilisé pour l'entité de prévision (météo).",
                 "title": "Prévisions",
                 "data_description": {
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Seules les lignes de votre lieu y sont lues : environ 0,4 Mo par heure, 10 Mo par jour. L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 150 ko par heure."
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Il est téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ». L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 150 ko par heure."
                 }
             },
             "mountain": {
@@ -84,7 +84,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Laisser vide pour utiliser le nom du lieu.",
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires et l'isotherme zéro degré que dans des fichiers pour toute la Suisse (33 Mo chacun). Seules les lignes de ce lieu y sont lues : environ 0,4 Mo chacun par heure, 20 Mo par jour pour les deux. Désactivez cette option pour économiser cela : la prévision n'a alors pas de températures horaires, et il n'y a pas de capteur d'isotherme zéro degré."
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires et l'isotherme zéro degré que dans des fichiers pour toute la Suisse (33 Mo chacun). Ils sont téléchargés toutes les trois heures : environ 520 Mo par jour pour les deux, ou environ 8 Mo avec « Économiser les données » sous « Configurer ». Désactivez cette option pour économiser cela : la prévision n'a alors pas de températures horaires, et il n'y a pas de capteur d'isotherme zéro degré."
                 }
             },
             "user_three": {
@@ -116,17 +116,19 @@
                     "foehn_threshold": "Fœhn probable à partir de",
                     "foehn_strong_threshold": "Fort fœhn à partir de",
                     "freezing_level": "Isotherme zéro degré",
-                    "climate_normals": "Normes climatiques"
+                    "climate_normals": "Normes climatiques",
+                    "save_data": "Économiser les données"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Seules les lignes de votre lieu y sont lues : environ 0,4 Mo par heure, 10 Mo par jour. L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 150 ko par heure.",
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Il est téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ». L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 150 ko par heure.",
                     "foehn": "Capteurs pour le fœhn : l'indice de fœhn mesuré par MeteoSuisse à la station météo, et une tendance tirée de la différence de pression à travers les Alpes, qui augmente des heures avant que le fœhn ne perce.",
                     "foehn_south_station": "Sa pression au niveau de la mer est comparée à celle de la station au nord des Alpes. Lugano est le choix classique.",
                     "foehn_north_station": "Zurich/Kloten est le choix classique.",
                     "foehn_threshold": "Différence de pression à partir de laquelle le fœhn est probable ; environ 4 hPa atteignent les vallées du nord, comme à Altdorf. De même dans l'autre sens pour le fœhn du nord.",
                     "foehn_strong_threshold": "Différence de pression à partir de laquelle le fœhn souffle fort ; environ 8 hPa.",
-                    "freezing_level": "Un capteur pour l'altitude prévue de l'isotherme zéro degré. MeteoSuisse la publie dans un fichier pour toute la Suisse (33 Mo), dont seules les lignes de ce lieu sont lues : environ 0,4 Mo par heure, 10 Mo par jour.",
-                    "climate_normals": "Capteurs comparant aujourd'hui et ce mois à la station météo avec ses normes 1991–2020, calculées à partir de la série de mesures de la station, et le record pour la date. La série (environ 1,4 Mo) est téléchargée au démarrage de Home Assistant, puis seulement vérifiée une fois par semaine ; les jours de cette année toutes les six heures."
+                    "freezing_level": "Un capteur pour l'altitude prévue de l'isotherme zéro degré. MeteoSuisse la publie dans un fichier pour toute la Suisse (33 Mo), téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ».",
+                    "climate_normals": "Capteurs comparant aujourd'hui et ce mois à la station météo avec ses normes 1991–2020, calculées à partir de la série de mesures de la station, et le record pour la date. La série (environ 1,4 Mo) est téléchargée au démarrage de Home Assistant, puis seulement vérifiée une fois par semaine ; les jours de cette année toutes les six heures.",
+                    "save_data": "Pour les connexions limitées. Ne lit que la partie des gros fichiers de MeteoSuisse qui concerne votre lieu au lieu de les télécharger en entier : 10 à 50 Mo par jour au lieu d'environ 300 Mo. Cela dépend de la façon dont MeteoSuisse organise ses fichiers ; s'ils changent, une mise à jour de l'intégration peut être nécessaire, et un avis de réparation vous le signale. S'applique à toutes les prévisions MeteoSuisse."
                 }
             }
         },

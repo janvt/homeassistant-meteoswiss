@@ -40,9 +40,11 @@ def value(point_id: int, ts: str) -> str:
     return f"{point_id}:{ts[-6:]}"
 
 
-def make_client(files: dict[str, bytes]) -> tuple[MeteoSwissOGD, FakeSession]:
+def make_client(
+    files: dict[str, bytes], save_data: bool = False
+) -> tuple[MeteoSwissOGD, FakeSession]:
     session = FakeSession(files)
-    return MeteoSwissOGD(session, "tests"), session  # type: ignore[arg-type]
+    return MeteoSwissOGD(session, "tests", save_data), session  # type: ignore[arg-type]
 
 
 def forecast_files() -> dict[str, bytes]:
@@ -775,7 +777,7 @@ class TestBlocks:
     @pytest.mark.parametrize("target", [POINTS[0], POINTS[200], POINTS[-1]])
     async def test_the_rows_match_the_whole_file(self, target):
         files = self.files([RUN])
-        client, session = make_client(files)
+        client, session = make_client(files, save_data=True)
         point = Point(*target, "x", "", 0, 0)
 
         rows = await client.get_hourly_rows([point], RUN, "tre200h0")
@@ -791,7 +793,7 @@ class TestBlocks:
     async def test_the_next_run_needs_a_small_range_per_block(self):
         runs = ["202610201100", RUN]
         files = self.files(runs)
-        client, session = make_client(files)
+        client, session = make_client(files, save_data=True)
         point = Point(*self.POINTS[300], "x", "", 0, 0)
         await client.get_hourly_rows([point], runs[0], "tre200h0")
         session.requests.clear()
@@ -809,7 +811,7 @@ class TestBlocks:
     async def test_a_new_day_reads_the_layout_again(self):
         tomorrow = "202610210000"
         files = self.files(["202610202300", tomorrow])
-        client, session = make_client(files)
+        client, session = make_client(files, save_data=True)
         point = Point(*self.POINTS[5], "x", "", 0, 0)
         await client.get_hourly_rows([point], "202610202300", "tre200h0")
         session.requests.clear()
@@ -823,7 +825,7 @@ class TestBlocks:
 
     async def test_several_points_and_one_not_in_the_file(self):
         files = self.files([RUN])
-        client, _ = make_client(files)
+        client, _ = make_client(files, save_data=True)
         points = [Point(*k, "x", "", 0, 0) for k in (self.POINTS[3], self.POINTS[-3])]
 
         rows = await client.get_hourly_rows(
@@ -844,7 +846,7 @@ class TestBlocks:
         start = 1 + 100 * per_block
         lines[start : start + per_block] = reversed(lines[start : start + per_block])
         files[url("tre200h0")] = body = "\n".join(lines).encode()
-        client, session = make_client(files)
+        client, session = make_client(files, save_data=True)
         point = Point(*self.POINTS[10], "x", "", 0, 0)
 
         rows = await client.get_hourly_rows([point], RUN, "tre200h0")

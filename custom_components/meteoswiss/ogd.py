@@ -550,9 +550,12 @@ def _utc(timestamp: str) -> datetime.datetime:
 class MeteoSwissOGD:
     """Fetches forecasts and measurements from MeteoSwiss open data."""
 
-    def __init__(self, session: aiohttp.ClientSession, user_agent: str) -> None:
+    def __init__(
+        self, session: aiohttp.ClientSession, user_agent: str, save_data: bool = False
+    ) -> None:
         self._session = session
         self._headers = {"User-Agent": user_agent}
+        self._save_data = save_data
         self._points: list[Point] | None = None
         self._stations: dict[StationType, list[Station]] = {}
         # The index in POINT_ORDERS that worked last, by parameter.
@@ -982,7 +985,7 @@ class MeteoSwissOGD:
         prefix = f"{point.point_id};{point.point_type};"
         parameter = _parameter(url)
         if parameter in self._by_time:
-            return (await self._blocked_rows(url, [point]))[point.key]
+            return (await self._time_ordered_rows(url, [point]))[point.key]
         if (hint := self._offsets.get((parameter, point.key))) is not None:
             rows = await self._hinted_point_values(url, point, prefix, *hint)
             if rows:
@@ -995,7 +998,7 @@ class MeteoSwissOGD:
             if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
                 return await self._ordered_point_values(url, total, point, prefix)
             self._by_time.add(parameter)
-            return (await self._blocked_rows(url, [point]))[point.key]
+            return (await self._time_ordered_rows(url, [point]))[point.key]
         return _rows_with_prefix(head.decode("latin-1"), prefix)
 
     def _note_size(self, url: str, total: int) -> None:
@@ -1171,6 +1174,19 @@ class MeteoSwissOGD:
         raw = getattr(response.content, "total_raw_bytes", None)
         size = raw if isinstance(raw, int) else body
         self._received.append((time.monotonic(), REQUEST_OVERHEAD + size))
+
+    @property
+    def save_data(self) -> bool:
+        """Whether files ordered by time are read block by block, rather than
+        downloaded whole (see _time_ordered_rows)."""
+        return self._save_data
+
+    @save_data.setter
+    def save_data(self, value: bool) -> None:
+        if value and not self._save_data:
+            # What was downloaded whole before is not counted against it.
+            self._received.clear()
+        self._save_data = value
 
     @property
     def downloaded(self) -> int:
@@ -1565,16 +1581,29 @@ class MeteoSwissOGD:
     ) -> dict[tuple[int, int], dict[str, str]]:
         """The rows of several points in a large file ordered by time.
 
-        Such a file (about 33 MB) is read block by block, a couple of hundred
-        requests for each point, so it is fetched once for all entries rather
-        than with the rest of each entry's forecast.
+        Such a file (about 33 MB) is downloaded whole, or with save_data read
+        block by block, so it is fetched once for all entries, and less often
+        than the rest of the forecast.
         """
         url = self._run_url(run, parameter)
         try:
-            return await self._blocked_rows(url, points)
+            return await self._time_ordered_rows(url, points)
         except RangesIgnoredError:
             self._note_whole_download()
             return await self._whole_file_rows(url, points, None)
+
+    async def _time_ordered_rows(
+        self, url: str, points: list[Point]
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        """The rows of points in a file ordered by time.
+
+        Downloaded whole, which is simple and always works; with save_data,
+        read block by block, which costs a few percent of that but relies on
+        how MeteoSwiss lays the files out.
+        """
+        if self.save_data:
+            return await self._blocked_rows(url, points)
+        return await self._whole_file_rows(url, points, self._known_size(url))
 
     async def get_forecast(
         self,

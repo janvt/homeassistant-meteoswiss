@@ -261,19 +261,26 @@ async def test_unload(hass, entry):
     assert hass.states.get(weather_id(hass, entry)).state == "unavailable"
 
 
-async def test_hourly_temperatures_are_refreshed_with_every_run(
+async def test_hourly_temperatures_are_refreshed_every_three_hours(
     hass, entry, fake_ogd, frozen_now
 ):
     await setup(hass, entry)
     coordinator = entry.runtime_data
     assert fake_ogd.temperature_calls == 1
 
-    for calls, hour in enumerate((13, 14), start=2):
+    # Every new run refreshes the rest of the forecast but reuses temperatures...
+    for hour in (13, 14):
         fake_ogd.run = f"20261020{hour}00"
         await refresh_after(hass, frozen_now, 60)
         assert coordinator.data["forecast"]["run"] == fake_ogd.run
-        assert coordinator.data["forecast"]["temperature_run"] == fake_ogd.run
-        assert fake_ogd.temperature_calls == calls
+        assert coordinator.data["forecast"]["temperature_run"] == "202610201200"
+    assert fake_ogd.temperature_calls == 1
+
+    # ...until they are three hours old.
+    fake_ogd.run = "202610201500"
+    await refresh_after(hass, frozen_now, 60)
+    assert fake_ogd.temperature_calls == 2
+    assert coordinator.data["forecast"]["temperature_run"] == "202610201500"
 
 
 async def test_forecast_works_without_hourly_temperatures(hass, entry, fake_ogd):
@@ -908,10 +915,22 @@ async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_
     assert fake_ogd.climate_calls == 2
 
 
-async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(
+async def test_no_notice_about_downloads_without_save_data(
     hass, entry, fake_ogd, frozen_now
 ):
     await setup(hass, entry)
+    assert not fake_ogd.instances[-1].save_data
+    fake_ogd.downloaded = 300 * 1024 * 1024
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == set()
+
+
+async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(
+    hass, entry, fake_ogd, frozen_now
+):
+    hass.config_entries.async_update_entry(entry, options={"save_data": True})
+    await setup(hass, entry)
+    assert fake_ogd.instances[-1].save_data
     # A busy day is fine.
     fake_ogd.downloaded = 30 * 1024 * 1024
     fake_ogd.run = "202610201300"

@@ -118,7 +118,8 @@ e.g. *Altdorf Temperature*.  Add the integration once more for each further plac
 * **Reconfigure** (in the entry's menu) changes the postal code or place and the
   stations; entities and their history are kept.
 * **Configure** (the cog) turns hourly temperatures, the freezing level, climate
-  normals and Föhn on or off, and sets the Föhn stations and thresholds.
+  normals, Föhn and Save data on or off, and sets the Föhn stations and
+  thresholds.
 
   <img src="docs/options.png" alt="Options" width="460">
 
@@ -233,18 +234,18 @@ unavailable when the station has reported nothing for six hours.
 ## Download volumes
 
 MeteoSwiss publishes its forecast as large files covering all of
-Switzerland.  The integration reads only the part for your place, so in
-normal use one entry with the default settings downloads **about 15 MB a
-day**, and each further place about 13 MB more.  Starting Home Assistant costs
-a few MB extra, and days with weather warnings anywhere in Switzerland up to
-about 40 MB more.
+Switzerland.  With the default settings the integration downloads **about
+300 MB a day**, most of it the hourly temperatures, a 33 MB file downloaded
+every three hours.  Further places add a few MB each, as they share the large
+files.
 
-If MeteoSwiss changes how it publishes its files, or your network does not
-let partial downloads through, the integration downloads the files whole
-rather than stop working: **at worst several GB a day**.  It is checked
-against MeteoSwiss's files twice a day, so changes on MeteoSwiss's side are
-noticed and fixed quickly; and if it downloads far more than usual, a repair
-notice asks you to update it.
+On a metered connection, turn on **Save data** under *Configure*.  The
+integration then reads only the part of the large files for your place:
+**10 to 50 MB a day**, depending on how many weather warnings there are.  This
+relies on how MeteoSwiss lays out its files.  If that changes, it downloads
+the files whole rather than stop working, and a repair notice asks you to
+update the integration.  It is checked against MeteoSwiss's files twice a day,
+so such changes are noticed and fixed quickly.
 
 ## Data sources
 
