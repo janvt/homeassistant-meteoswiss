@@ -67,6 +67,7 @@ from custom_components.meteoswiss.ogd import (
     Point,
     StationType,
     UnknownPointError,
+    distance_km,
 )
 from custom_components.meteoswiss.radar import Radar
 
@@ -89,6 +90,9 @@ DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}_downloads")
 DATA_RADAR: HassKey[Radar] = HassKey(f"{DOMAIN}_radar")
 # Radar images come every 5 minutes, a minute or so after their interval.
 RADAR_UPDATE_INTERVAL = datetime.timedelta(minutes=1)
+# A place this close to the home is taken to be the home's: the radar is then
+# read at the home, rather than at the postal code's centre a few km away.
+RADAR_HOME_DISTANCE_KM = 10
 
 type MeteoSwissConfigEntry = ConfigEntry[MeteoSwissDataUpdateCoordinator]
 
@@ -184,7 +188,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         if DATA_RADAR not in hass.data:
             hass.data[DATA_RADAR] = Radar(async_get_clientsession(hass), USER_AGENT)
         coordinator.radar = MeteoSwissRadarCoordinator(
-            hass, entry, hass.data[DATA_RADAR], point
+            hass, entry, hass.data[DATA_RADAR], point.name, radar_location(hass, point)
         )
         # Not first_refresh: the rest of the entry works without the radar.
         await coordinator.radar.async_refresh()
@@ -766,18 +770,37 @@ class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
     """The radar's readings at an entry's place, apart from its other data."""
 
     def __init__(
-        self, hass: HomeAssistant, entry: ConfigEntry, radar: Radar, point: Point
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        radar: Radar,
+        name: str,
+        location: tuple[float, float],
     ) -> None:
         super().__init__(
             hass,
             _LOGGER,
             config_entry=entry,
-            name=f"MeteoSwiss radar {point.name}",
+            name=f"MeteoSwiss radar {name}",
             update_interval=RADAR_UPDATE_INTERVAL,
         )
         self._radar = radar
-        self._point = point
+        self.location = location
 
     async def _async_update_data(self) -> RadarReadings:
         now = datetime.datetime.now(datetime.timezone.utc)
-        return await self._radar.get(self._point.lat, self._point.lon, now)
+        return await self._radar.get(*self.location, now)
+
+
+def radar_location(hass: HomeAssistant, point: Point) -> tuple[float, float]:
+    """Where the radar is read for a place: at the home if it is near.
+
+    Not for mountains, whose place is their summit.
+    """
+    home = (hass.config.latitude, hass.config.longitude)
+    if (
+        point.point_type != POINT_TYPE_POI
+        and distance_km(point.lat, point.lon, *home) <= RADAR_HOME_DISTANCE_KM
+    ):
+        return home
+    return point.lat, point.lon

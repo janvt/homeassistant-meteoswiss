@@ -234,7 +234,9 @@ unavailable when the station has reported nothing for six hours.
 ### Radar
 
 Turn on *Radar* under *Configure* for three sensors from MeteoSwiss's weather
-radar, at the place's 1 km square, every 5 minutes:
+radar, every 5 minutes, at the 1 km square of your Home Assistant home if the
+place is within 10 km of it, and otherwise of the place (for a mountain, its
+summit):
 
 * *Radar rain rate*, in mm/h.
 * *Radar hail probability*, in %.

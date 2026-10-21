@@ -995,3 +995,22 @@ async def test_radar_sensors(hass, entry, frozen_now):
     FakeRadar.readings = {**FakeRadar.readings, "rain_rate": (0.0, NOW)}
     await refresh_after(hass, frozen_now, 1)
     assert hass.states.get(states["rain_rate"].entity_id).state == "0.0"
+
+
+async def test_the_radar_is_read_at_home_near_it(hass, entry):
+    # Home in Zürich, 2 km from the postal code's centre.
+    await hass.config.async_update(latitude=47.37, longitude=8.54)
+    hass.config_entries.async_update_entry(entry, options={"radar": True})
+
+    await setup(hass, entry)
+
+    assert FakeRadar.calls == [(47.37, 8.54)]
+
+
+async def test_a_mountain_s_radar_is_read_at_its_summit(hass):
+    await hass.config.async_update(latitude=46.76, longitude=8.72)
+    entry = MockConfigEntry(domain=DOMAIN, data=MOUNTAIN, options={"radar": True})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    assert entry.runtime_data.radar.location == (46.7526, 8.7062)
