@@ -13,6 +13,7 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
+from custom_components.meteoswiss import DATA_ALERTS, DATA_CLIENT, DATA_DOWNLOADS
 from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
@@ -163,7 +164,7 @@ async def test_unrecognised_symbol_is_unavailable(hass, entry, frozen_now):
     await setup(hass, entry)
     frozen_now.move_to("2026-10-20T19:30:00+00:00")
 
-    await hass.data[DOMAIN][entry.entry_id].async_refresh()
+    await entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
 
     assert hass.states.get(weather_id(hass, entry)).state == "unavailable"
@@ -186,7 +187,7 @@ async def test_forecast_is_fetched_once_per_run(hass, entry, fake_ogd, frozen_no
     fake_ogd.run = "202610201300"
     await refresh_after(hass, frozen_now, 15)
     assert fake_ogd.forecast_calls == 2
-    assert hass.data[DOMAIN][entry.entry_id].data["forecast"]["run"] == "202610201300"
+    assert entry.runtime_data.data["forecast"]["run"] == "202610201300"
 
 
 async def test_previous_forecast_is_kept_when_a_check_fails(
@@ -197,7 +198,7 @@ async def test_previous_forecast_is_kept_when_a_check_fails(
 
     await refresh_after(hass, frozen_now, 16)
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.last_update_success
     assert coordinator.data["forecast"]["run"] == "202610201200"
     assert hass.states.get(weather_id(hass, entry)).state == "sunny"
@@ -247,7 +248,7 @@ async def test_entry_without_stations_only_has_the_forecast(hass, entry_data):
 
 async def test_the_coordinator_belongs_to_the_entry(hass, entry):
     await setup(hass, entry)
-    assert hass.data[DOMAIN][entry.entry_id].config_entry is entry
+    assert entry.runtime_data.config_entry is entry
 
 
 async def test_unload(hass, entry):
@@ -264,7 +265,7 @@ async def test_hourly_temperatures_are_refreshed_every_three_hours(
     hass, entry, fake_ogd, frozen_now
 ):
     await setup(hass, entry)
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert fake_ogd.temperature_calls == 1
 
     # Every new run refreshes the rest of the forecast but reuses temperatures...
@@ -309,7 +310,7 @@ async def test_failed_temperature_refresh_keeps_the_previous_ones(
     fake_ogd.run = "202610201600"
     await refresh_after(hass, frozen_now, 4 * 60)
 
-    forecast = hass.data[DOMAIN][entry.entry_id].data["forecast"]
+    forecast = entry.runtime_data.data["forecast"]
     assert forecast["run"] == "202610201600"
     assert forecast["temperature_run"] == "202610201200"
 
@@ -472,8 +473,8 @@ async def test_entries_share_the_large_downloads(hass, entry, fake_ogd, frozen_n
     await setup(hass, entry)
     await add_mountain(hass)
     zurich, bristen = (800500, 2), (864, 3)
-    # Each entry fetched when it was set up, as the other did not know about it.
-    assert fake_ogd.large_downloads["tre200h0"] == [{zurich}, {zurich, bristen}]
+    # Each entry fetched its point when it was set up.
+    assert fake_ogd.large_downloads["tre200h0"] == [{zurich}, {bristen}]
 
     # After that, one download serves both.
     fake_ogd.run = "202610201600"
@@ -705,7 +706,7 @@ async def test_stations_update_during_a_slow_download(
 ):
     await setup(hass, entry)
     temperature = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-temperature")
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
     # Four hours later there is a new run, and its temperatures download slowly.
     fake_ogd.download_gate = asyncio.Event()
@@ -739,7 +740,7 @@ async def test_a_failed_background_refresh_keeps_the_forecast(
     fake_ogd.run = "202610201600"
     await refresh_after(hass, frozen_now, 20)
 
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.last_update_success
     assert coordinator.data["forecast"]["run"] == "202610201200"
     # The next due refresh tries again.
@@ -849,7 +850,8 @@ async def test_a_postal_code_shares_the_mountains_freezing_level(
     fake_ogd.run = "202610201600"
     await refresh_after(hass, frozen_now, 4 * 60)
 
-    # One download for both, after each fetched once when set up.
+    # One read for both, after each read its point when set up.
+    assert fake_ogd.large_downloads["zprfr0hs"][:2] == [{(800500, 2)}, {(864, 3)}]
     assert fake_ogd.large_downloads["zprfr0hs"][2:] == [{(800500, 2), (864, 3)}]
 
 
@@ -911,3 +913,40 @@ async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_
 
     await refresh_after(hass, frozen_now, 35)
     assert fake_ogd.climate_calls == 2
+
+
+async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(
+    hass, entry, fake_ogd, frozen_now
+):
+    await setup(hass, entry)
+    # A busy day is fine.
+    fake_ogd.downloaded = 30 * 1024 * 1024
+    fake_ogd.run = "202610201300"
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == set()
+
+    fake_ogd.downloaded = 300 * 1024 * 1024
+    fake_ogd.run = "202610201400"
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == {"high_usage_meteoswiss"}
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "high_usage_meteoswiss")
+    assert issue.translation_placeholders == {"usage": "300"}
+
+    fake_ogd.downloaded = 0
+    fake_ogd.run = "202610201500"
+    await refresh_after(hass, frozen_now, 60)
+    assert issues(hass) == set()
+
+
+async def test_what_entries_share_lasts_until_the_last_is_unloaded(hass, entry):
+    await setup(hass, entry)
+    mountain = await add_mountain(hass)
+    client = hass.data[DATA_CLIENT]
+    assert entry.runtime_data.client is mountain.runtime_data.client is client
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert hass.data[DATA_CLIENT] is client
+
+    assert await hass.config_entries.async_unload(mountain.entry_id)
+    for key in (DATA_CLIENT, DATA_DOWNLOADS, DATA_ALERTS):
+        assert key not in hass.data

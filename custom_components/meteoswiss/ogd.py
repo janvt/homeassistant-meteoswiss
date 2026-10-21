@@ -9,6 +9,7 @@ Source: MeteoSwiss.
 from __future__ import annotations
 
 import asyncio
+import collections
 import csv
 import datetime
 import io
@@ -51,13 +52,38 @@ PROBE_BYTES = 512
 SEARCH_WINDOW = 4096
 # The rows of one point (9 days, hourly) fit comfortably in this many bytes.
 ROW_SPAN = 16384
-# A point is first looked for where it was in the previous run's file, which
-# is laid out almost the same: this far before and after that position.
-HINT_BEFORE = 4096
-HINT_AFTER = 16384
-# Files ordered by time up to this size are downloaded whole, compressed, once
-# for all entries; larger ones are streamed (see get_hourly_rows).
+# Files ordered by time hold a block of rows per timestep (217 hours or 9
+# days), with the points in the same order in each block.  A point's row is
+# read from each block with a small range request where it is expected, from
+# its position in the previous file or in the blocks before.  The first read
+# of the day takes the first block whole, to learn the order of the points.
+BLOCK_HEAD = 192 * 1024
+# Bytes either side of where a row is expected, at first; then adapted to how
+# far off the guesses were in the previous file.  Each request costs about
+# 650 bytes of headers, and a row that is missed is found with one more, so
+# the margin covers only most of the guesses (this share of them).
+BLOCK_MARGIN = 512
+BLOCK_MARGIN_RANGE = (256, 8192)
+BLOCK_MARGIN_SHARE = 0.75
+BLOCK_ROW = 64  # longer than any row
+# A row not found in a few reads, each closer, is given up on.
+BLOCK_TRIES = 4
+BLOCK_LIMIT = 1000  # more blocks than any file has
+# Files ordered by time that cannot be read by block are downloaded whole:
+# compressed if up to this size, otherwise streamed (see get_hourly_rows).
 SMALL_FILE = 8 * 1024 * 1024
+# Searching a file stops, and it is downloaded whole, as soon as the search has
+# cost as much as that would; and it does not start if it is expected to.
+# Each request costs about this many bytes of headers, and whole files up to
+# SMALL_FILE are sent compressed, to about this share of their size.
+REQUEST_OVERHEAD = 650
+COMPRESSED_SHARE = 0.17
+# A cold start costs the head and then walking the blocks: about this much
+# more than the head alone, at most.
+COLD_START_SHARE = 1.25
+# What was downloaded is counted over this long, for the repair notice when
+# it is far more than usual.
+USAGE_PERIOD = datetime.timedelta(hours=24)
 # Station measurements and the latest run are shared by entries this long.
 STATION_CACHE_SECONDS = 60
 RUN_CACHE = datetime.timedelta(minutes=5)
@@ -131,6 +157,14 @@ class UnknownPointError(OGDError):
 
 class UnknownPostcodeError(UnknownPointError):
     """MeteoSwiss has no forecast for a postal code."""
+
+
+class RangesIgnoredError(OGDError):
+    """The server sends whole files when asked for part of them.
+
+    The files are then downloaded whole instead: several hundred megabytes an
+    hour, but the forecast keeps working.
+    """
 
 
 class StationType(str, Enum):
@@ -262,6 +296,157 @@ POINT_ORDERS = (
 )
 
 
+def _row(line: bytes) -> tuple[tuple[int, int], str, str] | None:
+    """The point, timestamp and value of a CSV row, None for a header or junk."""
+    parts = line.decode("latin-1").split(";", 3)
+    try:
+        return (int(parts[0]), int(parts[1])), parts[2], parts[3]
+    except (ValueError, IndexError):
+        return None
+
+
+def _whole_rows(
+    chunk: bytes, start: int, total: int
+) -> list[tuple[int, tuple[int, int], str, str]]:
+    """The complete rows of a chunk read from start: position, point, time, value."""
+    parts = chunk.split(b"\n")
+    rows = []
+    position = start
+    for i, line in enumerate(parts):
+        # The first line may have begun before the chunk, the last may go on.
+        whole = (i > 0 or start == 0) and (
+            i < len(parts) - 1 or start + len(chunk) >= total
+        )
+        if whole and (row := _row(line)):
+            rows.append((position, *row))
+        position += len(line) + 1
+    return rows
+
+
+@dataclass
+class _Blocks:
+    """The layout of a file ordered by time: a block of rows per timestep."""
+
+    date: str  # the day of the runs it was read for, e.g. 20261020
+    order: dict[tuple[int, int], int]  # the place of each point in a block
+    first: datetime.datetime  # the time of the first block
+    step: datetime.timedelta
+    start: int  # where the first block starts
+    length: int  # bytes of the first block
+    margin: int = BLOCK_MARGIN
+    # What following a point through the blocks cost the last time, in bytes.
+    cost: int | None = None
+
+    def time(self, block: int) -> str:
+        return (self.first + block * self.step).strftime("%Y%m%d%H%M")
+
+    def blocks_between(self, earlier: str, later: str) -> int | None:
+        ahead = (_utc(later) - _utc(earlier)) / self.step
+        return int(ahead) if ahead == int(ahead) else None
+
+
+class _Lost(Exception):
+    """A point's row could not be found in a block."""
+
+
+class _OverBudget(_Lost):
+    """Searching has cost as much as downloading the whole file."""
+
+
+def _whole_cost(size: int) -> int:
+    """About how many bytes downloading a whole file costs."""
+    return size if size > SMALL_FILE else int(size * COMPRESSED_SHARE)
+
+
+class _Budget:
+    """The bytes a search may cost before the whole file is the cheaper way."""
+
+    def __init__(self, size: int | None) -> None:
+        self.limit = None if size is None else _whole_cost(size)
+        self.spent = 0
+
+    def spend(self, received: int, size: int) -> None:
+        if self.limit is None:
+            self.limit = _whole_cost(size)
+        self.spent += received + REQUEST_OVERHEAD
+        if self.spent > self.limit:
+            raise _OverBudget
+
+
+def _parse_blocks(
+    head: bytes, total: int, date: str
+) -> tuple[_Blocks, dict[tuple[int, int], dict[str, tuple[int, str]]]] | None:
+    """The layout of a file from its first bytes, and the rows read already.
+
+    None if the first block is not complete in them, or not laid out in blocks.
+    """
+    rows = _whole_rows(head, 0, total)
+    if not rows:
+        return None
+    first_time = rows[0][2]
+    count = next((i for i, r in enumerate(rows) if r[2] != first_time), len(rows))
+    block = rows[:count]
+    order = {r[1]: i for i, r in enumerate(block)}
+    # The first block must be complete, and the next start with the same point.
+    if (
+        count < 2
+        or count == len(rows)
+        or len(order) != count
+        or rows[count][1] != block[0][1]
+    ):
+        return None
+    after = rows[count]
+    try:
+        step = _utc(after[2]) - _utc(first_time)
+    except ValueError:
+        return None
+    if step <= datetime.timedelta(0):
+        return None
+    blocks = _Blocks(
+        date, order, _utc(first_time), step, block[0][0], after[0] - block[0][0]
+    )
+    known: dict[tuple[int, int], dict[str, tuple[int, str]]] = {}
+    for position, key, timestamp, value in rows:
+        known.setdefault(key, {})[timestamp] = (position, value)
+    return blocks, known
+
+
+def _guess_position(
+    blocks: _Blocks,
+    key: tuple[int, int],
+    positions: dict[str, int],
+    old: dict[str, int],
+    block: int,
+) -> int | None:
+    """Where a point's row in a block probably is, from the rows found already.
+
+    Blocks differ in length by a few kB, in much the same way from one run to
+    the next, so a row is expected as far from its row in the block before as
+    it was in the previous file; or, for a file read for the first time, as
+    far as the row before is from the one before that.
+    """
+    timestamp = blocks.time(block)
+    if block == 0:
+        if timestamp in old:
+            return old[timestamp]
+        # A point not read before: as far into the block as it is in the order.
+        share = blocks.order[key] / len(blocks.order)
+        return blocks.start + round(share * blocks.length)
+    before = blocks.time(block - 1)
+    if before not in positions:
+        return None
+    if timestamp in old and before in old:
+        return old[timestamp] + positions[before] - old[before]
+    if (earlier := blocks.time(block - 2)) in positions:
+        return 2 * positions[before] - positions[earlier]
+    return positions[before] + blocks.length
+
+
+def _run_of(url: str) -> str:
+    """The run of a forecast file, e.g. 202610201100."""
+    return url.rsplit(".", 3)[-3]
+
+
 def _rows_with_prefix(text: str, prefix: str) -> dict[str, str]:
     """Map timestamp to value for all rows starting with the prefix."""
     rows = {}
@@ -356,20 +541,38 @@ class MeteoSwissOGD:
         self._orders: dict[str, int] = {}
         # Parameters whose files are ordered by time rather than by point.
         self._by_time: set[str] = set()
-        # Where each point's rows started in the last file, by (parameter, point).
-        self._offsets: dict[tuple[str, tuple[int, int]], int] = {}
+        # The latest file of each parameter and its size.
+        self._files: dict[str, tuple[str, int]] = {}
+        # Files ordered by time, by parameter: their layout, and where each
+        # point's row was in each block of the last file, by time.
+        self._blocks: dict[str, _Blocks] = {}
+        self._block_positions: dict[tuple[str, tuple[int, int]], dict[str, int]] = {}
         # The last small file ordered by time, by parameter: its URL and text.
         self._small_files: dict[str, tuple[str, str]] = {}
         self._small_file_lock = asyncio.Lock()
+        # The ETag and Last-Modified of files fetched whole, by URL.
+        self._validators: dict[str, tuple[str | None, str | None]] = {}
+        # Small files ordered by time, downloaded whole on a cold start, by
+        # parameter: the URL and the file, until the next run's is read.
+        self._block_files: dict[str, tuple[str, bytes]] = {}
+        # When files were downloaded whole because they could not be searched.
+        self._whole_downloads: list[float] = []
+        # When each response came, and what it cost in bytes.
+        self._received: collections.deque[tuple[float, int]] = collections.deque()
+        # Whether the server sent a whole file when asked for part of it, the
+        # last time it was.
+        self.ranges_ignored = False
         # Recently fetched station files: URL to (monotonic time, body).
         self._station_files: dict[str, tuple[float, bytes]] = {}
         self._latest_run: tuple[datetime.datetime, str] | None = None
-        # By station: when its daily files were fetched, and their days.
+        # By station and file: when it was last checked, when it last changed,
+        # and its days.
         self._climate_files: dict[
-            tuple[str, str], tuple[datetime.datetime, list[climate.Day]]
+            tuple[str, str],
+            tuple[datetime.datetime, datetime.datetime, list[climate.Day]],
         ] = {}
-        # By station: when the files its normals were computed from were
-        # fetched, and the normals.
+        # By station: when the files its normals were computed from last
+        # changed, and the normals.
         self._climates: dict[
             str, tuple[tuple[datetime.datetime, ...], climate.Climate]
         ] = {}
@@ -390,7 +593,20 @@ class MeteoSwissOGD:
                 url, headers=headers, timeout=REQUEST_TIMEOUT
             ) as response:
                 response.raise_for_status()
+                if byte_range:
+                    # Not read: it is the whole file.
+                    ignored = response.status != 206
+                    if ignored and not self.ranges_ignored:
+                        _LOGGER.warning(
+                            "MeteoSwiss sends whole files when asked for part of "
+                            "them; downloading them whole until it no longer does"
+                        )
+                    self.ranges_ignored = ignored
+                    if ignored:
+                        self._count(response, 0)
+                        raise RangesIgnoredError(f"{url} was sent whole")
                 body = await response.read()
+                self._count(response, len(body))
                 total = len(body)
                 content_range = response.headers.get("Content-Range", "")
                 if "/" in content_range:
@@ -398,6 +614,47 @@ class MeteoSwissOGD:
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
         return body, total
+
+    async def _get_changed(self, url: str) -> bytes | None:
+        """Fetch a whole file, or None if it has not changed since the last time."""
+        headers = dict(self._headers)
+        validators = self._validators.get(url)
+        if validators:
+            etag, modified = validators
+            if etag:
+                headers["If-None-Match"] = etag
+            if modified:
+                headers["If-Modified-Since"] = modified
+        try:
+            async with self._session.get(
+                url, headers=headers, timeout=REQUEST_TIMEOUT
+            ) as response:
+                if response.status == 304 and validators:
+                    self._count(response, 0)
+                    return None
+                response.raise_for_status()
+                body = await response.read()
+                self._count(response, len(body))
+                self._validators[url] = (
+                    response.headers.get("ETag"),
+                    response.headers.get("Last-Modified"),
+                )
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            raise OGDError(f"Cannot fetch {url}: {exc}") from exc
+        return body
+
+    async def _size(self, url: str) -> int | None:
+        """The size of a file, uncompressed, None if the server does not say."""
+        headers = {**self._headers, "Accept-Encoding": "identity"}
+        try:
+            async with self._session.head(
+                url, headers=headers, timeout=REQUEST_TIMEOUT
+            ) as response:
+                self._count(response, 0)
+                response.raise_for_status()
+                return int(response.headers["Content-Length"])
+        except (aiohttp.ClientError, asyncio.TimeoutError, KeyError, ValueError):
+            return None
 
     # Metadata
 
@@ -592,13 +849,20 @@ class MeteoSwissOGD:
     ) -> list[climate.Day]:
         cached = self._climate_files.get((abbr, kind))
         if cached and abs(now - cached[0]) < refresh:
-            return cached[1]
+            return cached[2]
         low = abbr.lower()
-        body, _ = await self._get(f"{SMN_URL}/{low}/ogd-smn_{low}_d_{kind}.csv")
+        url = f"{SMN_URL}/{low}/ogd-smn_{low}_d_{kind}.csv"
+        if cached is None:
+            self._validators.pop(url, None)
+        body = await self._get_changed(url)
+        if body is None and cached:
+            # Unchanged, and so are the normals computed from it.
+            self._climate_files[(abbr, kind)] = (now, cached[1], cached[2])
+            return cached[2]
         days = await asyncio.get_running_loop().run_in_executor(
-            None, climate.parse_days, body.decode("windows-1252")
+            None, climate.parse_days, (body or b"").decode("windows-1252")
         )
-        self._climate_files[(abbr, kind)] = (now, days)
+        self._climate_files[(abbr, kind)] = (now, now, days)
         return days
 
     async def get_climate(
@@ -618,7 +882,7 @@ class MeteoSwissOGD:
                 abbr, "recent", CLIMATE_RECENT_REFRESH, now
             )
             key = tuple(
-                self._climate_files[(abbr, k)][0] for k in ("historical", "recent")
+                self._climate_files[(abbr, k)][1] for k in ("historical", "recent")
             )
             cached = self._climates.get(abbr)
             if cached is None or cached[0] != key:
@@ -635,7 +899,12 @@ class MeteoSwissOGD:
         cached = self._station_files.get(url)
         if cached and time.monotonic() - cached[0] < cache_seconds:
             return cached[1]
-        body, _ = await self._get(url)
+        if cached is None:
+            self._validators.pop(url, None)
+        # A new row only every 10 minutes (or hour), so often unchanged.
+        body = await self._get_changed(url)
+        if body is None:
+            body = cached[1]  # type: ignore[index]
         self._station_files[url] = (time.monotonic(), body)
         return body
 
@@ -663,6 +932,7 @@ class MeteoSwissOGD:
                 async with self._session.head(
                     url, headers=self._headers, timeout=REQUEST_TIMEOUT
                 ) as response:
+                    self._count(response, 0)
                     # Files that do not exist (yet) are answered with 403.
                     if response.status in (403, 404):
                         continue
@@ -674,77 +944,370 @@ class MeteoSwissOGD:
 
     async def _point_values(self, url: str, point: Point) -> dict[str, str]:
         """Timestamp to value of one point in a forecast file."""
+        try:
+            return await self._searched_point_values(url, point)
+        except RangesIgnoredError:
+            self._note_whole_download()
+            return (await self._whole_file_rows(url, [point], None))[point.key]
+
+    async def _searched_point_values(self, url: str, point: Point) -> dict[str, str]:
         prefix = f"{point.point_id};{point.point_type};"
         parameter = _parameter(url)
         if parameter in self._by_time:
-            return await self._time_ordered_point_values(url, prefix, None)
-        if (hint := self._offsets.get((parameter, point.key))) is not None:
-            rows = await self._hinted_point_values(url, point, prefix, hint)
-            if rows:
-                return rows
+            return (await self._blocked_rows(url, [point]))[point.key]
         head, total = await self._get(url, (0, HEAD_BYTES - 1))
+        self._note_size(url, total)
         if total > len(head):
             lines = head.decode("latin-1").splitlines()[1:3]
             keys = [_key(line) for line in lines]
             if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
                 return await self._ordered_point_values(url, total, point, prefix)
             self._by_time.add(parameter)
-            return await self._time_ordered_point_values(url, prefix, total)
+            return (await self._blocked_rows(url, [point]))[point.key]
         return _rows_with_prefix(head.decode("latin-1"), prefix)
 
-    async def _time_ordered_point_values(
-        self, url: str, prefix: str, total: int | None
-    ) -> dict[str, str]:
-        """The rows of a point in a file ordered by time.
+    def _note_size(self, url: str, total: int) -> None:
+        """Remember a file's size."""
+        parameter = _parameter(url)
+        last = self._files.get(parameter)
+        if last is None or last[0] != url:
+            self._files[parameter] = (url, total)
 
-        Small files are downloaded whole (compressed) once for all entries;
-        large ones are streamed.
+    def _known_size(self, url: str) -> int | None:
+        """The size of a file, if it is known without asking."""
+        last = self._files.get(_parameter(url))
+        return last[1] if last is not None and last[0] == url else None
+
+    async def _time_ordered_point_values(
+        self, url: str, prefixes: list[str], total: int | None
+    ) -> dict[str, dict[str, str]]:
+        """The rows of points in a file ordered by time, downloading it whole.
+
+        Small files are downloaded compressed, once for all entries; large ones
+        are streamed.
         """
         parameter = _parameter(url)
-        if total is not None and total > SMALL_FILE:
-            self._by_time.discard(parameter)
-            return (await self._streamed_point_values(url, [prefix]))[prefix]
+        if total is None:
+            total = await self._size(url)
+        if total is None or total > SMALL_FILE:
+            return await self._streamed_point_values(url, prefixes)
         async with self._small_file_lock:
             cached = self._small_files.get(parameter)
             if cached is None or cached[0] != url:
                 body, _ = await self._get(url)
                 cached = (url, body.decode("latin-1"))
                 self._small_files[parameter] = cached
-        return _rows_with_prefix(cached[1], prefix)
+        return {prefix: _rows_with_prefix(cached[1], prefix) for prefix in prefixes}
 
-    async def _hinted_point_values(
-        self, url: str, point: Point, prefix: str, offset: int
-    ) -> dict[str, str]:
-        """The rows of a point near where they were before, if all are there."""
-        start = max(0, offset - HINT_BEFORE)
-        end = offset + HINT_AFTER
-        try:
+    async def _blocked_rows(
+        self, url: str, points: list[Point]
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        """The rows of points in a file ordered by time, read block by block.
+
+        Points that cannot be followed through the blocks are followed again
+        with the order of the points read afresh, and if that fails too, or
+        costs as much as the whole file, are looked up in the whole file.
+        """
+        parameter = _parameter(url)
+        for files in (self._block_files, self._small_files):
+            if (cached := files.get(parameter)) is not None and cached[0] != url:
+                del files[parameter]  # an earlier run's
+        if (whole := self._block_files.get(parameter)) is not None:
+            # Downloaded whole for this run already.
+            return self._rows_from_whole(parameter, points, whole[1])
+        size = self._known_size(url) or (self._files.get(parameter) or (url, None))[1]
+        blocks = self._blocks.get(parameter)
+        # The order of the points is read once a day; points not read before
+        # are found from it.
+        fresh = blocks is None or blocks.date != _run_of(url)[:8]
+        if fresh:
+            if self._known_size(url) is None and (size := await self._size(url)):
+                self._note_size(url, size)
+            if size is not None and _whole_cost(size) <= COLD_START_SHARE * BLOCK_HEAD:
+                # Learning the order would cost as much as the whole file.
+                return await self._small_blocked_rows(url, points)
+        if size is not None and blocks is not None and blocks.cost is not None:
+            expected = len(points) * blocks.cost + (BLOCK_HEAD if fresh else 0)
+            if expected > _whole_cost(size):
+                _LOGGER.debug("%s is cheaper whole for %d points", url, len(points))
+                return await self._whole_file_rows(url, points, size)
+        budget = _Budget(size)
+        found: dict[tuple[int, int], dict[str, str]] = {}
+        todo = list(points)
+        for attempt in range(2):
+            known: dict[tuple[int, int], dict[str, tuple[int, str]]] = {}
+            if fresh or attempt:
+                try:
+                    learned = await self._learn_blocks(url, budget)
+                except _OverBudget:
+                    break
+                if learned is None:
+                    _LOGGER.debug("%s cannot be read by block", url)
+                    break
+                blocks, known, size, small = learned
+                if small:
+                    # A small file: all of it was read already.
+                    for p in todo:
+                        found[p.key] = {
+                            t: v for t, (_, v) in known.get(p.key, {}).items()
+                        }
+                    todo = []
+                    break
+            assert blocks is not None
+            todo, over = await self._walk_points(
+                url, blocks, todo, known, size, budget, found
+            )
+            if not todo or over:
+                break
+            _LOGGER.debug("Lost %s in %s, reading the order again", todo, url)
+        for point in points:
+            if point not in todo:
+                found.setdefault(point.key, {})
+        if todo:
+            _LOGGER.info("Reading %s whole for %s", url, [p.key for p in todo])
+            self._note_whole_download()
+            found.update(await self._whole_file_rows(url, todo, size))
+        return found
+
+    async def _small_blocked_rows(
+        self, url: str, points: list[Point]
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        """Download a small file ordered by time whole, learning its layout."""
+        parameter = _parameter(url)
+        body, total = await self._get(url)
+        self._note_size(url, total)
+        parsed = _parse_blocks(body, total, _run_of(url)[:8])
+        if parsed is None:
+            _LOGGER.info("%s cannot be read by block", url)
+            self._note_whole_download()
+            text = body.decode("latin-1")
+            return {
+                p.key: _rows_with_prefix(text, f"{p.point_id};{p.point_type};")
+                for p in points
+            }
+        self._adopt_blocks(parameter, parsed[0])
+        self._block_files[parameter] = (url, body)
+        return self._rows_from_whole(parameter, points, body)
+
+    def _rows_from_whole(
+        self, parameter: str, points: list[Point], body: bytes
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        """The rows of points in a whole file, remembering where they were."""
+        found = {}
+        for point in points:
+            needle = f"\n{point.point_id};{point.point_type};".encode("latin-1")
+            values: dict[str, str] = {}
+            positions: dict[str, int] = {}
+            start = body.find(needle)
+            while start >= 0:
+                end = body.find(b"\n", start + 1)
+                if row := _row(body[start + 1 : end if end >= 0 else None]):
+                    positions[row[1]] = start + 1
+                    values[row[1]] = row[2]
+                start = body.find(needle, end) if end >= 0 else -1
+            found[point.key] = values
+            if positions:
+                self._block_positions[(parameter, point.key)] = positions
+        return found
+
+    def _adopt_blocks(self, parameter: str, blocks: _Blocks) -> None:
+        """Use a newly read layout, keeping what was learnt about the file."""
+        old = self._blocks.get(parameter)
+        if old is not None:
+            blocks.margin, blocks.cost = old.margin, old.cost
+            if old.date != blocks.date:
+                # Where the rows were in another day's file says little.
+                for key in [k for k in self._block_positions if k[0] == parameter]:
+                    del self._block_positions[key]
+        self._blocks[parameter] = blocks
+
+    def _note_whole_download(self) -> None:
+        self._whole_downloads.append(time.monotonic())
+
+    @property
+    def whole_downloads(self) -> int:
+        """How many files were downloaded whole lately, as they could not be
+        searched (not those that were cheaper whole)."""
+        since = time.monotonic() - USAGE_PERIOD.total_seconds()
+        self._whole_downloads = [t for t in self._whole_downloads if t >= since]
+        return len(self._whole_downloads)
+
+    def _count(self, response: aiohttp.ClientResponse, body: int) -> None:
+        """Remember what a response cost, as transferred if it can be told."""
+        raw = getattr(response.content, "total_raw_bytes", None)
+        size = raw if isinstance(raw, int) else body
+        self._received.append((time.monotonic(), REQUEST_OVERHEAD + size))
+
+    @property
+    def downloaded(self) -> int:
+        """Bytes downloaded from MeteoSwiss in the last USAGE_PERIOD."""
+        since = time.monotonic() - USAGE_PERIOD.total_seconds()
+        while self._received and self._received[0][0] < since:
+            self._received.popleft()
+        return sum(size for _, size in self._received)
+
+    async def _learn_blocks(self, url: str, budget: _Budget):
+        """Read the first block of a file for the order of the points.
+
+        Returns the layout, the rows read, the file's size and whether that was
+        all of it; None if the file is not laid out in blocks.
+        """
+        parameter = _parameter(url)
+        head, total = await self._get(url, (0, BLOCK_HEAD - 1))
+        self._note_size(url, total)
+        if total > len(head):  # otherwise the whole file is in hand already
+            budget.spend(len(head), total)
+        parsed = _parse_blocks(head, total, _run_of(url)[:8])
+        if parsed is None:
+            return None
+        blocks, known = parsed
+        self._adopt_blocks(parameter, blocks)
+        return blocks, known, total, total <= len(head)
+
+    async def _walk_points(
+        self,
+        url: str,
+        blocks: _Blocks,
+        points: list[Point],
+        known: dict[tuple[int, int], dict[str, tuple[int, str]]],
+        size: int | None,
+        budget: _Budget,
+        found: dict[tuple[int, int], dict[str, str]],
+    ) -> tuple[list[Point], bool]:
+        """Follow points through the blocks, adding their rows to found.
+
+        Returns the points that were lost, and whether the budget ran out.
+        """
+        parameter = _parameter(url)
+        walks = [p for p in points if p.key in blocks.order]
+        for point in points:
+            if point.key not in blocks.order:
+                found[point.key] = {}  # not in the file
+        spent = budget.spent
+        results = await asyncio.gather(
+            *(
+                self._walk_blocks(
+                    url, blocks, p.key, known.get(p.key, {}), size, budget
+                )
+                for p in walks
+            ),
+            return_exceptions=True,
+        )
+        lost: list[Point] = []
+        errors: list[int] = []
+        over = False
+        for point, result in zip(walks, results):
+            if isinstance(result, _Lost):
+                lost.append(point)
+                over = over or isinstance(result, _OverBudget)
+            elif isinstance(result, BaseException):
+                raise result
+            else:
+                rows, positions, misses = result
+                found[point.key] = rows
+                self._block_positions[(parameter, point.key)] = positions
+                errors.extend(misses)
+        if errors:
+            low, high = BLOCK_MARGIN_RANGE
+            error = sorted(errors)[int(BLOCK_MARGIN_SHARE * (len(errors) - 1))]
+            blocks.margin = min(high, max(low, int(error * 1.1) + BLOCK_ROW))
+        if walks and not lost:
+            blocks.cost = (budget.spent - spent) // len(walks)
+        return lost, over
+
+    async def _whole_file_rows(
+        self, url: str, points: list[Point], total: int | None
+    ) -> dict[tuple[int, int], dict[str, str]]:
+        prefixes = {p.key: f"{p.point_id};{p.point_type};" for p in points}
+        rows = await self._time_ordered_point_values(
+            url, list(prefixes.values()), total
+        )
+        return {key: rows[prefix] for key, prefix in prefixes.items()}
+
+    async def _walk_blocks(
+        self,
+        url: str,
+        blocks: _Blocks,
+        key: tuple[int, int],
+        known: dict[str, tuple[int, str]],
+        total: int | None,
+        budget: _Budget,
+    ) -> tuple[dict[str, str], dict[str, int], list[int]]:
+        """A point's rows in every block: its values and positions by time.
+
+        Also how far off each guess was.  Raises _Lost if a row cannot be
+        found.
+        """
+        old = self._block_positions.get((_parameter(url), key), {})
+        positions = {t: p for t, (p, _) in known.items()}
+        values = {t: v for t, (_, v) in known.items()}
+        errors = []
+        for block in range(BLOCK_LIMIT):
+            timestamp = blocks.time(block)
+            if timestamp in positions:
+                continue
+            guess = _guess_position(blocks, key, positions, old, block)
+            if guess is None:
+                raise _Lost
+            if total is not None and guess - blocks.margin >= total:
+                break
+            found = await self._block_row(url, blocks, key, block, guess, total, budget)
+            if found is None:
+                break  # past the last block
+            position, value, total = found
+            errors.append(abs(position - guess))
+            positions[timestamp] = position
+            values[timestamp] = value
+        return values, positions, errors
+
+    async def _block_row(
+        self,
+        url: str,
+        blocks: _Blocks,
+        key: tuple[int, int],
+        block: int,
+        guess: int,
+        total: int | None,
+        budget: _Budget,
+    ) -> tuple[int, str, int] | None:
+        """A point's row in a block near a guessed position: position, value, size.
+
+        None if the file has no such block.
+        """
+        timestamp = blocks.time(block)
+        index = blocks.order[key]
+        margin = blocks.margin
+        for _ in range(BLOCK_TRIES):
+            start = max(0, guess - margin)
+            end = guess + margin + BLOCK_ROW
+            if total is not None:
+                if start >= total:
+                    return None
+                end = min(end, total)
             chunk, total = await self._get(url, (start, end - 1))
-        except OGDError:
-            return {}
-        lines = chunk.split(b"\n")
-        if start > 0:
-            lines = lines[1:]  # starts mid-line
-        if start + len(chunk) < total:
-            lines = lines[:-1]  # ends mid-line
-        keys = [_key(line) for line in lines]
-        found = [i for i, key in enumerate(keys) if key == point.key]
-        # Only if the rows before and after the point's are in the window too.
-        if (
-            not found
-            or found[0] == 0
-            or (found[-1] == len(keys) - 1 and start + len(chunk) < total)
-        ):
-            return {}
-        self._remember_offset(url, point, chunk, start, prefix)
-        return _rows_with_prefix(b"\n".join(lines).decode("latin-1"), prefix)
-
-    def _remember_offset(
-        self, url: str, point: Point, chunk: bytes, start: int, prefix: str
-    ) -> None:
-        position = chunk.find(b"\n" + prefix.encode("latin-1"))
-        if position >= 0:
-            self._offsets[(_parameter(url), point.key)] = start + position + 1
+            budget.spend(len(chunk), total)
+            rows = _whole_rows(chunk, start, total)
+            for position, row_key, row_time, value in rows:
+                if row_key == key and row_time == timestamp:
+                    return position, value, total
+            if not rows:
+                margin *= 2
+                continue
+            if start + len(chunk) >= total and rows[-1][2] < timestamp:
+                return None  # the file ends before the block
+            # How many rows away the point is, from a row in the middle.
+            position, row_key, row_time, _ = rows[len(rows) // 2]
+            ahead = blocks.blocks_between(timestamp, row_time)
+            if row_key not in blocks.order or ahead is None:
+                raise _Lost
+            away = index - blocks.order[row_key] - ahead * len(blocks.order)
+            width = (
+                (rows[-1][0] - rows[0][0]) / (len(rows) - 1)
+                if len(rows) > 1
+                else blocks.length / len(blocks.order)
+            )
+            guess = max(0, position + round(away * width))
+        raise _Lost
 
     async def _streamed_point_values(
         self, url: str, prefixes: list[str]
@@ -752,8 +1315,10 @@ class MeteoSwissOGD:
         """Stream a whole file, keeping only the rows starting with the prefixes."""
         needles = {prefix: b"\n" + prefix.encode("latin-1") for prefix in prefixes}
         rows: dict[str, list[bytes]] = {prefix: [] for prefix in prefixes}
+
         # Carries the incomplete last line of a chunk, after its line break.
         tail = b""
+        received = 0
         try:
             async with self._session.get(
                 url, headers=self._headers, timeout=STREAM_TIMEOUT
@@ -768,6 +1333,8 @@ class MeteoSwissOGD:
                     for prefix, needle in needles.items():
                         _rows_with_needle(rows[prefix], data[:cut], needle)
                     tail = data[cut:]
+                    received += len(chunk)
+                self._count(response, received)
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
         for prefix, needle in needles.items():
@@ -780,23 +1347,37 @@ class MeteoSwissOGD:
     async def _ordered_point_values(
         self, url: str, total: int, point: Point, prefix: str
     ) -> dict[str, str]:
-        """Find a point in a file ordered by point, trying the known orders."""
+        """Find a point in a file ordered by point, trying the known orders.
+
+        If the file is in neither order, the point is looked up in the whole
+        file instead.
+        """
         parameter = _parameter(url)
         last = self._orders.get(parameter, 0)
+        ordered = False
         for index in (last, *(i for i in range(len(POINT_ORDERS)) if i != last)):
-            rows = await self._ranged_point_values(
+            rows, in_order = await self._ranged_point_values(
                 url, total, point, prefix, POINT_ORDERS[index]
             )
             if rows:
                 self._orders[parameter] = index
                 return rows
-        _LOGGER.debug("Point %s not found in %s", point.key, url)
-        return {}
+            ordered = ordered or in_order
+        if ordered:
+            _LOGGER.debug("Point %s not in %s", point.key, url)
+            return {}
+        _LOGGER.info("%s is in no known order; reading it whole", url)
+        self._note_whole_download()
+        return (await self._streamed_point_values(url, [prefix]))[prefix]
 
     async def _ranged_point_values(
         self, url: str, total: int, point: Point, prefix: str, order
-    ) -> dict[str, str]:
-        """Binary search a file ordered by point, in the given order."""
+    ) -> tuple[dict[str, str], bool]:
+        """Binary search a file ordered by point, in the given order.
+
+        Also whether the rows where the point would be are in that order, so
+        that a point not found is really not in the file.
+        """
         target = order(point.point_id, point.point_type)
         # The first row of the target starts after the first line break past
         # `lo` and no later than the first line break past `hi`.
@@ -810,33 +1391,44 @@ class MeteoSwissOGD:
                 lo = mid
             else:
                 hi = mid
-        end = min(hi + ROW_SPAN, total)
-        chunk, _ = await self._get(url, (lo, end - 1))
-        self._remember_offset(url, point, chunk, lo, prefix)
-        lines = chunk.split(b"\n")
-        if lo > 0:
-            lines = lines[1:]  # starts mid-line
-        if end < total:
-            lines = lines[:-1]  # ends mid-line
-        return _rows_with_prefix(
-            b"\n".join(lines).decode("latin-1"),
-            prefix,
+        span = ROW_SPAN
+        while True:
+            end = min(hi + span, total)
+            chunk, _ = await self._get(url, (lo, end - 1))
+            lines = chunk.split(b"\n")
+            if lo > 0:
+                lines = lines[1:]  # starts mid-line
+            if end < total:
+                lines = lines[:-1]  # ends mid-line
+            keys = [order(*k) for line in lines if (k := _key(line))]
+            # Again, further, while the point's rows run to the end.
+            if end == total or not keys or keys[-1] != target:
+                break
+            span *= 2
+        rows = _rows_with_prefix(b"\n".join(lines).decode("latin-1"), prefix)
+        in_order = (
+            bool(keys)
+            and keys == sorted(keys)
+            and (lo == 0 or keys[0] < target)
+            and (end == total or keys[-1] > target)
         )
+        return rows, in_order
 
     async def get_hourly_rows(
         self, points: list[Point], run: str, parameter: str
     ) -> dict[tuple[int, int], dict[str, str]]:
-        """The rows of several points in a file ordered by time, for get_forecast.
+        """The rows of several points in a large file ordered by time.
 
-        Such a file is downloaded whole (about 33 MB), so it is fetched
-        separately from (and less often than) the rest of the forecast, once
-        for all points that need it.
+        Such a file (about 33 MB) is read block by block, a couple of hundred
+        requests for each point, so it is fetched once for all entries, and
+        less often than the rest of the forecast.
         """
-        prefixes = {p.key: f"{p.point_id};{p.point_type};" for p in points}
-        found = await self._streamed_point_values(
-            self._run_url(run, parameter), list(prefixes.values())
-        )
-        return {key: found[prefix] for key, prefix in prefixes.items()}
+        url = self._run_url(run, parameter)
+        try:
+            return await self._blocked_rows(url, points)
+        except RangesIgnoredError:
+            self._note_whole_download()
+            return await self._whole_file_rows(url, points, None)
 
     async def get_forecast(
         self,

@@ -19,6 +19,10 @@
         "point_no_data": {
             "title": "MeteoSwiss bietet für einen Ort keine Prognose mehr an",
             "description": "MeteoSwiss scheint für {name} keine Prognose mehr anzubieten.\n\nUm einen anderen Ort zu wählen, gehe zu Einstellungen → Geräte & Dienste → MeteoSwiss und wähle im Menü dieses Eintrags «Neu konfigurieren».\n\nBis dahin wird die Prognose als nicht verfügbar angezeigt."
+        },
+        "high_usage": {
+            "title": "MeteoSchweiz braucht mehr Daten als nötig",
+            "description": "Die MeteoSchweiz-Integration hat am letzten Tag viel mehr als üblich heruntergeladen ({usage} MB). Meist hat MeteoSchweiz geändert, wie die Prognose veröffentlicht wird. Aktualisiere die Integration: Eine Korrektur ist wahrscheinlich verfügbar. Dieser Hinweis verschwindet von selbst."
         }
     },
     "config": {
@@ -66,7 +70,7 @@
                 "description": "Die Postleitzahl wird verwendet, um die 5-Tage-Prognose abzurufen. Der hier eingegebene Name wird für das Prognose-(Wetter)-Entity verwendet.",
                 "title": "Prognose",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Die Nullgradgrenze ist eine eigene Einstellung. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde."
                 }
             },
             "mountain": {
@@ -80,7 +84,7 @@
                 },
                 "data_description": {
                     "forecast_name": "Leer lassen, um den Namen des Orts zu verwenden.",
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz, je etwa 33 MB, die alle drei Stunden heruntergeladen werden (etwa 530 MB pro Tag, 16 GB pro Monat, gemeinsam mit deinen anderen MeteoSwiss-Prognosen). Bei einer volumenbegrenzten Verbindung ausschalten: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen und die Nullgradgrenze nur in Dateien für die ganze Schweiz (je 33 MB). Daraus werden nur die Zeilen dieses Orts gelesen: je etwa 0,5 MB alle drei Stunden, für beide 8 MB pro Tag. Ausschalten, um das zu sparen: Die Prognose hat dann keine stündlichen Temperaturen, und es gibt keinen Sensor für die Nullgradgrenze."
                 }
             },
             "user_three": {
@@ -115,14 +119,14 @@
                     "climate_normals": "Klimanormwerte"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz. Sie kosten deshalb alle drei Stunden einen Download von 33 MB (etwa 260 MB pro Tag, 8 GB pro Monat), gemeinsam für alle deine MeteoSwiss-Prognosen. Die Nullgradgrenze ist eine eigene Einstellung. Bei einer volumenbegrenzten Verbindung ausschalten: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht nur wenige Kilobyte pro Stunde.",
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Daraus werden nur die Zeilen deines Orts gelesen: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde.",
                     "foehn": "Sensoren für Föhn: der von MeteoSchweiz an der Wetterstation gemessene Föhnindex und eine Aussicht aus der Druckdifferenz über die Alpen, die Stunden vor dem Föhndurchbruch steigt.",
                     "foehn_south_station": "Ihr Luftdruck auf Meereshöhe wird mit der Station nördlich der Alpen verglichen. Lugano ist die klassische Wahl.",
                     "foehn_north_station": "Zürich/Kloten ist die klassische Wahl.",
                     "foehn_threshold": "Druckdifferenz, ab der Föhn wahrscheinlich ist; etwa 4 hPa erreichen die nördlichen Täler wie in Altdorf. Für Nordföhn gleich, umgekehrt.",
                     "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
-                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer weiteren Datei von 33 MB alle drei Stunden (etwa 260 MB pro Tag), die für alle deine MeteoSwiss-Prognosen einmal heruntergeladen wird; sie kostet also nichts zusätzlich, wenn eine davon sie schon hat.",
-                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 6 MB) wird einmal pro Woche heruntergeladen, die Tage dieses Jahres alle sechs Stunden."
+                    "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), aus der nur die Zeilen dieses Orts gelesen werden: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag.",
+                    "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden."
                 }
             }
         },

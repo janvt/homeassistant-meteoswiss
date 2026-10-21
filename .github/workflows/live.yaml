@@ -1,0 +1,83 @@
+name: Live
+
+# Checks against the real MeteoSwiss and MeteoAlarm servers that the forecast
+# is still read correctly and within its download budget (see tests_live).
+# Twice a day, as the servers can change at any time; and for changes to the
+# code that reads them.
+on:
+  schedule:
+    - cron: "23 5,17 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - custom_components/meteoswiss/ogd.py
+      - custom_components/meteoswiss/alerts.py
+      - custom_components/meteoswiss/downloads.py
+      - tests_live/**
+      - .github/workflows/live.yaml
+
+concurrency:
+  group: live
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
+jobs:
+  live:
+    name: Live servers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: requirements_test.txt
+      - name: Install dependencies
+        run: pip install -r requirements_test.txt
+      # The Home Assistant test plugins block the network.
+      - name: Run the live tests
+        run: pytest -p no:homeassistant -p no:socket tests_live -v
+      # Scheduled runs report to an issue, assigned to the owner so that it
+      # notifies them: opened (or commented on) when the checks fail, closed
+      # when they pass again.
+      - name: Report a failure
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label live-checks --json number --jq '.[0].number')
+          body="The checks against MeteoSwiss's servers failed: $RUN"
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh label create live-checks --repo "$GITHUB_REPOSITORY" --force \
+              --color d73a4a --description "The live checks are failing"
+            gh issue create --repo "$GITHUB_REPOSITORY" --label live-checks \
+              --assignee "$GITHUB_REPOSITORY_OWNER" \
+              --title "Live checks against MeteoSwiss are failing" --body "$body"
+          fi
+      - name: Close the failure report
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for issue in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label live-checks --json number --jq '.[].number'); do
+            gh issue close "$issue" --repo "$GITHUB_REPOSITORY" \
+              --comment "Passing again: $RUN"
+          done
+      # GitHub turns off scheduled workflows after 60 days without commits;
+      # enabling it again resets that.
+      - name: Keep the schedule on
+        if: always() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/live.yaml/enable"

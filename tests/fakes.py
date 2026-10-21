@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import hashlib
 import re
 from unittest.mock import MagicMock
 
@@ -63,19 +64,31 @@ class FakeSession:
     def __init__(self, files: dict[str, bytes], chunk_size: int = 1000) -> None:
         self.files = files
         self.chunk_size = chunk_size
+        # Like a server that sends whole files when asked for part of them.
+        self.ignore_ranges = False
         self.requests: list[tuple[str, str, str | None]] = []
         self.headers: list[dict[str, str]] = []
+        # The size of each response's body.
+        self.served: list[int] = []
 
     def _respond(self, method: str, url: str, headers) -> FakeResponse:
-        byte_range = (headers or {}).get("Range")
+        headers = headers or {}
+        byte_range = headers.get("Range")
         self.requests.append((method, url, byte_range))
-        self.headers.append(dict(headers or {}))
+        self.headers.append(dict(headers))
         body = self.files.get(url)
         if body is None:
             return FakeResponse(403)
-        if byte_range is None:
+        if byte_range is None or self.ignore_ranges:
+            # Like S3: the ETag is a hash of the content.
+            etag = f'"{hashlib.md5(body).hexdigest()}"'
+            if headers.get("If-None-Match") == etag:
+                return FakeResponse(304)
             return FakeResponse(
-                200, b"" if method == "HEAD" else body, chunk_size=self.chunk_size
+                200,
+                b"" if method == "HEAD" else body,
+                {"Content-Length": str(len(body)), "ETag": etag},
+                chunk_size=self.chunk_size,
             )
         match = re.fullmatch(r"bytes=(\d+)-(\d+)", byte_range)
         assert match, byte_range
@@ -87,10 +100,26 @@ class FakeSession:
         )
 
     def get(self, url, headers=None, timeout=None) -> FakeResponse:
-        return self._respond("GET", url, headers)
+        response = self._respond("GET", url, headers)
+        self.served.append(len(response.body))
+        return response
 
     def head(self, url, headers=None, timeout=None) -> FakeResponse:
+        self.served.append(0)
         return self._respond("HEAD", url, headers)
+
+    def transferred(self, overhead: int = 650) -> int:
+        """Bytes received, with about as much for each response's headers as
+        the real server sends (whole files are counted uncompressed)."""
+        return sum(self.served) + overhead * len(self.served)
+
+    def clear(self) -> None:
+        self.requests.clear()
+        self.headers.clear()
+        self.served.clear()
+
+    def count(self, method: str = "GET", url: str | None = None) -> int:
+        return sum(1 for m, u, _ in self.requests if m == method and url in (None, u))
 
     @property
     def ranged_bytes(self) -> int:
@@ -252,6 +281,8 @@ class FakeOGD:
     large_downloads: dict[str, list[set[tuple[int, int]]]] = {}
     # When set, large downloads wait for it, like a slow connection.
     download_gate: asyncio.Event | None = None
+    # Like MeteoSwissOGD's: bytes downloaded lately.
+    downloaded = 0
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
@@ -271,6 +302,7 @@ class FakeOGD:
         cls.large_downloads = {}
         cls.download_gate = None
         cls.hours = 12
+        cls.downloaded = 0
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]

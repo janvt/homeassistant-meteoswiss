@@ -248,7 +248,7 @@ async def test_options_turn_hourly_temperatures_off(hass, entry, fake_ogd):
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["hourly_temperature"] is False
     # The entry was reloaded with the new setting and did not download again.
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
     assert coordinator.hourly_temperature is False
     assert coordinator.data["forecast"]["temperature_run"] is None
     assert fake_ogd.temperature_calls == 1
@@ -470,7 +470,7 @@ async def test_reconfigure_a_postcode(hass, entry):
         "real_time_name": "Fluntern",
     }
     # Reloaded with the new settings.
-    assert hass.data[DOMAIN][entry.entry_id].postcode == 1000
+    assert entry.runtime_data.postcode == 1000
 
 
 async def test_reconfigure_a_postcode_into_a_mountain(hass, entry):

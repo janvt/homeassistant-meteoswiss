@@ -12,7 +12,6 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     PERCENTAGE,
     UnitOfLength,
@@ -28,6 +27,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.meteoswiss import (
+    MeteoSwissConfigEntry,
     MeteoSwissDataUpdateCoordinator,
     climate,
     foehn,
@@ -49,7 +49,6 @@ from custom_components.meteoswiss.const import (
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
-    DOMAIN,
     SENSOR_DATA_ID,
     SENSOR_TYPE_CLASS,
     SENSOR_TYPE_ICON,
@@ -166,12 +165,12 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: MeteoSwissConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up all sensors."""
     _LOGGER.debug("Starting async setup platform for sensor")
-    c: MeteoSwissDataUpdateCoordinator = hass.data[DOMAIN][entry.entry_id]
+    c = entry.runtime_data
 
     if c.weather_station:
         async_add_entities(

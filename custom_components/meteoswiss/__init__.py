@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.util.hass_dict import HassKey
 
 from custom_components.meteoswiss.alerts import AlertError, MeteoAlarm, WeatherWarning
 from custom_components.meteoswiss.const import (
@@ -46,6 +47,8 @@ from custom_components.meteoswiss.const import (
 )
 from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.issues import (
+    HIGH_USAGE_ISSUE,
+    USAGE_NOTICE_PER_ENTRY,
     async_delete_issues,
     freezing_level_setting,
     no_forecast_issue_id,
@@ -77,9 +80,11 @@ UPDATE_TIMEOUT = 60
 # The client keeps a station's history for longer; this is how often to ask.
 CLIMATE_CHECK_INTERVAL = datetime.timedelta(hours=1)
 # Shared by all entries.
-DATA_CLIENT = f"{DOMAIN}_client"
-DATA_ALERTS = f"{DOMAIN}_alerts"
-DATA_DOWNLOADS = f"{DOMAIN}_downloads"
+DATA_CLIENT: HassKey[MeteoSwissOGD] = HassKey(f"{DOMAIN}_client")
+DATA_ALERTS: HassKey[MeteoAlarm] = HassKey(f"{DOMAIN}_alerts")
+DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}_downloads")
+
+type MeteoSwissConfigEntry = ConfigEntry[MeteoSwissDataUpdateCoordinator]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
@@ -99,9 +104,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    hass.data.setdefault(DOMAIN, {})
-
+async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -> bool:
     _LOGGER.debug("Current configuration: %s", entry.data)
     name = entry.data.get(
         CONF_FORECAST_NAME,
@@ -173,7 +176,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
+    entry.runtime_data = coordinator
 
     await hass.config_entries.async_forward_entry_setups(
         entry,
@@ -193,7 +196,7 @@ async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -> bool:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(
         entry,
@@ -201,10 +204,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
 
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
-        downloads: SharedDownloads = hass.data[DATA_DOWNLOADS]
-        downloads.unregister(entry.entry_id)
-        if not hass.data[DOMAIN]:
+        hass.data[DATA_DOWNLOADS].unregister(entry.entry_id)
+        others = [
+            e
+            for e in hass.config_entries.async_loaded_entries(DOMAIN)
+            if e.entry_id != entry.entry_id
+        ]
+        if not others:
+            # The last entry: what was downloaded for all of them can go.
             hass.data.pop(DATA_DOWNLOADS)
             hass.data.pop(DATA_CLIENT)
             hass.data.pop(DATA_ALERTS)
@@ -379,6 +386,14 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         if not self._forecast_due(now):
             return self._forecast
         try:
+            return await self._async_fetch_forecast(now)
+        finally:
+            self._async_update_download_issues()
+
+    async def _async_fetch_forecast(
+        self, now: datetime.datetime
+    ) -> LocalForecast | None:
+        try:
             if self._point is None:
                 self._point = await self.client.resolve_point(
                     self.postcode, self.point_id, self.point_type
@@ -407,6 +422,28 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 raise
             _LOGGER.warning("Keeping the previous forecast: %s", exc)
         return self._forecast
+
+    @callback
+    def _async_update_download_issues(self) -> None:
+        """Tell the user to update while MeteoSwiss's files cost far more than
+        they should, which means MeteoSwiss changed something."""
+        entries = len(self.hass.config_entries.async_loaded_entries(DOMAIN))
+        downloaded = self.client.downloaded
+        if downloaded > USAGE_NOTICE_PER_ENTRY * max(1, entries):
+            ir.async_create_issue(
+                self.hass,
+                DOMAIN,
+                HIGH_USAGE_ISSUE,
+                is_fixable=False,
+                is_persistent=False,
+                severity=IssueSeverity.WARNING,
+                translation_key="high_usage",
+                translation_placeholders={
+                    "usage": str(round(downloaded / 1024 / 1024))
+                },
+            )
+        else:
+            ir.async_delete_issue(self.hass, DOMAIN, HIGH_USAGE_ISSUE)
 
     @property
     def device_info(self) -> DeviceInfo:
