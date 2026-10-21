@@ -77,8 +77,10 @@ class _Counted:
     async def __aexit__(self, *exc):
         r = self._response
         headers = sum(len(k) + len(v) + 4 for k, v in r.raw_headers) + 20
-        # As transferred: compressed, if it was.
-        body = r.content.total_raw_bytes if self._method == "GET" else 0
+        # As transferred: compressed, if it was.  Empty replies (304) have no
+        # count, and raise when asked for one.
+        raw = getattr(r.content, "total_raw_bytes", 0) if self._method == "GET" else 0
+        body = raw if isinstance(raw, int) else 0
         self._owner.log.append(
             Exchange(
                 self._method,

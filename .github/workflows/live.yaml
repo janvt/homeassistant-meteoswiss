@@ -20,6 +20,11 @@ concurrency:
   group: live
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  issues: write
+  actions: write
+
 jobs:
   live:
     name: Live servers
@@ -37,3 +42,42 @@ jobs:
       # The Home Assistant test plugins block the network.
       - name: Run the live tests
         run: pytest -p no:homeassistant -p no:socket tests_live -v
+      # Scheduled runs report to an issue, assigned to the owner so that it
+      # notifies them: opened (or commented on) when the checks fail, closed
+      # when they pass again.
+      - name: Report a failure
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          issue=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label live-checks --json number --jq '.[0].number')
+          body="The checks against MeteoSwiss's servers failed: $RUN"
+          if [ -n "$issue" ]; then
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh label create live-checks --repo "$GITHUB_REPOSITORY" --force \
+              --color d73a4a --description "The live checks are failing"
+            gh issue create --repo "$GITHUB_REPOSITORY" --label live-checks \
+              --assignee "$GITHUB_REPOSITORY_OWNER" \
+              --title "Live checks against MeteoSwiss are failing" --body "$body"
+          fi
+      - name: Close the failure report
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          for issue in $(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label live-checks --json number --jq '.[].number'); do
+            gh issue close "$issue" --repo "$GITHUB_REPOSITORY" \
+              --comment "Passing again: $RUN"
+          done
+      # GitHub turns off scheduled workflows after 60 days without commits;
+      # enabling it again resets that.
+      - name: Keep the schedule on
+        if: always() && github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/$GITHUB_REPOSITORY/actions/workflows/live.yaml/enable"
