@@ -280,6 +280,8 @@ class TestDailyFilesOrderedByTime:
         assert rows[MIDDLE] == expected(files[url("d", RUNS[1])], MIDDLE)
         assert all(r is not None for _, _, r in session.requests)
         assert len(session.requests) <= 9 + 3
+        # And the file is no longer kept.
+        assert "d" not in client._block_files
 
 
 class TestServerThatIgnoresRanges:

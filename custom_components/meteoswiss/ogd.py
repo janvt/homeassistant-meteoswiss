@@ -581,10 +581,8 @@ class MeteoSwissOGD:
         # The ETag and Last-Modified of files fetched whole, by URL.
         self._validators: dict[str, tuple[str | None, str | None]] = {}
         # Small files ordered by time, downloaded whole on a cold start, by
-        # parameter: the URL and every point's rows with their positions.
-        self._block_files: dict[
-            str, tuple[str, dict[tuple[int, int], dict[str, tuple[int, str]]]]
-        ] = {}
+        # parameter: the URL and the file, until the next run's is read.
+        self._block_files: dict[str, tuple[str, bytes]] = {}
         # When files were downloaded whole because they could not be searched.
         self._whole_downloads: list[float] = []
         # When each response came, and what it cost in bytes.
@@ -1032,10 +1030,12 @@ class MeteoSwissOGD:
         costs as much as the whole file, are looked up in the whole file.
         """
         parameter = _parameter(url)
-        cached = self._block_files.get(parameter)
-        if cached is not None and cached[0] == url:
+        for files in (self._block_files, self._small_files):
+            if (cached := files.get(parameter)) is not None and cached[0] != url:
+                del files[parameter]  # an earlier run's
+        if (whole := self._block_files.get(parameter)) is not None:
             # Downloaded whole for this run already.
-            return self._rows_from_known(parameter, points, cached[1])
+            return self._rows_from_whole(parameter, points, whole[1])
         size = self._known_size(url) or (self._files.get(parameter) or (url, None))[1]
         blocks = self._blocks.get(parameter)
         # The order of the points is read once a day; points not read before
@@ -1106,26 +1106,29 @@ class MeteoSwissOGD:
                 p.key: _rows_with_prefix(text, f"{p.point_id};{p.point_type};")
                 for p in points
             }
-        blocks, known = parsed
-        self._adopt_blocks(parameter, blocks)
-        self._block_files[parameter] = (url, known)
-        return self._rows_from_known(parameter, points, known)
+        self._adopt_blocks(parameter, parsed[0])
+        self._block_files[parameter] = (url, body)
+        return self._rows_from_whole(parameter, points, body)
 
-    def _rows_from_known(
-        self,
-        parameter: str,
-        points: list[Point],
-        known: dict[tuple[int, int], dict[str, tuple[int, str]]],
+    def _rows_from_whole(
+        self, parameter: str, points: list[Point], body: bytes
     ) -> dict[tuple[int, int], dict[str, str]]:
-        """The rows of points from a whole file, remembering where they were."""
+        """The rows of points in a whole file, remembering where they were."""
         found = {}
         for point in points:
-            rows = known.get(point.key, {})
-            found[point.key] = {t: v for t, (_, v) in rows.items()}
-            if rows:
-                self._block_positions[(parameter, point.key)] = {
-                    t: p for t, (p, _) in rows.items()
-                }
+            needle = f"\n{point.point_id};{point.point_type};".encode("latin-1")
+            values: dict[str, str] = {}
+            positions: dict[str, int] = {}
+            start = body.find(needle)
+            while start >= 0:
+                end = body.find(b"\n", start + 1)
+                if row := _row(body[start + 1 : end if end >= 0 else None]):
+                    positions[row[1]] = start + 1
+                    values[row[1]] = row[2]
+                start = body.find(needle, end) if end >= 0 else -1
+            found[point.key] = values
+            if positions:
+                self._block_positions[(parameter, point.key)] = positions
         return found
 
     def _adopt_blocks(self, parameter: str, blocks: _Blocks) -> None:
