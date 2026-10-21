@@ -70,7 +70,7 @@
                 "description": "The postal code is used to look up the nine-day forecast.  The name you enter here will be used for the forecast (weather) entity.",
                 "title": "Forecast",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland (33 MB). It is downloaded every three hours: about 260 MB a day, or about 4 MB with Save data. The freezing level is a setting of its own. Turn this off to save that too: the hourly forecast then has no temperatures, and the rest of the forecast needs about 150 kB an hour."
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland (33 MB). It is downloaded every three hours: about 260 MB a day, or about 4 MB with Save data. The freezing level is a setting of its own. Turn this off to save that too: the hourly forecast then has no temperatures, and the rest of the forecast needs about 1 MB an hour."
                 }
             },
             "mountain": {
@@ -120,7 +120,7 @@
                     "save_data": "Save data"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland (33 MB). It is downloaded every three hours: about 260 MB a day, or about 4 MB with Save data. The freezing level is a setting of its own. Turn this off to save that too: the hourly forecast then has no temperatures, and the rest of the forecast needs about 150 kB an hour.",
+                    "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland (33 MB). It is downloaded every three hours: about 260 MB a day, or about 4 MB with Save data. The freezing level is a setting of its own. Turn this off to save that too: the hourly forecast then has no temperatures, and the rest of the forecast needs about 1 MB an hour.",
                     "foehn": "Sensors for Föhn: MeteoSwiss's measured Föhn index at the weather station, and an outlook from the pressure difference across the Alps, which rises hours before the Föhn breaks through.",
                     "foehn_south_station": "Its sea-level pressure is compared with the station north of the Alps. Lugano is the classic choice.",
                     "foehn_north_station": "Zürich/Kloten is the classic choice.",

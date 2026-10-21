@@ -70,7 +70,7 @@
                 "description": "Le code postal est utilisé pour consulter les prévisions météo à 5 jours. Le nom que vous entrez ici sera utilisé pour l'entité de prévision (météo).",
                 "title": "Prévisions",
                 "data_description": {
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Il est téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ». L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 150 ko par heure."
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Il est téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ». L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 1 Mo par heure."
                 }
             },
             "mountain": {
@@ -120,7 +120,7 @@
                     "save_data": "Économiser les données"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Il est téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ». L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 150 ko par heure.",
+                    "hourly_temperature": "MeteoSuisse ne publie les températures horaires que dans un seul fichier pour toute la Suisse (33 Mo). Il est téléchargé toutes les trois heures : environ 260 Mo par jour, ou environ 4 Mo avec « Économiser les données ». L'isotherme zéro degré est un réglage à part. Désactivez cette option pour économiser cela aussi : la prévision horaire n'a alors pas de températures, et le reste de la prévision demande environ 1 Mo par heure.",
                     "foehn": "Capteurs pour le fœhn : l'indice de fœhn mesuré par MeteoSuisse à la station météo, et une tendance tirée de la différence de pression à travers les Alpes, qui augmente des heures avant que le fœhn ne perce.",
                     "foehn_south_station": "Sa pression au niveau de la mer est comparée à celle de la station au nord des Alpes. Lugano est le choix classique.",
                     "foehn_north_station": "Zurich/Kloten est le choix classique.",

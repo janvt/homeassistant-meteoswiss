@@ -70,7 +70,7 @@
                 "description": "Postnummeret brukes til å lete opp 5-dagers værforslag. Navnet du skriver inn her, vil brukes for vær- (vær) enhetsnavn.",
                 "title": "Værforslag",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Den lastes ned hver tredje time: omtrent 260 MB per dag, eller omtrent 4 MB med «Spar data». Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 150 kB i timen."
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Den lastes ned hver tredje time: omtrent 260 MB per dag, eller omtrent 4 MB med «Spar data». Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 1 MB i timen."
                 }
             },
             "mountain": {
@@ -120,7 +120,7 @@
                     "save_data": "Spar data"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Den lastes ned hver tredje time: omtrent 260 MB per dag, eller omtrent 4 MB med «Spar data». Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 150 kB i timen.",
+                    "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Den lastes ned hver tredje time: omtrent 260 MB per dag, eller omtrent 4 MB med «Spar data». Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 1 MB i timen.",
                     "foehn": "Sensorer for føhn: MeteoSwiss' målte føhnindeks ved værstasjonen, og et utsyn fra trykkforskjellen over Alpene, som stiger timer før føhnen bryter gjennom.",
                     "foehn_south_station": "Lufttrykket ved havnivå sammenlignes med stasjonen nord for Alpene. Lugano er det klassiske valget.",
                     "foehn_north_station": "Zürich/Kloten er det klassiske valget.",

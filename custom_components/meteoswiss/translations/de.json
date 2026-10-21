@@ -70,7 +70,7 @@
                 "description": "Die Postleitzahl wird verwendet, um die 5-Tage-Prognose abzurufen. Der hier eingegebene Name wird für das Prognose-(Wetter)-Entity verwendet.",
                 "title": "Prognose",
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Sie wird alle drei Stunden heruntergeladen: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 150 kB pro Stunde."
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Sie wird alle drei Stunden heruntergeladen: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde."
                 }
             },
             "mountain": {
@@ -120,7 +120,7 @@
                     "save_data": "Daten sparen"
                 },
                 "data_description": {
-                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Sie wird alle drei Stunden heruntergeladen: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 150 kB pro Stunde.",
+                    "hourly_temperature": "MeteoSwiss veröffentlicht stündliche Temperaturen nur in einer Datei für die ganze Schweiz (33 MB). Sie wird alle drei Stunden heruntergeladen: etwa 260 MB pro Tag, mit «Daten sparen» etwa 4 MB. Die Nullgradgrenze ist eine eigene Einstellung. Ausschalten, um auch das zu sparen: Die stündliche Prognose hat dann keine Temperaturen, und der Rest der Prognose braucht etwa 1 MB pro Stunde.",
                     "foehn": "Sensoren für Föhn: der von MeteoSchweiz an der Wetterstation gemessene Föhnindex und eine Aussicht aus der Druckdifferenz über die Alpen, die Stunden vor dem Föhndurchbruch steigt.",
                     "foehn_south_station": "Ihr Luftdruck auf Meereshöhe wird mit der Station nördlich der Alpen verglichen. Lugano ist die klassische Wahl.",
                     "foehn_north_station": "Zürich/Kloten ist die klassische Wahl.",
