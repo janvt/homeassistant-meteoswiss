@@ -116,7 +116,8 @@
                     "foehn_threshold": "Favonio probabile da",
                     "foehn_strong_threshold": "Favonio forte da",
                     "freezing_level": "Zero termico",
-                    "climate_normals": "Norme climatiche"
+                    "climate_normals": "Norme climatiche",
+                    "radar": "Radar"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSvizzera pubblica le temperature orarie solo in un unico file per tutta la Svizzera (33 MB). Ne vengono lette solo le righe della tua località: circa 0,5 MB ogni tre ore, 4 MB al giorno. Lo zero termico è un'impostazione a sé. Disattivare l'opzione per risparmiare anche questo: le previsioni orarie non avranno temperature e il resto delle previsioni richiede circa 1 MB all'ora.",
@@ -126,7 +127,8 @@
                     "foehn_threshold": "Differenza di pressione da cui il favonio è probabile; circa 4 hPa raggiungono le valli del nord, come ad Altdorf. Lo stesso al contrario per il favonio da nord.",
                     "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa.",
                     "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un file per tutta la Svizzera (33 MB), di cui vengono lette solo le righe di questa località: circa 0,5 MB ogni tre ore, 4 MB al giorno.",
-                    "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 1,4 MB) viene scaricata all'avvio di Home Assistant e poi solo controllata una volta alla settimana; i giorni di quest'anno ogni sei ore."
+                    "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 1,4 MB) viene scaricata all'avvio di Home Assistant e poi solo controllata una volta alla settimana; i giorni di quest'anno ogni sei ore.",
+                    "radar": "Sensori di pioggia e grandine in questo momento in questa località, dal radar meteorologico di MeteoSvizzera, ogni 5 minuti: più rapidi e vicini della stazione pluviometrica, ad esempio per chiudere le finestre. Scarica da 15 a 35 MB al giorno, per tutte le località insieme."
                 }
             }
         },
@@ -241,6 +243,15 @@
             },
             "record_high": {
                 "name": "Record di caldo per la data"
+            },
+            "radar_rain_rate": {
+                "name": "Radar intensità di pioggia"
+            },
+            "radar_hail_probability": {
+                "name": "Radar probabilità di grandine"
+            },
+            "radar_hail_size": {
+                "name": "Radar dimensione della grandine"
             }
         }
     }

@@ -116,7 +116,8 @@
                     "foehn_threshold": "Föhn likely from",
                     "foehn_strong_threshold": "Strong Föhn from",
                     "freezing_level": "Freezing level",
-                    "climate_normals": "Climate normals"
+                    "climate_normals": "Climate normals",
+                    "radar": "Radar"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSwiss only publishes hourly temperatures in one file for all of Switzerland (33 MB). Only the rows of your place are read from it: about 0.5 MB every three hours, 4 MB a day. The freezing level is a setting of its own. Turn this off to save that too: the hourly forecast then has no temperatures, and the rest of the forecast needs about 1 MB an hour.",
@@ -126,7 +127,8 @@
                     "foehn_threshold": "Pressure difference from which Föhn is likely; about 4 hPa reaches the northern valleys, as in Altdorf. The same the other way round for north Föhn.",
                     "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa.",
                     "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in a file for all of Switzerland (33 MB), of which only the rows of this place are read: about 0.5 MB every three hours, 4 MB a day.",
-                    "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 1.4 MB) is downloaded when Home Assistant starts, then only checked for changes once a week; this year's days every six hours."
+                    "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 1.4 MB) is downloaded when Home Assistant starts, then only checked for changes once a week; this year's days every six hours.",
+                    "radar": "Sensors for rain and hail right now at this place, from MeteoSwiss's weather radar, every 5 minutes: quicker and closer than the precipitation station, for automations such as closing windows. Downloads 15 to 35 MB a day, shared by all places."
                 }
             }
         },
@@ -241,6 +243,15 @@
             },
             "record_high": {
                 "name": "Record high for the date"
+            },
+            "radar_rain_rate": {
+                "name": "Radar rain rate"
+            },
+            "radar_hail_probability": {
+                "name": "Radar hail probability"
+            },
+            "radar_hail_size": {
+                "name": "Radar hail size"
             }
         }
     }

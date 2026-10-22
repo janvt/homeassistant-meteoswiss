@@ -33,12 +33,14 @@ from custom_components.meteoswiss.const import (
     CONF_POLLEN_STATION,
     CONF_POSTCODE,
     CONF_PRECIPITATION_STATION,
+    CONF_RADAR,
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
     CONF_STATION,
     CONF_UPDATE_INTERVAL,
     DEFAULT_CLIMATE_NORMALS,
     DEFAULT_HOURLY_TEMPERATURE,
+    DEFAULT_RADAR,
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     FOEHN_DEFAULTS,
@@ -65,7 +67,9 @@ from custom_components.meteoswiss.ogd import (
     Point,
     StationType,
     UnknownPointError,
+    distance_km,
 )
+from custom_components.meteoswiss.radar import Radar
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR, Platform.WEATHER]
@@ -83,6 +87,12 @@ CLIMATE_CHECK_INTERVAL = datetime.timedelta(hours=1)
 DATA_CLIENT: HassKey[MeteoSwissOGD] = HassKey(f"{DOMAIN}_client")
 DATA_ALERTS: HassKey[MeteoAlarm] = HassKey(f"{DOMAIN}_alerts")
 DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}_downloads")
+DATA_RADAR: HassKey[Radar] = HassKey(f"{DOMAIN}_radar")
+# Radar images come every 5 minutes, a minute or so after their interval.
+RADAR_UPDATE_INTERVAL = datetime.timedelta(minutes=1)
+# A place this close to the home is taken to be the home's: the radar is then
+# read at the home, rather than at the postal code's centre a few km away.
+RADAR_HOME_DISTANCE_KM = 10
 
 type MeteoSwissConfigEntry = ConfigEntry[MeteoSwissDataUpdateCoordinator]
 
@@ -173,6 +183,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         ),
     )
     await coordinator.async_config_entry_first_refresh()
+    point = coordinator.data["point"]
+    if entry.options.get(CONF_RADAR, DEFAULT_RADAR) and point is not None:
+        if DATA_RADAR not in hass.data:
+            hass.data[DATA_RADAR] = Radar(async_get_clientsession(hass), USER_AGENT)
+        coordinator.radar = MeteoSwissRadarCoordinator(
+            hass, entry, hass.data[DATA_RADAR], point.name, radar_location(hass, point)
+        )
+        # Not first_refresh: the rest of the entry works without the radar.
+        await coordinator.radar.async_refresh()
 
     entry.async_on_unload(entry.add_update_listener(update_listener))
 
@@ -215,6 +234,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) 
             hass.data.pop(DATA_DOWNLOADS)
             hass.data.pop(DATA_CLIENT)
             hass.data.pop(DATA_ALERTS)
+            hass.data.pop(DATA_RADAR, None)
 
     return unload_ok
 
@@ -333,6 +353,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
         self.client = client
         self.alerts = alerts
+        # The radar's readings at the place, if turned on.
+        self.radar: MeteoSwissRadarCoordinator | None = None
         self._point: Point | None = None
         self._forecast: LocalForecast | None = None
         self._forecast_checked: datetime.datetime | None = None
@@ -739,3 +761,46 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             self.real_time_precipitation_station_name
         )
         return newdata
+
+
+type RadarReadings = dict[str, tuple[float | None, datetime.datetime] | None]
+
+
+class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
+    """The radar's readings at an entry's place, apart from its other data."""
+
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        radar: Radar,
+        name: str,
+        location: tuple[float, float],
+    ) -> None:
+        super().__init__(
+            hass,
+            _LOGGER,
+            config_entry=entry,
+            name=f"MeteoSwiss radar {name}",
+            update_interval=RADAR_UPDATE_INTERVAL,
+        )
+        self._radar = radar
+        self.location = location
+
+    async def _async_update_data(self) -> RadarReadings:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        return await self._radar.get(*self.location, now)
+
+
+def radar_location(hass: HomeAssistant, point: Point) -> tuple[float, float]:
+    """Where the radar is read for a place: at the home if it is near.
+
+    Not for mountains, whose place is their summit.
+    """
+    home = (hass.config.latitude, hass.config.longitude)
+    if (
+        point.point_type != POINT_TYPE_POI
+        and distance_km(point.lat, point.lon, *home) <= RADAR_HOME_DISTANCE_KM
+    ):
+        return home
+    return point.lat, point.lon

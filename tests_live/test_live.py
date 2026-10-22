@@ -13,9 +13,13 @@ its budget: see .github/workflows/live.yaml, which runs them twice a day.
 
 from __future__ import annotations
 
+import datetime
+import json
+
+import numpy as np
 import pytest
 
-from custom_components.meteoswiss import alerts, ogd
+from custom_components.meteoswiss import alerts, ogd, radar
 from custom_components.meteoswiss.ogd import MeteoSwissOGD, StationType
 
 from .conftest import (
@@ -193,3 +197,65 @@ async def test_station_files_are_fetched_only_when_they_changed(
     )
     record("station ALT", "3 updates", counting.requests, counting.transferred, whole)
     assert 304 in statuses  # a new row comes only every 10 minutes
+
+
+RAIN_GAUGES = (
+    "https://data.geo.admin.ch/ch.meteoschweiz.messwerte-niederschlag-10min/"
+    "ch.meteoschweiz.messwerte-niederschlag-10min_en.json"
+)
+
+
+async def test_radar_images(http, counting):
+    meteo = radar.Radar(counting, USER_AGENT)  # type: ignore[arg-type]
+    now = datetime.datetime.now(datetime.timezone.utc)
+    readings = await meteo.get(47.3769, 8.5417, now)  # Zürich
+    assert readings[radar.RAIN_RATE] is not None, "no rain image in 20 minutes"
+    image = meteo._images[radar.RAIN_RATE]
+    # The Swiss composite's grid, 1 km pixels from its north-west corner.
+    assert (image.west, image.north, image.scale) == (2255000, 1480000, 1000)
+    assert image.values.shape == (640, 710)
+    # Images are downloaded whole: the share is 100%.
+    sent = counting.transferred
+    record("radar", "latest images", counting.requests, sent, sent)
+    # Each image is small: nothing to gain from reading part of it.
+    for exchange in counting.log:
+        if exchange.status == 200:
+            assert exchange.bytes < 300 * KB
+    # Hail images, published alongside.
+    slot = image.time
+    for key in (radar.HAIL_PROBABILITY, radar.HAIL_SIZE):
+        product = radar.PRODUCTS[key]
+        body = await meteo._image(product, slot, slot + radar.LOOKUP_AFTER)
+        assert body is not None, f"no {key} image for {slot}"
+        assert radar.Image.parse(body, slot, product.scale).values.shape == (640, 710)
+
+
+async def test_radar_agrees_with_rain_gauges(http):
+    """North is up: where gauges measure rain, the radar sees it."""
+    async with http.get(RAIN_GAUGES, headers={"User-Agent": USER_AGENT}) as response:
+        gauges = json.loads(await response.read())["features"]
+    end = datetime.datetime.fromisoformat(
+        gauges[0]["properties"]["reference_ts"].replace("Z", "+00:00")
+    )
+    meteo = radar.Radar(http, USER_AGENT)
+    rates = []
+    for slot in (end, end - radar.INTERVAL):  # the gauges' 10 minutes
+        body = await meteo._image(radar.PRODUCTS[radar.RAIN_RATE], slot, end)
+        if body is None:
+            pytest.skip("no radar image for the gauges' interval")
+        rates.append(radar.Image.parse(body, slot, 1.0))
+    measured, seen = [], []
+    for gauge in gauges:
+        east, north = gauge["geometry"]["coordinates"]
+        row = int((1480000 - north) // 1000)
+        column = int((east - 2255000) // 1000)
+        values = [float(image.values[row, column]) for image in rates]
+        if gauge["properties"]["value"] is None or any(v != v for v in values):
+            continue
+        measured.append(gauge["properties"]["value"])
+        seen.append(sum(values) / 2 * 10 / 60)  # mm in 10 minutes
+    if sum(m > 0 for m in measured) < 20:
+        pytest.skip("too little rain to compare")
+    correlation = np.corrcoef(measured, seen)[0, 1]
+    # About 0.7 over 10 minutes; about 0.1 if the image were upside down.
+    assert correlation > 0.4, f"radar and gauges correlate at {correlation:.2f}"

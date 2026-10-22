@@ -116,7 +116,8 @@
                     "foehn_threshold": "Foehn probable desde",
                     "foehn_strong_threshold": "Foehn fuerte desde",
                     "freezing_level": "Isoterma de cero grados",
-                    "climate_normals": "Normales climáticas"
+                    "climate_normals": "Normales climáticas",
+                    "radar": "Radar"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSuiza solo publica las temperaturas por hora en un único archivo para toda Suiza (33 MB). Solo se leen las filas de su lugar: unos 0,5 MB cada tres horas, 4 MB al día. La isoterma de cero grados es un ajuste aparte. Desactívelo para ahorrar también eso: la previsión por hora no tendrá temperaturas, y el resto de la previsión necesita unos 1 MB por hora.",
@@ -126,7 +127,8 @@
                     "foehn_threshold": "Diferencia de presión a partir de la cual el foehn es probable; unos 4 hPa llegan a los valles del norte, como en Altdorf. Igual en sentido contrario para el foehn del norte.",
                     "foehn_strong_threshold": "Diferencia de presión a partir de la cual el foehn sopla fuerte; unos 8 hPa.",
                     "freezing_level": "Un sensor para la altitud prevista de la isoterma de cero grados. MeteoSuiza la publica en un archivo para toda Suiza (33 MB), del que solo se leen las filas de este lugar: unos 0,5 MB cada tres horas, 4 MB al día.",
-                    "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 1,4 MB) se descarga al iniciar Home Assistant y después solo se comprueba una vez por semana; los días de este año cada seis horas."
+                    "climate_normals": "Sensores que comparan hoy y este mes en la estación meteorológica con sus normales de 1991–2020, calculadas a partir de la serie de mediciones de la estación, y el récord para la fecha. La serie (unos 1,4 MB) se descarga al iniciar Home Assistant y después solo se comprueba una vez por semana; los días de este año cada seis horas.",
+                    "radar": "Sensores de lluvia y granizo en este momento en este lugar, del radar meteorológico de MeteoSuiza, cada 5 minutos: más rápidos y cercanos que la estación de precipitación, por ejemplo para cerrar ventanas. Descarga de 15 a 35 MB al día, para todos los lugares juntos."
                 }
             }
         },
@@ -241,6 +243,15 @@
             },
             "record_high": {
                 "name": "Récord de calor para la fecha"
+            },
+            "radar_rain_rate": {
+                "name": "Radar intensidad de lluvia"
+            },
+            "radar_hail_probability": {
+                "name": "Radar probabilidad de granizo"
+            },
+            "radar_hail_size": {
+                "name": "Radar tamaño del granizo"
             }
         }
     }

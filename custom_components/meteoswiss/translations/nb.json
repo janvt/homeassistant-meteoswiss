@@ -116,7 +116,8 @@
                     "foehn_threshold": "Føhn sannsynlig fra",
                     "foehn_strong_threshold": "Sterk føhn fra",
                     "freezing_level": "Nullgradersgrense",
-                    "climate_normals": "Klimanormaler"
+                    "climate_normals": "Klimanormaler",
+                    "radar": "Radar"
                 },
                 "data_description": {
                     "hourly_temperature": "MeteoSwiss publiserer temperatur per time bare i én fil for hele Sveits (33 MB). Bare radene for stedet ditt leses fra den: omtrent 0,5 MB hver tredje time, 4 MB per dag. Nullgradersgrensen er en egen innstilling. Slå dette av for å spare også det: timesvarselet får da ingen temperaturer, og resten av varselet trenger omtrent 1 MB i timen.",
@@ -126,7 +127,8 @@
                     "foehn_threshold": "Trykkforskjell fra der føhn er sannsynlig; omtrent 4 hPa når dalene i nord, som i Altdorf. Det samme omvendt for nordføhn.",
                     "foehn_strong_threshold": "Trykkforskjell fra der føhnen blåser kraftig; omtrent 8 hPa.",
                     "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en fil for hele Sveits (33 MB), der bare radene for dette stedet leses: omtrent 0,5 MB hver tredje time, 4 MB per dag.",
-                    "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 1,4 MB) lastes ned når Home Assistant starter, og sjekkes deretter bare for endringer én gang i uken; årets dager hver sjette time."
+                    "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 1,4 MB) lastes ned når Home Assistant starter, og sjekkes deretter bare for endringer én gang i uken; årets dager hver sjette time.",
+                    "radar": "Sensorer for regn og hagl akkurat nå på dette stedet, fra værradaren til MeteoSwiss, hvert 5. minutt: raskere og nærmere enn nedbørsstasjonen, for eksempel for å lukke vinduer. Laster ned 15 til 35 MB per dag, for alle steder samlet."
                 }
             }
         },
@@ -241,6 +243,15 @@
             },
             "record_high": {
                 "name": "Varmerekord for datoen"
+            },
+            "radar_rain_rate": {
+                "name": "Radar regnintensitet"
+            },
+            "radar_hail_probability": {
+                "name": "Radar haglsannsynlighet"
+            },
+            "radar_hail_size": {
+                "name": "Radar haglstørrelse"
             }
         }
     }
