@@ -307,5 +307,38 @@
                 "name": "Downloads"
             }
         }
+    },
+    "services": {
+        "import_history": {
+            "name": "Stationsverlauf importieren",
+            "description": "Importiert die stündlichen Messungen der Wetterstation von MeteoSchweiz in die Langzeitstatistik ihrer Sensoren, für die Stunden, bevor Home Assistant sie aufgezeichnet hat. Lädt etwa 1 MB für dieses Jahr und 7 bis 13 MB pro früherem Jahrzehnt herunter.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Eintrag",
+                    "description": "Der MeteoSchweiz-Eintrag, dessen Wetterstation importiert wird."
+                },
+                "since": {
+                    "name": "Ab",
+                    "description": "Der erste zu importierende Tag. Standardmässig der Beginn dieses Jahrzehnts; alle Sensoren der Station belegen etwa 9 MB Statistik pro Jahr, dauerhaft."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "Der MeteoSchweiz-Eintrag ist nicht eingerichtet."
+        },
+        "no_weather_station": {
+            "message": "Dieser Eintrag hat keine Wetterstation."
+        },
+        "downloads_paused": {
+            "message": "Downloads sind für diesen Eintrag pausiert: Schalte zuerst seinen Schalter Downloads ein."
+        },
+        "no_recorder": {
+            "message": "Der Recorder läuft nicht, es gibt also keine Statistik zum Importieren."
+        },
+        "history_unavailable": {
+            "message": "Der Stationsverlauf konnte nicht heruntergeladen werden: {error}"
+        }
     }
 }

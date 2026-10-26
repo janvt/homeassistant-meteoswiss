@@ -307,5 +307,38 @@
                 "name": "Downloads"
             }
         }
+    },
+    "services": {
+        "import_history": {
+            "name": "Import station history",
+            "description": "Imports the weather station's hourly measurements from MeteoSwiss into the long-term statistics of its sensors, for the hours before Home Assistant recorded them. Downloads about 1 MB for this year and 7 to 13 MB for each decade before.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Entry",
+                    "description": "The MeteoSwiss entry whose weather station to import."
+                },
+                "since": {
+                    "name": "Since",
+                    "description": "The first day to import. By default the start of this decade; all the station's sensors take about 9 MB of statistics a year, kept for good."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "The MeteoSwiss entry is not set up."
+        },
+        "no_weather_station": {
+            "message": "This entry has no weather station."
+        },
+        "downloads_paused": {
+            "message": "Downloads are paused for this entry: turn its Downloads switch on first."
+        },
+        "no_recorder": {
+            "message": "The recorder is not running, so there are no statistics to import into."
+        },
+        "history_unavailable": {
+            "message": "The station history could not be downloaded: {error}"
+        }
     }
 }

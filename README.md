@@ -289,6 +289,35 @@ and less reliable in the mountains: for how much it rained, use the
 precipitation station.  Hail is only looked at while it rains at or next to
 the place.
 
+## Station history
+
+The action *MeteoSwiss: Import station history* (`meteoswiss.import_history`)
+fills the long-term statistics of the weather station's sensors with the
+station's hourly measurements from MeteoSwiss, so that their history graphs
+reach back before you installed the integration:
+
+```yaml
+action: meteoswiss.import_history
+data:
+  config_entry_id: 0123456789abcdef0123456789abcdef
+  since: "2020-01-01"
+```
+
+* It imports only the hours before Home Assistant started recording each
+  sensor: what Home Assistant recorded itself is left as it is, and importing
+  again adds nothing.  A sensor needs to have been recorded for an hour first.
+* `since` is the first day; by default the start of this decade.  Each year
+  adds about 9 MB to Home Assistant's database for all the station's sensors,
+  and long-term statistics are kept for good, so go further back only if you
+  want it.
+* It downloads the station's history files: compressed, about 0.4 MB a year.
+* Temperatures get the hour's mean, lowest and highest; the other sensors the
+  mean only, so their lowest and highest show from your install on.  Gusts,
+  the wind direction and wind chill are not imported.
+* It is the history of the weather station the entry has now.  If you chose
+  another station before, the older part of the graphs is the new station's.
+* It is refused while the entry's *Downloads* switch is off.
+
 ## Download volumes
 
 MeteoSwiss publishes its forecast as large files covering all of

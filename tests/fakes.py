@@ -188,6 +188,21 @@ POLLEN_NOW = {
 
 NOW = datetime.datetime(2026, 10, 20, 12, 30, tzinfo=UTC)
 
+# The station's history: hours from midnight UTC on the 19th to 14:00 on the
+# 20th, past NOW, all alike.
+HISTORY_HOURS = [
+    datetime.datetime(2026, 10, 19, tzinfo=UTC) + datetime.timedelta(hours=i)
+    for i in range(38)
+]
+STATION_HOURS = {
+    "tre200h0": 5.0,
+    "tre200hn": 4.0,
+    "tre200hx": 6.5,
+    "ure200h0": 90.0,
+    "rre150h0": 0.6,  # mm in the hour: 0.1 per 10 minutes
+    # No pressures, so those sensors get nothing.
+}
+
 
 def make_forecast(
     run: str = "202610201200", with_temperature: bool = True, hours: int = 12
@@ -281,6 +296,7 @@ class FakeOGD:
     forecast_calls = 0
     run_checks = 0
     station_calls = 0
+    history_calls: list = []
     temperature_calls = 0
     temperature_error: Exception | None = None
     climate_calls = 0
@@ -307,6 +323,7 @@ class FakeOGD:
         cls.forecast_calls = 0
         cls.run_checks = 0
         cls.station_calls = 0
+        cls.history_calls = []
         cls.temperature_calls = 0
         cls.temperature_error = None
         cls.climate_calls = 0
@@ -377,6 +394,17 @@ class FakeOGD:
         if abbr in FOEHN_PRESSURES:
             return {"pp0qffs0": FOEHN_PRESSURES[abbr]}
         return dict(STATION_MEASUREMENTS)
+
+    def station_history_urls(self, abbr, since, now):
+        return [f"https://fake/{abbr.lower()}/ogd-smn_{abbr.lower()}_h_recent.csv"]
+
+    async def get_station_hours(self, url, columns, since):
+        FakeOGD.history_calls.append((url, frozenset(columns), since))
+        return [
+            (start, {c: STATION_HOURS.get(c) for c in columns})
+            for start in HISTORY_HOURS
+            if start >= since
+        ]
 
     async def latest_run(self, now=None):
         FakeOGD.run_checks += 1

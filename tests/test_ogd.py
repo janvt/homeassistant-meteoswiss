@@ -575,6 +575,63 @@ async def test_missing_precipitation_station_reports_its_own_file():
         await client.get_station_now("XYZ", StationType.PRECIPITATION, now=STATIONS_NOW)
 
 
+class TestStationHistory:
+    HEADER = "station_abbr;reference_timestamp;tre200h0;rre150h0;ure200h0\n"
+
+    def test_rows_are_by_the_start_of_their_hour(self):
+        # A row's timestamp is the end of its hour.
+        text = (
+            self.HEADER
+            + "SMA;19.10.2026 23:00;4.0;0.2;80\n"
+            + "SMA;20.10.2026 00:00;5.0;;81\n"
+            + "SMA;20.10.2026 01:00;6.0;0.4;82\n"
+        )
+        hours = ogd.parse_station_hours(
+            text,
+            {"tre200h0", "rre150h0"},
+            datetime.datetime(2026, 10, 19, 23, tzinfo=UTC),
+        )
+        assert hours == [
+            (
+                datetime.datetime(2026, 10, 19, 23, tzinfo=UTC),
+                {"tre200h0": 5.0, "rre150h0": None},
+            ),
+            (
+                datetime.datetime(2026, 10, 20, 0, tzinfo=UTC),
+                {"tre200h0": 6.0, "rre150h0": 0.4},
+            ),
+        ]
+
+    def test_files_from_the_decade_of_since(self):
+        client, _ = make_client({})
+        urls = client.station_history_urls(
+            "BER",
+            datetime.datetime(2009, 6, 1, tzinfo=UTC),
+            datetime.datetime(2026, 10, 20, tzinfo=UTC),
+        )
+        assert [u.rsplit("/", 1)[1] for u in urls] == [
+            "ogd-smn_ber_h_historical_2000-2009.csv",
+            "ogd-smn_ber_h_historical_2010-2019.csv",
+            "ogd-smn_ber_h_historical_2020-2029.csv",
+            "ogd-smn_ber_h_recent.csv",
+        ]
+
+    async def test_a_decade_before_the_station_is_no_file(self):
+        url = f"{ogd.SMN_URL}/ber/ogd-smn_ber_h_recent.csv"
+        body = self.HEADER + "BER;20.10.2026 01:00;6.0;0.4;82\n"
+        client, session = make_client({url: body.encode("cp1252")})
+        since = datetime.datetime(2026, 1, 1, tzinfo=UTC)
+
+        missing = url.replace("recent", "historical_1980-1989")
+        assert await client.get_station_hours(missing, {"tre200h0"}, since) == []
+        hours = await client.get_station_hours(url, {"tre200h0"}, since)
+        assert hours == [
+            (datetime.datetime(2026, 10, 20, 0, tzinfo=UTC), {"tre200h0": 6.0})
+        ]
+        # Both counted, the missing one for its headers.
+        assert client.downloaded == session.transferred()
+
+
 class TestFewerRequests:
     """Lookups reuse what they learnt, as each run's files are laid out alike."""
 

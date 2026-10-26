@@ -307,5 +307,38 @@
                 "name": "Nedlastinger"
             }
         }
+    },
+    "services": {
+        "import_history": {
+            "name": "Importer stasjonshistorikk",
+            "description": "Importerer værstasjonens timesmålinger fra MeteoSveits til langtidsstatistikken til sensorene, for timene før Home Assistant registrerte dem. Laster ned omtrent 1 MB for i år og 7 til 13 MB for hvert tiår før.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Oppføring",
+                    "description": "MeteoSveits-oppføringen hvis værstasjon skal importeres."
+                },
+                "since": {
+                    "name": "Fra",
+                    "description": "Den første dagen som importeres. Som standard starten av dette tiåret; alle stasjonens sensorer tar omtrent 9 MB statistikk i året, som beholdes for godt."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "MeteoSveits-oppføringen er ikke satt opp."
+        },
+        "no_weather_station": {
+            "message": "Denne oppføringen har ingen værstasjon."
+        },
+        "downloads_paused": {
+            "message": "Nedlastinger er satt på pause for denne oppføringen: slå først på bryteren Nedlastinger."
+        },
+        "no_recorder": {
+            "message": "Opptakeren kjører ikke, så det finnes ingen statistikk å importere til."
+        },
+        "history_unavailable": {
+            "message": "Stasjonshistorikken kunne ikke lastes ned: {error}"
+        }
     }
 }

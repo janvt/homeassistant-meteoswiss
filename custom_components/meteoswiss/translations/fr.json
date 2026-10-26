@@ -307,5 +307,38 @@
                 "name": "Téléchargements"
             }
         }
+    },
+    "services": {
+        "import_history": {
+            "name": "Importer l'historique de la station",
+            "description": "Importe les mesures horaires de la station météo de MétéoSuisse dans les statistiques à long terme de ses capteurs, pour les heures avant que Home Assistant ne les enregistre. Télécharge environ 1 Mo pour cette année et 7 à 13 Mo par décennie précédente.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Entrée",
+                    "description": "L'entrée MétéoSuisse dont la station météo est importée."
+                },
+                "since": {
+                    "name": "Depuis",
+                    "description": "Le premier jour à importer. Par défaut le début de cette décennie ; tous les capteurs de la station occupent environ 9 Mo de statistiques par an, conservées pour de bon."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "L'entrée MétéoSuisse n'est pas configurée."
+        },
+        "no_weather_station": {
+            "message": "Cette entrée n'a pas de station météo."
+        },
+        "downloads_paused": {
+            "message": "Les téléchargements sont en pause pour cette entrée : activez d'abord son interrupteur Téléchargements."
+        },
+        "no_recorder": {
+            "message": "L'enregistreur ne fonctionne pas, il n'y a donc pas de statistiques où importer."
+        },
+        "history_unavailable": {
+            "message": "L'historique de la station n'a pas pu être téléchargé : {error}"
+        }
     }
 }
