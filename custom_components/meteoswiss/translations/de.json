@@ -258,6 +258,48 @@
             },
             "downloaded_this_month": {
                 "name": "Heruntergeladen diesen Monat"
+            },
+            "max_temperature_today": {
+                "name": "Höchsttemperatur heute"
+            },
+            "min_temperature_today": {
+                "name": "Tiefsttemperatur heute"
+            },
+            "precipitation_today": {
+                "name": "Niederschlag heute"
+            },
+            "sunshine_today": {
+                "name": "Sonnenschein heute"
+            },
+            "lowest_freezing_level_48h": {
+                "name": "Tiefste Nullgradgrenze nächste 48 Stunden"
+            },
+            "snow_depth": {
+                "name": "Schneehöhe"
+            },
+            "temperature_5cm": {
+                "name": "Temperatur 5 cm über Boden"
+            },
+            "soil_temperature_5cm": {
+                "name": "Bodentemperatur 5 cm"
+            },
+            "soil_temperature_10cm": {
+                "name": "Bodentemperatur 10 cm"
+            },
+            "soil_temperature_20cm": {
+                "name": "Bodentemperatur 20 cm"
+            },
+            "wind_chill": {
+                "name": "Windchill"
+            },
+            "diffuse_radiation": {
+                "name": "Diffuse Strahlung"
+            },
+            "longwave_radiation": {
+                "name": "Langwellige Strahlung"
+            },
+            "measurement_time": {
+                "name": "Messzeitpunkt"
             }
         },
         "switch": {

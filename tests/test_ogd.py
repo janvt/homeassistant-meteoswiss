@@ -484,6 +484,8 @@ class TestStationNow:
             "tre200s0": 10.0,
             "ure200s0": 80.0,
             "rre150z0": 0.2,
+            # The time of the newest row.
+            "measured": datetime.datetime(2026, 10, 20, 11, 40, tzinfo=UTC),
         }
 
     async def test_old_rows_are_not_used(self):
@@ -511,7 +513,14 @@ class TestStationNow:
             "SMA", StationType.WEATHER, now=STATIONS_NOW
         )
         assert result == (
-            {"tre200s0": 10.0, "ure200s0": 75.0, "rre150z0": 0.2} if fresh else {}
+            {
+                "tre200s0": 10.0,
+                "ure200s0": 75.0,
+                "rre150z0": 0.2,
+                "measured": datetime.datetime(2026, 10, 20, 10, 40, tzinfo=UTC),
+            }
+            if fresh
+            else {}
         )
 
     async def test_rows_without_a_time_are_ignored(self):
@@ -536,7 +545,7 @@ class TestStationNow:
         result = await client.get_station_now(
             "ABE", StationType.PRECIPITATION, now=STATIONS_NOW
         )
-        assert result == {"rre150z0": 0.4}
+        assert result["rre150z0"] == 0.4
 
     async def test_unknown_station(self):
         client, _ = make_client({})
@@ -619,12 +628,12 @@ class TestFewerRequests:
 
         # Asked whether it changed, and answered that it did not.
         assert "If-None-Match" in session.headers[1]
-        assert now == {"tre200s0": 5.0}
+        assert now["tre200s0"] == 5.0
 
         session.files[file] = (body + "SMA;20.10.2026 11:50;6\n").encode()
         clock[0] += 300
         now = await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
-        assert now == {"tre200s0": 6.0}
+        assert now["tre200s0"] == 6.0
 
 
 class TestBlocks:

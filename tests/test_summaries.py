@@ -217,3 +217,41 @@ class TestOtherSummaries:
             sunshine=lambda t: None if t == utc(2026, 10, 21, 8) else 60.0,
         )
         assert summaries.sunshine_hours(hourly, self.DAY) is None
+
+
+class TestToday:
+    def test_is_the_local_day(self):
+        # 00:30 local on the 21st (UTC+2), while it is still the 20th in UTC.
+        start, end = summaries.today(utc(2026, 10, 20, 22, 30))
+        assert (start, end) == (utc(2026, 10, 20, 22), utc(2026, 10, 21, 22))
+
+    def test_sunshine_today_counts_the_whole_day(self):
+        hourly = hours(utc(2026, 10, 19, 22), utc(2026, 10, 21, 22))
+        window = summaries.today(utc(2026, 10, 20, 15))
+        assert summaries.sunshine_hours(hourly, window) == 12.0
+
+    def test_day_of(self):
+        daily = [{"date": "2026-10-20"}, {"date": "2026-10-21"}]
+        assert summaries.day_of(daily, utc(2026, 10, 20, 22, 30)) == daily[1]
+        assert summaries.day_of(daily, utc(2026, 10, 23, 12)) is None
+
+
+class TestLowestHour:
+    def test_the_first_lowest_hour(self):
+        levels = {13: 1800.0, 20: 1500.0, 30: 1500.0}
+        hourly = hours(
+            utc(2026, 10, 20, 12),
+            utc(2026, 10, 22, 12),
+            freezing_level=lambda t: levels.get(t.hour + (t.day - 20) * 24, 2500.0),
+        )
+        window = summaries.coming_hours(utc(2026, 10, 20, 12, 30), 48)
+        lowest = summaries.lowest_hour(hourly, window, "freezing_level")
+        assert lowest["freezing_level"] == 1500.0
+        assert lowest["time"] == utc(2026, 10, 20, 20)
+
+    def test_none_when_an_hour_is_missing(self):
+        hourly = hours(
+            utc(2026, 10, 20, 12), utc(2026, 10, 21, 12), freezing_level=2500.0
+        )
+        window = summaries.coming_hours(utc(2026, 10, 20, 12), 48)
+        assert summaries.lowest_hour(hourly, window, "freezing_level") is None

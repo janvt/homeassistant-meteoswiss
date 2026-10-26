@@ -10,7 +10,11 @@ from __future__ import annotations
 import datetime
 from collections.abc import Callable
 
-from custom_components.meteoswiss.ogd import LOCAL_TIME_ZONE, HourlyForecast
+from custom_components.meteoswiss.ogd import (
+    LOCAL_TIME_ZONE,
+    DailyForecast,
+    HourlyForecast,
+)
 
 HOUR = datetime.timedelta(hours=1)
 
@@ -49,6 +53,15 @@ def tonight(now: datetime.datetime) -> Window:
         start = _local(today, NIGHT[0])
         end = _local(today + datetime.timedelta(days=1), NIGHT[1])
     return max(start, _hour_start(now)), end
+
+
+def today(now: datetime.datetime) -> Window:
+    """Today, from midnight: the forecast starts at the local midnight before
+    its run."""
+    day = now.astimezone(LOCAL_TIME_ZONE).date()
+    return _local(day, datetime.time(0)), _local(
+        day + datetime.timedelta(days=1), datetime.time(0)
+    )
 
 
 def tomorrow(
@@ -125,3 +138,19 @@ max_gust = _summarise("wind_gust", max)
 min_temperature = _summarise("temperature", min)
 precipitation = _summarise("precipitation", sum)
 precipitation_probability = _summarise("precipitation_probability", max)
+
+
+def lowest_hour(
+    hourly: list[HourlyForecast], window: Window, key: str
+) -> HourlyForecast | None:
+    """The hour of a window with the lowest value, the first if several."""
+    hours = hours_in(hourly, window)
+    if _values(hours, key) is None:
+        return None
+    return min(hours, key=lambda h: h[key])  # type: ignore[literal-required]
+
+
+def day_of(daily: list[DailyForecast], now: datetime.datetime) -> DailyForecast | None:
+    """Today's daily forecast (local date)."""
+    date = now.astimezone(LOCAL_TIME_ZONE).date().isoformat()
+    return next((d for d in daily if d["date"] == date), None)

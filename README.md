@@ -147,6 +147,19 @@ The station pressure, QNH and dew point (which the weather entity also has)
 are created turned off: turn them on from the device's page, under *entities
 not shown*.
 
+Some stations measure more, and their sensors are created for the stations
+that report them when the entry is set up:
+
+* *Snow depth*, in cm, measured automatically.
+* *Temperature 5 cm above ground*, which shows ground frost before the
+  temperature at 2 m does.
+* *Soil temperature 5 cm*, *10 cm* and *20 cm* (turned off).
+* *Wind chill*, the temperature felt in the wind (turned off).
+* *Diffuse radiation* and *Longwave radiation*, in W/m² (turned off).
+
+*Measurement time* (diagnostic, turned off) is when the station's latest
+measurement was made.
+
 ### Forecast summaries
 
 Every forecast has sensors summarising it.  All times are local
@@ -160,7 +173,10 @@ Every forecast has sensors summarising it.  All times are local
 | Strongest gust tomorrow 9–15 | km/h |
 | Precipitation next hour, Chance of rain next hour | For the hour after the current one; the chance of rain is MeteoSwiss's for the three hours up to its end |
 | Lowest temperature tonight | °C, 18:00 to 08:00 from the current hour on |
+| Highest temperature today, Lowest temperature today, Precipitation today | MeteoSwiss's forecast for the day |
+| Sunshine today | Hours of sunshine over the whole day, the hours already past included |
 | Freezing level | Forecast height of the 0 °C line for the current hour, in m (when turned on) |
+| Lowest freezing level next 48 hours | The lowest of those heights from the current hour on, in m, with the hour it is forecast for as `at` (when turned on) |
 
 The snow and temperature sensors need *Hourly temperatures*.  A sensor is
 unavailable when any hour of its window, or a value it needs, is missing,
