@@ -166,14 +166,21 @@ async def test_hourly_forecast_starts_with_the_current_hour(hass, entry):
     assert hours[7]["condition"] is None  # symbol 999 is unknown
 
 
-async def test_unrecognised_symbol_is_unavailable(hass, entry, frozen_now):
+async def test_unrecognised_symbol_is_unknown(hass, entry, frozen_now, caplog):
     await setup(hass, entry)
     frozen_now.move_to("2026-10-20T19:30:00+00:00")
 
     await entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
 
-    assert hass.states.get(weather_id(hass, entry)).state == "unavailable"
+    state = hass.states.get(weather_id(hass, entry))
+    assert state.state == "unknown"
+    # The measurements are still shown.
+    assert state.attributes["temperature"] == 13.4
+    # Logged once, not on every update.
+    assert caplog.text.count("Unknown MeteoSwiss weather symbol 999") == 1
 
 
 async def test_forecast_is_fetched_once_per_run(hass, entry, fake_ogd, frozen_now):
