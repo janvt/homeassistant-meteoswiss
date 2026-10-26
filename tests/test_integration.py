@@ -78,7 +78,8 @@ async def test_weather_entity(hass, entry):
     assert state.state == "sunny"
     assert state.attributes["temperature"] == 13.4
     assert state.attributes["humidity"] == 80  # rounded by Home Assistant
-    assert state.attributes["pressure"] == 940.5
+    # At sea level, not the station's 940.5 hPa.
+    assert state.attributes["pressure"] == 1012.3
     assert state.attributes["wind_speed"] == 8.6
     assert state.attributes["wind_bearing"] == 31.0
     assert state.attributes["wind_gust_speed"] == 25.2

@@ -191,8 +191,10 @@ class MeteoSwissWeather(
 
     @property
     def native_pressure(self) -> float | None:
+        # Reduced to sea level (QFF), as weather cards and other weather
+        # integrations show it, rather than at the station's height.
         return condition_name_to_first_value(
-            self._condition_for_all_stations, "prestas0"
+            self._condition_for_all_stations, "pp0qffs0"
         )
 
     @property

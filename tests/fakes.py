@@ -233,6 +233,7 @@ STATION_MEASUREMENTS = {
     "tre200s0": 13.4,
     "ure200s0": 79.9,
     "prestas0": 940.5,
+    "pp0qffs0": 1012.3,
     "fu3010z0": 8.6,
     "dkl010z0": 31.0,
     "fu3010z1": 25.2,
