@@ -50,6 +50,7 @@ from custom_components.meteoswiss.const import (
     USER_AGENT,
 )
 from custom_components.meteoswiss.downloads import SharedDownloads
+from custom_components.meteoswiss.history import async_setup_services
 from custom_components.meteoswiss.issues import (
     HIGH_USAGE_ISSUE,
     USAGE_NOTICE_PER_ENTRY,
@@ -107,6 +108,7 @@ type MeteoSwissConfigEntry = ConfigEntry[MeteoSwissDataUpdateCoordinator]
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
     """Setup via old entry in configuration.yaml."""
     _LOGGER.debug("Async setup: meteoswiss")
+    async_setup_services(hass)
 
     conf = config.get(DOMAIN)
     if conf is None:
@@ -269,10 +271,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) 
 
 class MeteoSwissClientResult(TypedDict):
     forecast: LocalForecast | None
-    # Latest measurements of each configured station, by station.
-    condition_by_station: dict[str, dict[str, float | None]]
+    # Latest measurements of each configured station, by station: by
+    # parameter, and "measured", the time of the latest.
+    condition_by_station: dict[str, dict[str, Any]]
     # The same, in order of preference.
-    condition: list[dict[str, float | None]]
+    condition: list[dict[str, Any]]
     # The latest pollen measurements by pollen type, and "measured".
     pollen: dict[str, Any]
     # The weather warnings for the place that have not expired; None if unknown.
@@ -720,7 +723,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         """Update data from MeteoSwiss open data."""
         if self.paused:
             return self._paused_data()
-        condition_by_station: dict[str, dict[str, float | None]] = {}
+        condition_by_station: dict[str, dict[str, Any]] = {}
         # Only the first forecast is waited for: there is none to show before.
         first = self._forecast is None
         try:

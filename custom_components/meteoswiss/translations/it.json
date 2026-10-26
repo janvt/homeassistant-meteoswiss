@@ -261,6 +261,48 @@
             },
             "downloaded_this_month": {
                 "name": "Scaricato questo mese"
+            },
+            "max_temperature_today": {
+                "name": "Temperatura massima oggi"
+            },
+            "min_temperature_today": {
+                "name": "Temperatura minima oggi"
+            },
+            "precipitation_today": {
+                "name": "Precipitazioni oggi"
+            },
+            "sunshine_today": {
+                "name": "Soleggiamento oggi"
+            },
+            "lowest_freezing_level_48h": {
+                "name": "Limite dello zero termico più basso nelle prossime 48 ore"
+            },
+            "snow_depth": {
+                "name": "Altezza della neve"
+            },
+            "temperature_5cm": {
+                "name": "Temperatura a 5 cm dal suolo"
+            },
+            "soil_temperature_5cm": {
+                "name": "Temperatura del suolo 5 cm"
+            },
+            "soil_temperature_10cm": {
+                "name": "Temperatura del suolo 10 cm"
+            },
+            "soil_temperature_20cm": {
+                "name": "Temperatura del suolo 20 cm"
+            },
+            "wind_chill": {
+                "name": "Temperatura percepita dal vento"
+            },
+            "diffuse_radiation": {
+                "name": "Radiazione diffusa"
+            },
+            "longwave_radiation": {
+                "name": "Radiazione a onde lunghe"
+            },
+            "measurement_time": {
+                "name": "Ora della misura"
             }
         },
         "image": {
@@ -272,6 +314,39 @@
             "downloads": {
                 "name": "Download"
             }
+        }
+    },
+    "services": {
+        "import_history": {
+            "name": "Importa la cronologia della stazione",
+            "description": "Importa le misure orarie della stazione meteo di MeteoSvizzera nelle statistiche a lungo termine dei suoi sensori, per le ore prima che Home Assistant le registrasse. Scarica circa 1 MB per quest'anno e da 7 a 13 MB per ogni decennio precedente.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Voce",
+                    "description": "La voce MeteoSvizzera di cui importare la stazione meteo."
+                },
+                "since": {
+                    "name": "Dal",
+                    "description": "Il primo giorno da importare. Di default l'inizio di questo decennio; tutti i sensori della stazione occupano circa 9 MB di statistiche all'anno, conservate per sempre."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "La voce MeteoSvizzera non è configurata."
+        },
+        "no_weather_station": {
+            "message": "Questa voce non ha una stazione meteo."
+        },
+        "downloads_paused": {
+            "message": "I download sono in pausa per questa voce: attiva prima il suo interruttore Download."
+        },
+        "no_recorder": {
+            "message": "Il registratore non è attivo, quindi non ci sono statistiche in cui importare."
+        },
+        "history_unavailable": {
+            "message": "Non è stato possibile scaricare la cronologia della stazione: {error}"
         }
     }
 }
