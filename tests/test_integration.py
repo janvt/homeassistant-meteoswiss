@@ -53,6 +53,10 @@ SUMMARY_NAMES = (
     "fohn_outlook",
     "downloaded_last_24_hours",
     "downloaded_this_month",
+    "highest_temperature_today",
+    "lowest_temperature_today",
+    "precipitation_today",
+    "sunshine_today",
 )
 
 
@@ -670,12 +674,72 @@ async def test_less_used_sensors_are_off_by_default(hass, entry_data):
         "pressure",
         "pressure_qnh",
         "dew_point",
+        "wind_chill",
+        "longwave_radiation",
+        "measurement_time",
         "pollen_alder",
         "pollen_ash",
         "pollen_beech",
         "pollen_hazel",
         "pollen_oak",
     }
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_station_sensors_for_what_the_station_measures(hass, entry):
+    await setup(hass, entry)
+
+    def state(key):
+        found = er.async_get(hass).async_get_entity_id(
+            "sensor", DOMAIN, f"sensor.{entry.entry_id}-{key}"
+        )
+        return found and hass.states.get(found)
+
+    assert state("snow_depth").state == "0.0"
+    assert state("snow_depth").attributes["unit_of_measurement"] == "cm"
+    assert state("temperature_5cm").state == "11.2"
+    assert (
+        state("temperature_5cm").attributes["friendly_name"]
+        == "Fluntern Temperature 5 cm above ground"
+    )
+    assert state("wind_chill").state == "12.1"
+    assert state("longwave_radiation").state == "335.0"
+    assert state("measurement_time").state == "2026-10-20T12:20:00+00:00"
+    # Not measured at this station, so not created.
+    for key in (
+        "soil_temperature_5cm",
+        "soil_temperature_10cm",
+        "soil_temperature_20cm",
+        "diffuse_radiation",
+    ):
+        assert state(key) is None, key
+
+
+async def test_today_sensors(hass, entry):
+    await setup(hass, entry)
+
+    def state(key):
+        return hass.states.get(
+            entity_id(hass, "sensor", f"sensor.{entry.entry_id}-{key}")
+        )
+
+    assert state("max_temperature_today").state == "15.0"
+    assert state("min_temperature_today").state == "8.0"
+    assert state("precipitation_today").state == "0.0"
+    # The fake forecast starts at 11:00 local, so today is incomplete.
+    assert state("sunshine_today").state == "unavailable"
+
+
+async def test_lowest_freezing_level_next_48_hours(hass, fake_ogd, frozen_now):
+    fake_ogd.hours = 60
+    entry = await add_mountain(hass)
+
+    state = hass.states.get(
+        entity_id(hass, "sensor", f"sensor.{entry.entry_id}-lowest_freezing_level_48h")
+    )
+    assert state.state == "2900.0"
+    assert state.attributes["at"] == "2026-10-20T12:00:00+00:00"
+    assert state.attributes["unit_of_measurement"] == "m"
 
 
 async def test_pollen_station_without_recent_data(hass, entry_data):

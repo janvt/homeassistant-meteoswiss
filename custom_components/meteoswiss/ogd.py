@@ -753,8 +753,9 @@ class MeteoSwissOGD:
         abbr: str,
         station_type: StationType,
         now: datetime.datetime | None = None,
-    ) -> dict[str, float | None]:
-        """The latest measurements of a station, empty if it has none recently."""
+    ) -> dict[str, Any]:
+        """The latest measurements of a station by parameter, and "measured",
+        the time of the latest; empty if it has none recently."""
         low = abbr.lower()
         weather_url = f"{SMN_URL}/{low}/ogd-smn_{low}_t_now.csv"
         if station_type == StationType.WEATHER:
@@ -783,13 +784,15 @@ class MeteoSwissOGD:
         ]
         # The newest row is often incomplete, so every parameter comes from the
         # most recent of the last few rows that has a value for it.
-        latest: dict[str, float | None] = {}
+        latest: dict[str, Any] = {}
         for row in reversed(rows[-STATION_ROWS_LOOKBACK:]):
             for key, value in row.items():
                 if key in ("station_abbr", "reference_timestamp"):
                     continue
                 if latest.get(key) is None:
                     latest[key] = _number(value)
+        if rows:
+            latest["measured"] = _station_time(rows[-1]["reference_timestamp"])
         return latest
 
     async def get_pollen_now(

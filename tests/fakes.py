@@ -241,6 +241,13 @@ STATION_MEASUREMENTS = {
     "tde200s0": 9.9,
     "wcc006s0": 2.0,  # MeteoSwiss's Föhn index: Föhn
     "rre150z0": 0.0,
+    # Only some stations measure these; this one has no soil temperatures
+    # or diffuse radiation.
+    "htoauts0": 0.0,
+    "tre005s0": 11.2,
+    "xchills0": 12.1,
+    "oli000z0": 335.0,
+    "measured": datetime.datetime(2026, 10, 20, 12, 20, tzinfo=datetime.timezone.utc),
 }
 
 

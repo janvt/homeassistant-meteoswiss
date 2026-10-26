@@ -258,6 +258,48 @@
             },
             "downloaded_this_month": {
                 "name": "Downloaded this month"
+            },
+            "max_temperature_today": {
+                "name": "Highest temperature today"
+            },
+            "min_temperature_today": {
+                "name": "Lowest temperature today"
+            },
+            "precipitation_today": {
+                "name": "Precipitation today"
+            },
+            "sunshine_today": {
+                "name": "Sunshine today"
+            },
+            "lowest_freezing_level_48h": {
+                "name": "Lowest freezing level next 48 hours"
+            },
+            "snow_depth": {
+                "name": "Snow depth"
+            },
+            "temperature_5cm": {
+                "name": "Temperature 5 cm above ground"
+            },
+            "soil_temperature_5cm": {
+                "name": "Soil temperature 5 cm"
+            },
+            "soil_temperature_10cm": {
+                "name": "Soil temperature 10 cm"
+            },
+            "soil_temperature_20cm": {
+                "name": "Soil temperature 20 cm"
+            },
+            "wind_chill": {
+                "name": "Wind chill"
+            },
+            "diffuse_radiation": {
+                "name": "Diffuse radiation"
+            },
+            "longwave_radiation": {
+                "name": "Longwave radiation"
+            },
+            "measurement_time": {
+                "name": "Measurement time"
             }
         },
         "switch": {

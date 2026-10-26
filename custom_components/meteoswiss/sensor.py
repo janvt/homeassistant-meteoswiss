@@ -16,6 +16,7 @@ from homeassistant.const import (
     PERCENTAGE,
     EntityCategory,
     UnitOfInformation,
+    UnitOfIrradiance,
     UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfPressure,
@@ -63,6 +64,7 @@ from custom_components.meteoswiss.const import (
 from custom_components.meteoswiss.ogd import (
     POLLEN_PARAMETERS,
     HourlyForecast,
+    LocalForecast,
     StationType,
     current_hour,
 )
@@ -82,6 +84,91 @@ PRECIPITATION_SENSOR_TYPES = ("10minrain",)
 STATION_SENSORS_OFF_BY_DEFAULT = ("pressure", "pressure_qnh", "dew_point")
 # The pollen most people are allergic to; the others are created turned off.
 POLLEN_ON_BY_DEFAULT = ("birch", "grasses")
+
+
+@dataclass(frozen=True, kw_only=True)
+class StationDescription(SensorEntityDescription):
+    """A measurement only some weather stations make.
+
+    Created only for a station that reported it at setup.
+    """
+
+    parameter: str  # e.g. htoauts0
+
+
+def _soil(depth: int) -> StationDescription:
+    return StationDescription(
+        key=f"soil_temperature_{depth}cm",
+        translation_key=f"soil_temperature_{depth}cm",
+        parameter=f"tso{depth:03d}s0",
+        icon="mdi:thermometer-lines",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+    )
+
+
+STATION_SENSORS: tuple[StationDescription, ...] = (
+    StationDescription(
+        key="snow_depth",
+        translation_key="snow_depth",
+        parameter="htoauts0",
+        icon="mdi:snowflake",
+        device_class=SensorDeviceClass.DISTANCE,
+        native_unit_of_measurement=UnitOfLength.CENTIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+    ),
+    StationDescription(
+        # Colder than at 2 m on clear nights: shows ground frost first.
+        key="temperature_5cm",
+        translation_key="temperature_5cm",
+        parameter="tre005s0",
+        icon="mdi:thermometer-low",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+    _soil(5),
+    _soil(10),
+    _soil(20),
+    StationDescription(
+        key="wind_chill",
+        translation_key="wind_chill",
+        parameter="xchills0",
+        icon="mdi:snowflake-thermometer",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        entity_registry_enabled_default=False,
+    ),
+    StationDescription(
+        key="diffuse_radiation",
+        translation_key="diffuse_radiation",
+        parameter="ods000z0",
+        icon="mdi:weather-partly-cloudy",
+        device_class=SensorDeviceClass.IRRADIANCE,
+        native_unit_of_measurement=UnitOfIrradiance.WATTS_PER_SQUARE_METER,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+    ),
+    StationDescription(
+        key="longwave_radiation",
+        translation_key="longwave_radiation",
+        parameter="oli000z0",
+        icon="mdi:sun-wireless",
+        device_class=SensorDeviceClass.IRRADIANCE,
+        native_unit_of_measurement=UnitOfIrradiance.WATTS_PER_SQUARE_METER,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+        entity_registry_enabled_default=False,
+    ),
+)
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -178,6 +265,92 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
 )
 
 
+@dataclass(frozen=True, kw_only=True)
+class ForecastDescription(SensorEntityDescription):
+    """A value of today's forecast, or of the coming hours."""
+
+    value: Callable[[LocalForecast, datetime], float | None]
+    attributes: Callable[[LocalForecast, datetime], dict[str, typing.Any]] | None = None
+
+
+def _today(key: str) -> Callable[[LocalForecast, datetime], float | None]:
+    def value(forecast: LocalForecast, now: datetime) -> float | None:
+        day = summaries.day_of(forecast["daily"], now)
+        return day[key] if day else None  # type: ignore[literal-required]
+
+    return value
+
+
+TODAY_SENSORS: tuple[ForecastDescription, ...] = (
+    ForecastDescription(
+        key="max_temperature_today",
+        translation_key="max_temperature_today",
+        icon="mdi:thermometer-high",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        suggested_display_precision=1,
+        value=_today("temperature_max"),
+    ),
+    ForecastDescription(
+        key="min_temperature_today",
+        translation_key="min_temperature_today",
+        icon="mdi:thermometer-low",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        suggested_display_precision=1,
+        value=_today("temperature_min"),
+    ),
+    ForecastDescription(
+        key="precipitation_today",
+        translation_key="precipitation_today",
+        icon="mdi:weather-rainy",
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
+        suggested_display_precision=1,
+        value=_today("precipitation"),
+    ),
+    ForecastDescription(
+        # The whole day, the hours already past included.
+        key="sunshine_today",
+        translation_key="sunshine_today",
+        icon="mdi:weather-sunny",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        suggested_display_precision=1,
+        value=lambda forecast, now: summaries.sunshine_hours(
+            forecast["hourly"], summaries.today(now)
+        ),
+    ),
+)
+
+
+def _lowest_freezing_level(forecast: LocalForecast, now: datetime):
+    return summaries.lowest_hour(
+        forecast["hourly"], summaries.coming_hours(now, 48), "freezing_level"
+    )
+
+
+# The snow line at its lowest in the coming two days, and when.
+LOWEST_FREEZING_LEVEL = ForecastDescription(
+    key="lowest_freezing_level_48h",
+    translation_key="lowest_freezing_level_48h",
+    icon="mdi:snowflake-thermometer",
+    device_class=SensorDeviceClass.DISTANCE,
+    native_unit_of_measurement=UnitOfLength.METERS,
+    suggested_display_precision=0,
+    value=lambda forecast, now: (
+        hour["freezing_level"]
+        if (hour := _lowest_freezing_level(forecast, now))
+        else None
+    ),
+    attributes=lambda forecast, now: (
+        {"at": hour["time"].isoformat()}
+        if (hour := _lowest_freezing_level(forecast, now))
+        else {}
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: MeteoSwissConfigEntry,
@@ -200,6 +373,17 @@ async def async_setup_entry(
             "The data update coordinator has no real-time weather station configured"
             + " — not providing weather sensor data."
         )
+    if c.weather_station:
+        measured = c.data["condition_by_station"].get(c.weather_station, {})
+        async_add_entities(
+            [
+                MeteoSwissStationSensor(entry.entry_id, c, d)
+                for d in STATION_SENSORS
+                if measured.get(d.parameter) is not None
+            ]
+            + [MeteoSwissMeasurementTimeSensor(entry.entry_id, c)],
+            True,
+        )
     if c.precipitation_station:
         async_add_entities(
             [
@@ -214,7 +398,16 @@ async def async_setup_entry(
             + " configured — not providing precipitation sensor data."
         )
     if c.freezing_level:
-        async_add_entities([MeteoSwissFreezingLevelSensor(entry.entry_id, c)], True)
+        async_add_entities(
+            [
+                MeteoSwissFreezingLevelSensor(entry.entry_id, c),
+                MeteoSwissForecastSensor(entry.entry_id, c, LOWEST_FREEZING_LEVEL),
+            ],
+            True,
+        )
+    async_add_entities(
+        [MeteoSwissForecastSensor(entry.entry_id, c, d) for d in TODAY_SENSORS], True
+    )
     async_add_entities(
         [MeteoSwissSummarySensor(entry.entry_id, c, d) for d in SUMMARIES], True
     )
@@ -725,6 +918,108 @@ class MeteoSwissDownloadedThisMonthSensor(MeteoSwissDownloadedSensor):
     @property
     def native_value(self) -> int:
         return self.coordinator.downloaded_this_month
+
+
+class MeteoSwissStationSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """A measurement only some weather stations make, such as snow depth."""
+
+    entity_description: StationDescription
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        integration_id: str,
+        coordinator: MeteoSwissDataUpdateCoordinator,
+        description: StationDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
+        self._attr_device_info = coordinator.station_device_info(StationType.WEATHER)
+
+    @property
+    def _measured(self) -> dict[str, typing.Any]:
+        station = self.coordinator.weather_station
+        return self.coordinator.data["condition_by_station"].get(station) or {}
+
+    @property
+    def native_value(self) -> float | None:
+        return self._measured.get(self.entity_description.parameter)
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
+
+
+class MeteoSwissMeasurementTimeSensor(MeteoSwissStationSensor):
+    """When the weather station's latest measurement was made."""
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(
+            integration_id,
+            coordinator,
+            StationDescription(
+                key="measurement_time",
+                translation_key="measurement_time",
+                parameter="measured",
+                device_class=SensorDeviceClass.TIMESTAMP,
+                entity_category=EntityCategory.DIAGNOSTIC,
+                entity_registry_enabled_default=False,
+            ),
+        )
+
+    @property
+    def native_value(self) -> datetime | None:  # type: ignore[override]
+        return self._measured.get("measured")
+
+
+class MeteoSwissForecastSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """A value of today's forecast, or of the coming hours.
+
+    Without a state class, like the summaries: forecasts need no long-term
+    statistics.
+    """
+
+    entity_description: ForecastDescription
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        integration_id: str,
+        coordinator: MeteoSwissDataUpdateCoordinator,
+        description: ForecastDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
+        self._attr_device_info = coordinator.device_info
+
+    @property
+    def native_value(self) -> float | None:
+        forecast = self.coordinator.data["forecast"]
+        if not forecast:
+            return None
+        return self.entity_description.value(forecast, datetime.now(timezone.utc))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, typing.Any] | None:
+        forecast = self.coordinator.data["forecast"]
+        attributes = self.entity_description.attributes
+        if not forecast or attributes is None:
+            return None
+        return attributes(forecast, datetime.now(timezone.utc))
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.native_value is not None
 
 
 RADAR_SENSORS = (
