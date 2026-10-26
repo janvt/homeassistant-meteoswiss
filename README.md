@@ -43,6 +43,11 @@ and is now maintained on its own: see [Credits](#credits).
 
 ### HACS
 
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=janvt&repository=homeassistant-meteoswiss&category=integration)
+
+The button opens this repository in your HACS, adding it as a custom
+repository if needed, so you can skip step 1:
+
 1. In HACS, open the menu → *Custom repositories*, add
    `https://github.com/janvt/homeassistant-meteoswiss` with the type
    *Integration*.
@@ -56,6 +61,8 @@ Copy `custom_components/meteoswiss` from the
 [latest release](https://github.com/janvt/homeassistant-meteoswiss/releases) to
 the `custom_components` folder of your Home Assistant configuration, and restart
 Home Assistant.
+
+Either way, it needs Home Assistant 2024.11 or newer.
 
 ### Coming from Rudd-O's or websylv's version
 
@@ -135,6 +142,10 @@ station's latest 10-minute measurement.  Values older than 90 minutes are not
 shown; a value missing from the latest measurement is taken from the half
 hour before.  A
 precipitation station has only the 10-minute rain.
+
+The station pressure, QNH and dew point (which the weather entity also has)
+are created turned off: turn them on from the device's page, under *entities
+not shown*.
 
 ### Forecast summaries
 
@@ -230,6 +241,8 @@ One sensor per type of pollen (alder, ash, beech, birch, grasses, hazel and
 oak) with the latest hourly concentration in pollen/m³ at the chosen station,
 one of MeteoSwiss's 15.  They are measurements, not forecasts, and are
 unavailable when the station has reported nothing for six hours.
+Birch and grasses are turned on; the others are created turned off, to be
+turned on from the device's page by those who need them.
 
 ### Radar
 
@@ -277,6 +290,46 @@ Starting Home Assistant costs a few MB extra.  The radar, when turned on, adds
 15 to 35 MB a day, the same for any number of places, and up to 15 MB more
 on a day of rain.
 
+The diagnostic sensor *Downloaded last 24 hours*, on each forecast's device,
+shows what the integration actually downloaded over the last 24 hours, for all
+places together: forecasts, measurements, warnings and the radar.
+*Downloaded this month* does the same from the first of the month (local
+time), and is kept across restarts, for automations on a monthly data
+allowance.
+
+Each forecast's device also has a *Downloads* switch.  Turned off, that place
+downloads nothing (no measurements, forecasts, warnings or radar) and its
+entities keep their last values, until it is turned on again; a restart
+keeps it off.  For example, to stop at 3 GB a month and start again on the
+first:
+
+```yaml
+automation:
+  - alias: MeteoSwiss data allowance
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.zurich_downloaded_this_month
+        above: 3000  # MB
+        id: over
+      - trigger: time
+        at: "00:05:00"
+        id: day
+    conditions:
+      - condition: or
+        conditions:
+          - condition: trigger
+            id: over
+          - condition: template
+            value_template: "{{ now().day == 1 }}"
+    actions:
+      - action: "switch.turn_{{ 'off' if trigger.id == 'over' else 'on' }}"
+        target:
+          entity_id: switch.zurich_downloads
+```
+
+Weather warnings stop too while it is off, so think twice before relying on
+them with a tight allowance.
+
 If MeteoSwiss changes how it publishes its files, the integration downloads
 them whole rather than stop working, until it is updated: **at worst several GB
 a day**.  It is checked against MeteoSwiss's files twice a day, so
@@ -323,7 +376,9 @@ Radar images cover all of Switzerland and are downloaded whole.
 ## Troubleshooting
 
 Please report problems in the
-[issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with a debug
+[issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with the
+entry's diagnostics (*Download diagnostics* in the entry's menu: what it read
+from MeteoSwiss and how, without your coordinates or postal code) and a debug
 log.  To get one, turn on debug logging in the entry's menu, or add this to
 `configuration.yaml` and restart:
 

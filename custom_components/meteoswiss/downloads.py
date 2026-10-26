@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
+from typing import Any
 
 from custom_components.meteoswiss.ogd import MeteoSwissOGD, OGDError, Point
 
@@ -34,6 +35,20 @@ class SharedDownloads:
 
     def unregister(self, owner: str) -> None:
         self._wanted.pop(owner, None)
+
+    def diagnostics(self) -> dict[str, Any]:
+        """What was read for all entries, for a diagnostics download."""
+        return {
+            "entries": len(self._wanted),
+            "parameters": {
+                parameter: {
+                    "run": self._runs.get(parameter),
+                    "fetched": fetched.isoformat(),
+                    "points": len(self._rows.get(parameter, {})),
+                }
+                for parameter, fetched in self._fetched.items()
+            },
+        }
 
     async def get(
         self, point: Point, parameter: str, run: str, now: datetime.datetime

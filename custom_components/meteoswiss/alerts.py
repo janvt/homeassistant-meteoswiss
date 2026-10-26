@@ -18,6 +18,8 @@ from urllib.parse import quote
 
 import aiohttp
 
+from custom_components.meteoswiss.usage import Usage
+
 _LOGGER = logging.getLogger(__name__)
 
 FEED_URL = "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-switzerland"
@@ -209,6 +211,12 @@ class MeteoAlarm:
         self._fetched: datetime.datetime | None = None
         self._details: dict[str, _Details | None] = {}
         self._lock = asyncio.Lock()
+        self.usage = Usage()
+
+    @property
+    def downloaded(self) -> int:
+        """Bytes of warnings downloaded in the last day."""
+        return self.usage.downloaded
 
     async def _get(self, url: str) -> bytes:
         try:
@@ -216,7 +224,9 @@ class MeteoAlarm:
                 url, headers=self._headers, timeout=REQUEST_TIMEOUT
             ) as response:
                 response.raise_for_status()
-                return await response.read()
+                body = await response.read()
+                self.usage.count(response, len(body))
+                return body
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise AlertError(f"Cannot fetch {url}: {exc}") from exc
 

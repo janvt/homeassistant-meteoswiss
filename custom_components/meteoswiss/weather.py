@@ -21,7 +21,6 @@ from homeassistant.components.weather import (
     WeatherEntityFeature,
 )
 from homeassistant.const import (
-    STATE_UNAVAILABLE,
     UnitOfPressure,
     UnitOfSpeed,
     UnitOfTemperature,
@@ -114,7 +113,8 @@ class MeteoSwissWeather(
         coordinator: MeteoSwissDataUpdateCoordinator,
     ):
         super().__init__(coordinator)
-        self._invalid_legacy_icon_logged = False
+        # Symbols not in CODE_TO_CONDITION_MAP, logged once each.
+        self._unknown_symbols: set[int] = set()
         self._attr_unique_id = "weather.%s" % integration_id
         self._attr_device_info = coordinator.device_info
         self._attr_postcode = coordinator.data[CONF_POSTCODE]
@@ -191,8 +191,10 @@ class MeteoSwissWeather(
 
     @property
     def native_pressure(self) -> float | None:
+        # Reduced to sea level (QFF), as weather cards and other weather
+        # integrations show it, rather than at the station's height.
         return condition_name_to_first_value(
-            self._condition_for_all_stations, "prestas0"
+            self._condition_for_all_stations, "pp0qffs0"
         )
 
     @property
@@ -240,11 +242,13 @@ class MeteoSwissWeather(
         symbolId = current["symbol"] if current else None
         cond = CODE_TO_CONDITION_MAP.get(symbolId, ("", None))[0] if symbolId else ""
         if not cond:
-            _LOGGER.error(
-                "MeteoSwiss returned no recognized current-weather symbol: %r",
-                symbolId,
-            )
-            return STATE_UNAVAILABLE
+            # Unknown rather than unavailable: the measurements still are.
+            if symbolId and symbolId not in self._unknown_symbols:
+                self._unknown_symbols.add(symbolId)
+                _LOGGER.warning("Unknown MeteoSwiss weather symbol %r", symbolId)
+            else:
+                _LOGGER.debug("No weather symbol for the current hour")
+            return None
         _LOGGER.debug("Current symbol is %s, condition is: %s", symbolId, cond)
         return str(cond)
 

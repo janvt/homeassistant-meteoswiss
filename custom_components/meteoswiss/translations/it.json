@@ -255,11 +255,22 @@
             },
             "radar_rain_last_hour": {
                 "name": "Radar pioggia ultima ora"
+            },
+            "downloaded": {
+                "name": "Scaricato nelle ultime 24 ore"
+            },
+            "downloaded_this_month": {
+                "name": "Scaricato questo mese"
             }
         },
         "image": {
             "radar_loop": {
                 "name": "Radar animazione"
+            }
+        },
+        "switch": {
+            "downloads": {
+                "name": "Download"
             }
         }
     }

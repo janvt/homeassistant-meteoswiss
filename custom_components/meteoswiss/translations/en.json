@@ -255,11 +255,22 @@
             },
             "radar_rain_last_hour": {
                 "name": "Radar rain last hour"
+            },
+            "downloaded": {
+                "name": "Downloaded last 24 hours"
+            },
+            "downloaded_this_month": {
+                "name": "Downloaded this month"
             }
         },
         "image": {
             "radar_loop": {
                 "name": "Radar loop"
+            }
+        },
+        "switch": {
+            "downloads": {
+                "name": "Downloads"
             }
         }
     }

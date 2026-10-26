@@ -14,6 +14,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
+    EntityCategory,
+    UnitOfInformation,
     UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfPressure,
@@ -75,6 +77,12 @@ _LOGGER = logging.getLogger(__name__)
 
 # Precipitation stations only measure rain.
 PRECIPITATION_SENSOR_TYPES = ("10minrain",)
+# Created turned off, to keep the device tidy: the pressures that are not
+# reduced as weather maps are (QFF is), and the dew point, which the weather
+# entity has.
+STATION_SENSORS_OFF_BY_DEFAULT = ("pressure", "pressure_qnh", "dew_point")
+# The pollen most people are allergic to; the others are created turned off.
+POLLEN_ON_BY_DEFAULT = ("birch", "grasses")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -239,6 +247,13 @@ async def async_setup_entry(
             ],
             True,
         )
+    async_add_entities(
+        [
+            MeteoSwissDownloadedSensor(entry.entry_id, c),
+            MeteoSwissDownloadedThisMonthSensor(entry.entry_id, c),
+        ],
+        True,
+    )
     if c.radar is not None:
         async_add_entities(
             [
@@ -605,6 +620,7 @@ class MeteoSwissPollenSensor(
         self._kind = kind
         self._attr_translation_key = f"pollen_{kind}"
         self._attr_unique_id = f"sensor.{integration_id}-pollen_{kind}"
+        self._attr_entity_registry_enabled_default = kind in POLLEN_ON_BY_DEFAULT
         self._attr_device_info = coordinator.station_device_info(StationType.POLLEN)
 
     @property
@@ -656,6 +672,60 @@ class MeteoSwissSummarySensor(
     @property
     def available(self) -> bool:
         return super().available and self.native_value is not None
+
+
+class MeteoSwissDownloadedSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """What the integration downloaded in the last 24 hours, for all entries.
+
+    Updated with the stations, so it lags the downloads by up to an update
+    interval.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "downloaded"
+    _attr_icon = "mdi:download-network"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.DATA_SIZE
+    _attr_native_unit_of_measurement = UnitOfInformation.BYTES
+    _attr_suggested_unit_of_measurement = UnitOfInformation.MEGABYTES
+    _attr_suggested_display_precision = 1
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-downloaded"
+        self._attr_device_info = coordinator.device_info
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.downloaded
+
+
+class MeteoSwissDownloadedThisMonthSensor(MeteoSwissDownloadedSensor):
+    """What the integration downloaded this calendar month, for all entries.
+
+    Kept across restarts, and back to 0 when a month starts (local time).
+    For automations on a monthly data allowance.
+    """
+
+    _attr_translation_key = "downloaded_this_month"
+    # Statistics then count each month as a new cycle.
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(integration_id, coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-downloaded_this_month"
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.downloaded_this_month
 
 
 RADAR_SENSORS = (
@@ -793,6 +863,9 @@ class MeteoSwissSensor(
         self._attr_device_info = coordinator.station_device_info(station_type)
         self._state = None
         self._type = sensor_type
+        self._attr_entity_registry_enabled_default = (
+            sensor_type not in STATION_SENSORS_OFF_BY_DEFAULT
+        )
         self._attr_native_unit_of_measurement = SENSOR_TYPES[self._type][
             SENSOR_TYPE_UNIT
         ]

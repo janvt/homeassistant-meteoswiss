@@ -20,6 +20,7 @@ from custom_components.meteoswiss.ogd import (
     UnknownPostcodeError,
     distance_km,
 )
+from custom_components.meteoswiss.usage import Usage
 
 UTC = datetime.timezone.utc
 
@@ -233,6 +234,7 @@ STATION_MEASUREMENTS = {
     "tre200s0": 13.4,
     "ure200s0": 79.9,
     "prestas0": 940.5,
+    "pp0qffs0": 1012.3,
     "fu3010z0": 8.6,
     "dkl010z0": 31.0,
     "fu3010z1": 25.2,
@@ -271,6 +273,7 @@ class FakeOGD:
     instances: list[FakeOGD] = []
     forecast_calls = 0
     run_checks = 0
+    station_calls = 0
     temperature_calls = 0
     temperature_error: Exception | None = None
     climate_calls = 0
@@ -286,6 +289,7 @@ class FakeOGD:
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:
@@ -295,6 +299,7 @@ class FakeOGD:
         cls.instances = []
         cls.forecast_calls = 0
         cls.run_checks = 0
+        cls.station_calls = 0
         cls.temperature_calls = 0
         cls.temperature_error = None
         cls.climate_calls = 0
@@ -303,6 +308,9 @@ class FakeOGD:
         cls.download_gate = None
         cls.hours = 12
         cls.downloaded = 0
+
+    def diagnostics(self):
+        return {"downloaded_last_24h": self.downloaded}
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
@@ -354,6 +362,7 @@ class FakeOGD:
         return dict(POLLEN_NOW) if abbr == "PZH" else {}
 
     async def get_station_now(self, abbr, station_type):
+        FakeOGD.station_calls += 1
         if self.station_error:
             raise self.station_error
         if station_type == StationType.PRECIPITATION:
@@ -413,12 +422,14 @@ def make_warning(type_, level, onset, expires, event=None):
 class FakeMeteoAlarm:
     """Replacement for MeteoAlarm with fixed warnings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     warnings: list = []
     error: Exception | None = None
     calls: list = []
 
     def __init__(self, session, user_agent) -> None:
-        pass
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:
@@ -436,12 +447,14 @@ class FakeMeteoAlarm:
 class FakeRadar:
     """Replacement for Radar with fixed readings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     readings: dict = {}
     images: dict = {}
     calls: list = []
 
     def __init__(self, session, user_agent) -> None:
-        pass
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:

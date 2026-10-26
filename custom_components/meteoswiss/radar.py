@@ -20,6 +20,8 @@ from dataclasses import dataclass
 import aiohttp
 import numpy as np
 
+from custom_components.meteoswiss.usage import Usage
+
 _LOGGER = logging.getLogger(__name__)
 
 FILE_URL = "https://data.geo.admin.ch/{collection}/{day}-ch/{name}"
@@ -211,6 +213,12 @@ class Radar:
         # Since when the rain images have shown no rain at or next to a place.
         self._dry_since: dict[tuple[float, float], datetime.datetime] = {}
         self._lock = asyncio.Lock()
+        self.usage = Usage()
+
+    @property
+    def downloaded(self) -> int:
+        """Bytes of radar images and lists downloaded in the last day."""
+        return self.usage.downloaded
 
     def image(self, key: str) -> Image | None:
         """The latest image of a product, if one was downloaded."""
@@ -224,9 +232,12 @@ class Radar:
             ) as response:
                 # The file store answers 403 for files it does not have.
                 if response.status in (403, 404):
+                    self.usage.count(response, 0)
                     return None
                 response.raise_for_status()
-                return await response.read()
+                body = await response.read()
+                self.usage.count(response, len(body))
+                return body
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise RadarError(f"Cannot fetch {url}: {exc}") from exc
 
