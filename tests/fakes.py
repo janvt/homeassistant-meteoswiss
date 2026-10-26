@@ -304,6 +304,9 @@ class FakeOGD:
         cls.hours = 12
         cls.downloaded = 0
 
+    def diagnostics(self):
+        return {"downloaded_last_24h": self.downloaded}
+
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
 
