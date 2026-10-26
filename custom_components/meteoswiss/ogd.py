@@ -29,6 +29,8 @@ from custom_components.meteoswiss.usage import (
     Usage,
 )
 
+HOUR = datetime.timedelta(hours=1)
+
 _LOGGER = logging.getLogger(__name__)
 
 BASE_URL = "https://data.geo.admin.ch"
@@ -469,6 +471,24 @@ def _rows_with_needle(rows: list[bytes], data: bytes, needle: bytes) -> None:
         start = data.find(needle, end)
 
 
+def parse_station_hours(
+    text: str, columns: set[str], since: datetime.datetime
+) -> list[tuple[datetime.datetime, dict[str, float | None]]]:
+    """The rows of an hourly station history file from `since` on, by the
+    start of their hour (UTC), with only the given columns.
+
+    A row's timestamp is the end of its hour: its rain and sunshine are the
+    sums of the six 10-minute values up to it.
+    """
+    hours = []
+    for row in csv.DictReader(io.StringIO(text), delimiter=";"):
+        end = _station_time(row.get("reference_timestamp"))
+        if end is None or end - HOUR < since:
+            continue
+        hours.append((end - HOUR, {c: _number(row.get(c)) for c in columns}))
+    return hours
+
+
 def _station_time(timestamp: str | None) -> datetime.datetime | None:
     """The time of a station row, e.g. 20.10.2026 11:40 (UTC)."""
     try:
@@ -895,6 +915,40 @@ class MeteoSwissOGD:
                 )
                 self._climates[abbr] = cached = (key, computed)
             return cached[1], recent
+
+    def station_history_urls(
+        self, abbr: str, since: datetime.datetime, now: datetime.datetime
+    ) -> list[str]:
+        """The hourly history files of a weather station from `since` on,
+        oldest first: one per decade up to last year, then this year's."""
+        low = abbr.lower()
+        decades = range(since.year // 10 * 10, (now.year - 1) // 10 * 10 + 1, 10)
+        return [
+            f"{SMN_URL}/{low}/ogd-smn_{low}_h_historical_{d}-{d + 9}.csv"
+            for d in decades
+        ] + [f"{SMN_URL}/{low}/ogd-smn_{low}_h_recent.csv"]
+
+    async def get_station_hours(
+        self, url: str, columns: set[str], since: datetime.datetime
+    ) -> list[tuple[datetime.datetime, dict[str, float | None]]]:
+        """The hours of a station history file (see parse_station_hours), none
+        if there is no such file, e.g. for a decade before the station."""
+        try:
+            async with self._session.get(
+                url, headers=self._headers, timeout=STREAM_TIMEOUT
+            ) as response:
+                # The file store answers 403 for files it does not have.
+                if response.status in (403, 404):
+                    self._count(response, 0)
+                    return []
+                response.raise_for_status()
+                body = await response.read()
+                self._count(response, len(body))
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            raise OGDError(f"Cannot fetch {url}: {exc}") from exc
+        return await asyncio.get_running_loop().run_in_executor(
+            None, parse_station_hours, body.decode("windows-1252"), columns, since
+        )
 
     async def _get_station_file(
         self, url: str, cache_seconds: float = STATION_CACHE_SECONDS

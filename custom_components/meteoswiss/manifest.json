@@ -1,6 +1,9 @@
 {
     "domain": "meteoswiss",
     "name": "MeteoSwiss",
+    "after_dependencies": [
+        "recorder"
+    ],
     "codeowners": [
         "@janvt"
     ],

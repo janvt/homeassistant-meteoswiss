@@ -50,6 +50,7 @@ from custom_components.meteoswiss.const import (
     USER_AGENT,
 )
 from custom_components.meteoswiss.downloads import SharedDownloads
+from custom_components.meteoswiss.history import async_setup_services
 from custom_components.meteoswiss.issues import (
     HIGH_USAGE_ISSUE,
     USAGE_NOTICE_PER_ENTRY,
@@ -106,6 +107,7 @@ type MeteoSwissConfigEntry = ConfigEntry[MeteoSwissDataUpdateCoordinator]
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
     """Setup via old entry in configuration.yaml."""
     _LOGGER.debug("Async setup: meteoswiss")
+    async_setup_services(hass)
 
     conf = config.get(DOMAIN)
     if conf is None:
