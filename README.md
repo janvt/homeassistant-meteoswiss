@@ -272,6 +272,9 @@ Starting Home Assistant costs a few MB extra.  The radar, when turned on, adds
 The diagnostic sensor *Downloaded last 24 hours*, on each forecast's device,
 shows what the integration actually downloaded over the last 24 hours, for all
 places together: forecasts, measurements, warnings and the radar.
+*Downloaded this month* does the same from the first of the month (local
+time), and is kept across restarts, for automations on a monthly data
+allowance.
 
 If MeteoSwiss changes how it publishes its files, the integration downloads
 them whole rather than stop working, until it is updated: **at worst several GB

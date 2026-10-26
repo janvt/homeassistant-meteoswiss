@@ -179,12 +179,12 @@ class Radar:
         self._variants: dict[str, str] = {}
         self._looked_up: dict[str, datetime.datetime] = {}
         self._lock = asyncio.Lock()
-        self._usage = Usage()
+        self.usage = Usage()
 
     @property
     def downloaded(self) -> int:
         """Bytes of radar images and lists downloaded in the last day."""
-        return self._usage.downloaded
+        return self.usage.downloaded
 
     async def _fetch(self, url: str) -> bytes | None:
         """A file, or None if it is not (yet) published."""
@@ -194,11 +194,11 @@ class Radar:
             ) as response:
                 # The file store answers 403 for files it does not have.
                 if response.status in (403, 404):
-                    self._usage.count(response, 0)
+                    self.usage.count(response, 0)
                     return None
                 response.raise_for_status()
                 body = await response.read()
-                self._usage.count(response, len(body))
+                self.usage.count(response, len(body))
                 return body
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise RadarError(f"Cannot fetch {url}: {exc}") from exc

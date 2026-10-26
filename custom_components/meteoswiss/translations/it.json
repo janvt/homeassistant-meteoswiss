@@ -255,6 +255,9 @@
             },
             "downloaded": {
                 "name": "Scaricato nelle ultime 24 ore"
+            },
+            "downloaded_this_month": {
+                "name": "Scaricato questo mese"
             }
         }
     }

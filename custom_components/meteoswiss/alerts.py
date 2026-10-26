@@ -211,12 +211,12 @@ class MeteoAlarm:
         self._fetched: datetime.datetime | None = None
         self._details: dict[str, _Details | None] = {}
         self._lock = asyncio.Lock()
-        self._usage = Usage()
+        self.usage = Usage()
 
     @property
     def downloaded(self) -> int:
         """Bytes of warnings downloaded in the last day."""
-        return self._usage.downloaded
+        return self.usage.downloaded
 
     async def _get(self, url: str) -> bytes:
         try:
@@ -225,7 +225,7 @@ class MeteoAlarm:
             ) as response:
                 response.raise_for_status()
                 body = await response.read()
-                self._usage.count(response, len(body))
+                self.usage.count(response, len(body))
                 return body
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise AlertError(f"Cannot fetch {url}: {exc}") from exc

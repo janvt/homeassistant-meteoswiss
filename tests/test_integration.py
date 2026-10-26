@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+from types import SimpleNamespace
 
 import pytest
 from homeassistant.config_entries import ConfigEntryState
@@ -13,10 +14,16 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.meteoswiss import DATA_ALERTS, DATA_CLIENT, DATA_DOWNLOADS
+from custom_components.meteoswiss import (
+    DATA_ALERTS,
+    DATA_CLIENT,
+    DATA_DOWNLOADS,
+    DATA_RADAR,
+)
 from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
+from custom_components.meteoswiss.usage import REQUEST_OVERHEAD
 
 from .fakes import (
     FOEHN_PRESSURES,
@@ -45,6 +52,7 @@ SUMMARY_NAMES = (
     "fohn_pressure_difference",
     "fohn_outlook",
     "downloaded_last_24_hours",
+    "downloaded_this_month",
 )
 
 
@@ -937,6 +945,52 @@ async def test_downloaded_sensor(hass, entry_data, fake_ogd, monkeypatch):
     assert float(state.state) == 48.0
     assert state.attributes["unit_of_measurement"] == "MB"
     assert er.async_get(hass).async_get(sensor).entity_category == "diagnostic"
+
+
+async def test_downloaded_this_month_sensor(hass, entry_data, frozen_now, hass_storage):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, options={"radar": True})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-downloaded_this_month")
+
+    def download(client, size):
+        # Each response costs its headers on top.
+        client.usage.count(SimpleNamespace(content=None), size - REQUEST_OVERHEAD)
+
+    # From the forecast and station client, the warnings and the radar.
+    download(hass.data[DATA_CLIENT], 4_000_000)
+    download(hass.data[DATA_ALERTS], 1_000_000)
+    download(hass.data[DATA_RADAR], 2_000_000)
+    await refresh_after(hass, frozen_now, 5)
+    state = hass.states.get(sensor)
+    assert float(state.state) == 7.0
+    assert state.attributes["unit_of_measurement"] == "MB"
+    assert state.attributes["state_class"] == "total_increasing"
+
+    # Kept across a restart.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert hass_storage["meteoswiss.usage"]["data"]["downloaded"] == 7_000_000
+    await setup(hass, entry)
+    assert float(hass.states.get(sensor).state) == 7.0
+
+    # And back to 0 when the next month starts.
+    frozen_now.move_to("2026-11-01T12:00:00+00:00")
+    await refresh_after(hass, frozen_now, 5)
+    assert float(hass.states.get(sensor).state) == 0.0
+
+
+async def test_downloaded_this_month_starts_over_after_a_month_away(
+    hass, entry, hass_storage
+):
+    hass_storage["meteoswiss.usage"] = {
+        "version": 1,
+        "key": "meteoswiss.usage",
+        "data": {"month": "2026-09", "downloaded": 900_000_000},
+    }
+    await setup(hass, entry)
+
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-downloaded_this_month")
+    assert float(hass.states.get(sensor).state) == 0.0
 
 
 async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(

@@ -255,6 +255,9 @@
             },
             "downloaded": {
                 "name": "Heruntergeladen in 24 Stunden"
+            },
+            "downloaded_this_month": {
+                "name": "Heruntergeladen diesen Monat"
             }
         }
     }

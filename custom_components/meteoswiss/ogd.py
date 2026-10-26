@@ -559,7 +559,7 @@ class MeteoSwissOGD:
         self._whole_downloads: list[float] = []
         # What responses cost, for the repair notice when it is far more than
         # usual.
-        self._usage = Usage()
+        self.usage = Usage()
         # Whether the server sent a whole file when asked for part of it, the
         # last time it was.
         self.ranges_ignored = False
@@ -1134,12 +1134,12 @@ class MeteoSwissOGD:
         return len(self._whole_downloads)
 
     def _count(self, response: aiohttp.ClientResponse, body: int) -> None:
-        self._usage.count(response, body)
+        self.usage.count(response, body)
 
     @property
     def downloaded(self) -> int:
         """Bytes downloaded from MeteoSwiss in the last USAGE_PERIOD."""
-        return self._usage.downloaded
+        return self.usage.downloaded
 
     async def _learn_blocks(self, url: str, budget: _Budget):
         """Read the first block of a file for the order of the points.

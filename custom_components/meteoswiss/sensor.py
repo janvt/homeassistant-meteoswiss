@@ -240,7 +240,13 @@ async def async_setup_entry(
             ],
             True,
         )
-    async_add_entities([MeteoSwissDownloadedSensor(entry.entry_id, c)], True)
+    async_add_entities(
+        [
+            MeteoSwissDownloadedSensor(entry.entry_id, c),
+            MeteoSwissDownloadedThisMonthSensor(entry.entry_id, c),
+        ],
+        True,
+    )
     if c.radar is not None:
         async_add_entities(
             [
@@ -690,6 +696,28 @@ class MeteoSwissDownloadedSensor(
     @property
     def native_value(self) -> int:
         return self.coordinator.downloaded
+
+
+class MeteoSwissDownloadedThisMonthSensor(MeteoSwissDownloadedSensor):
+    """What the integration downloaded this calendar month, for all entries.
+
+    Kept across restarts, and back to 0 when a month starts (local time).
+    For automations on a monthly data allowance.
+    """
+
+    _attr_translation_key = "downloaded_this_month"
+    # Statistics then count each month as a new cycle.
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(integration_id, coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-downloaded_this_month"
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.downloaded_this_month
 
 
 RADAR_SENSORS = (
