@@ -35,11 +35,13 @@ INTERVAL = datetime.timedelta(minutes=5)
 MAX_AGE = datetime.timedelta(minutes=20)
 # File names end in letters telling which radars contributed: usually the same
 # for days at a time, so the last that worked is tried first, then these.
-VARIANTS = ("rl", "vl")
+VARIANTS = ("rl", "vl", "pl")
 # An image this late is looked up in the day's list of files (up to 280 kB),
-# at most this often for each collection.
+# at most this often for each collection.  The list lags the files by 4 to 6
+# minutes, so the latest image it lists gives the variant; it is read again
+# each minute while that does not find the image, rather than wait.
 LOOKUP_AFTER = datetime.timedelta(minutes=3)
-LOOKUP_EVERY = datetime.timedelta(minutes=30)
+LOOKUP_EVERY = datetime.timedelta(minutes=1)
 
 
 @dataclass(frozen=True)
@@ -191,18 +193,29 @@ class Radar:
             raise RadarError(f"Cannot fetch {url}: {exc}") from exc
 
     async def _variant(self, product: Product, slot: datetime.datetime) -> str | None:
-        """An image's variant, from the day's list of files."""
-        url = ITEM_URL.format(collection=product.collection, day=f"{slot:%Y%m%d}")
-        body = await self._fetch(url)
-        if body is None:
-            return None
-        try:
-            assets = json.loads(body).get("assets", {})
-        except ValueError as exc:
-            raise RadarError(f"Cannot read {url}: {exc}") from exc
+        """An image's likely variant: that of the latest image listed up to it.
+
+        The day's list may not have the image yet; early in the day it may
+        have none, so the day before's is read then.
+        """
         stamp = _stamp(product, slot)
-        for name in sorted(assets):
-            if name.startswith(stamp) and name.endswith(product.suffix):
+        for day in (slot, slot - datetime.timedelta(days=1)):
+            url = ITEM_URL.format(collection=product.collection, day=f"{day:%Y%m%d}")
+            if (body := await self._fetch(url)) is None:
+                continue
+            try:
+                assets = json.loads(body).get("assets", {})
+            except ValueError as exc:
+                raise RadarError(f"Cannot read {url}: {exc}") from exc
+            names = [
+                name
+                for name in assets
+                if name.startswith(product.stem)
+                and name.endswith(product.suffix)
+                and name[: len(stamp)] <= stamp
+            ]
+            if names:
+                name = max(names)
                 return name[len(stamp) : -len(product.suffix)]
         return None
 
