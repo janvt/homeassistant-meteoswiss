@@ -313,7 +313,9 @@ Radar images cover all of Switzerland and are downloaded whole.
 ## Troubleshooting
 
 Please report problems in the
-[issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with a debug
+[issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with the
+entry's diagnostics (*Download diagnostics* in the entry's menu: what it read
+from MeteoSwiss and how, without your coordinates or postal code) and a debug
 log.  To get one, turn on debug logging in the entry's menu, or add this to
 `configuration.yaml` and restart:
 

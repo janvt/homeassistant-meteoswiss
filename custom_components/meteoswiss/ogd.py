@@ -1138,6 +1138,21 @@ class MeteoSwissOGD:
         size = raw if isinstance(raw, int) else body
         self._received.append((time.monotonic(), REQUEST_OVERHEAD + size))
 
+    def diagnostics(self) -> dict[str, Any]:
+        """How MeteoSwiss's files were read lately, for a diagnostics download."""
+        return {
+            "downloaded_last_24h": self.downloaded,
+            "whole_downloads_last_24h": self.whole_downloads,
+            "ranges_ignored": self.ranges_ignored,
+            "latest_run": self._latest_run[1] if self._latest_run else None,
+            "files": {
+                parameter: {"url": url, "size": size}
+                for parameter, (url, size) in self._files.items()
+            },
+            "ordered_by_time": sorted(self._by_time),
+            "point_orders": dict(self._orders),
+        }
+
     @property
     def downloaded(self) -> int:
         """Bytes downloaded from MeteoSwiss in the last USAGE_PERIOD."""
