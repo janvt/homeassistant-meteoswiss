@@ -259,6 +259,11 @@
             "downloaded_this_month": {
                 "name": "Lastet ned denne måneden"
             }
+        },
+        "switch": {
+            "downloads": {
+                "name": "Nedlastinger"
+            }
         }
     }
 }
