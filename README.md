@@ -43,6 +43,11 @@ and is now maintained on its own: see [Credits](#credits).
 
 ### HACS
 
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=janvt&repository=homeassistant-meteoswiss&category=integration)
+
+The button opens this repository in your HACS, adding it as a custom
+repository if needed, so you can skip step 1:
+
 1. In HACS, open the menu → *Custom repositories*, add
    `https://github.com/janvt/homeassistant-meteoswiss` with the type
    *Integration*.
