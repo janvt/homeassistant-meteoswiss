@@ -1,6 +1,6 @@
 """Shared fixtures."""
 
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -13,6 +13,17 @@ from .fakes import NOW, FakeMeteoAlarm, FakeOGD, FakeRadar
 @pytest.fixture(autouse=True)
 def _enable_custom_integrations(enable_custom_integrations):
     """Let Home Assistant load custom_components/meteoswiss."""
+
+
+@pytest.fixture
+def entity_registry_enabled_by_default():
+    """Create the entities that are turned off by default turned on."""
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        new_callable=PropertyMock,
+        return_value=True,
+    ):
+        yield
 
 
 @pytest.fixture

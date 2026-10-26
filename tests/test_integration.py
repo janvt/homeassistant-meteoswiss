@@ -87,6 +87,7 @@ async def test_weather_entity(hass, entry):
     assert "Forecasts from postal code 8005" in state.attributes["attribution"]
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_sensors(hass, entry):
     await setup(hass, entry)
 
@@ -620,6 +621,7 @@ async def test_summaries_needing_hourly_temperatures(hass, entry_data, fake_ogd)
     assert summary(hass, entry, "precipitation_next_hour").state == "0.4"
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_pollen_sensors(hass, entry_data):
     entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "pollen_station": "PZH"})
     entry.add_to_hass(hass)
@@ -641,6 +643,29 @@ async def test_pollen_sensors(hass, entry_data):
         er.async_get(hass).async_get(birch.entity_id).device_id
     )
     assert (device.name, device.model) == ("Zürich pollen", "Pollen station")
+
+
+async def test_less_used_sensors_are_off_by_default(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "pollen_station": "PZH"})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    registry = er.async_get(hass)
+    off = {
+        e.unique_id.removeprefix(f"sensor.{entry.entry_id}-")
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    }
+    assert off == {
+        "pressure",
+        "pressure_qnh",
+        "dew_point",
+        "pollen_alder",
+        "pollen_ash",
+        "pollen_beech",
+        "pollen_hazel",
+        "pollen_oak",
+    }
 
 
 async def test_pollen_station_without_recent_data(hass, entry_data):

@@ -143,6 +143,10 @@ shown; a value missing from the latest measurement is taken from the half
 hour before.  A
 precipitation station has only the 10-minute rain.
 
+The station pressure, QNH and dew point (which the weather entity also has)
+are created turned off: turn them on from the device's page, under *entities
+not shown*.
+
 ### Forecast summaries
 
 Every forecast has sensors summarising it.  All times are local
@@ -237,6 +241,8 @@ One sensor per type of pollen (alder, ash, beech, birch, grasses, hazel and
 oak) with the latest hourly concentration in pollen/m³ at the chosen station,
 one of MeteoSwiss's 15.  They are measurements, not forecasts, and are
 unavailable when the station has reported nothing for six hours.
+Birch and grasses are turned on; the others are created turned off, to be
+turned on from the device's page by those who need them.
 
 ### Radar
 
