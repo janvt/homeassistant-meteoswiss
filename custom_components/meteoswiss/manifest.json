@@ -7,6 +7,7 @@
     "config_flow": true,
     "dependencies": [],
     "documentation": "https://github.com/janvt/homeassistant-meteoswiss",
+    "integration_type": "service",
     "iot_class": "cloud_polling",
     "issue_tracker": "https://github.com/janvt/homeassistant-meteoswiss/issues",
     "requirements": [
