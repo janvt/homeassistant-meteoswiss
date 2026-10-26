@@ -14,6 +14,8 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import (
     PERCENTAGE,
+    EntityCategory,
+    UnitOfInformation,
     UnitOfLength,
     UnitOfPrecipitationDepth,
     UnitOfPressure,
@@ -244,6 +246,13 @@ async def async_setup_entry(
             ],
             True,
         )
+    async_add_entities(
+        [
+            MeteoSwissDownloadedSensor(entry.entry_id, c),
+            MeteoSwissDownloadedThisMonthSensor(entry.entry_id, c),
+        ],
+        True,
+    )
     if c.radar is not None:
         async_add_entities(
             [
@@ -662,6 +671,60 @@ class MeteoSwissSummarySensor(
     @property
     def available(self) -> bool:
         return super().available and self.native_value is not None
+
+
+class MeteoSwissDownloadedSensor(
+    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    SensorEntity,
+):
+    """What the integration downloaded in the last 24 hours, for all entries.
+
+    Updated with the stations, so it lags the downloads by up to an update
+    interval.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "downloaded"
+    _attr_icon = "mdi:download-network"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.DATA_SIZE
+    _attr_native_unit_of_measurement = UnitOfInformation.BYTES
+    _attr_suggested_unit_of_measurement = UnitOfInformation.MEGABYTES
+    _attr_suggested_display_precision = 1
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-downloaded"
+        self._attr_device_info = coordinator.device_info
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.downloaded
+
+
+class MeteoSwissDownloadedThisMonthSensor(MeteoSwissDownloadedSensor):
+    """What the integration downloaded this calendar month, for all entries.
+
+    Kept across restarts, and back to 0 when a month starts (local time).
+    For automations on a monthly data allowance.
+    """
+
+    _attr_translation_key = "downloaded_this_month"
+    # Statistics then count each month as a new cycle.
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+
+    def __init__(
+        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
+    ) -> None:
+        super().__init__(integration_id, coordinator)
+        self._attr_unique_id = f"sensor.{integration_id}-downloaded_this_month"
+
+    @property
+    def native_value(self) -> int:
+        return self.coordinator.downloaded_this_month
 
 
 RADAR_SENSORS = (

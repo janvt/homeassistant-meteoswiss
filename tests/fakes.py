@@ -20,6 +20,7 @@ from custom_components.meteoswiss.ogd import (
     UnknownPostcodeError,
     distance_km,
 )
+from custom_components.meteoswiss.usage import Usage
 
 UTC = datetime.timezone.utc
 
@@ -287,6 +288,7 @@ class FakeOGD:
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:
@@ -417,12 +419,14 @@ def make_warning(type_, level, onset, expires, event=None):
 class FakeMeteoAlarm:
     """Replacement for MeteoAlarm with fixed warnings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     warnings: list = []
     error: Exception | None = None
     calls: list = []
 
     def __init__(self, session, user_agent) -> None:
-        pass
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:
@@ -440,11 +444,13 @@ class FakeMeteoAlarm:
 class FakeRadar:
     """Replacement for Radar with fixed readings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     readings: dict = {}
     calls: list = []
 
     def __init__(self, session, user_agent) -> None:
-        pass
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:

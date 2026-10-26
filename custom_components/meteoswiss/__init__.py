@@ -13,11 +13,13 @@ from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.issue_registry import IssueSeverity
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
+from homeassistant.util import dt as dt_util
 from homeassistant.util.hass_dict import HassKey
 
 from custom_components.meteoswiss.alerts import AlertError, MeteoAlarm, WeatherWarning
@@ -70,6 +72,7 @@ from custom_components.meteoswiss.ogd import (
     distance_km,
 )
 from custom_components.meteoswiss.radar import Radar
+from custom_components.meteoswiss.usage import MonthToDate
 
 _LOGGER = logging.getLogger(__name__)
 PLATFORMS = [Platform.SENSOR, Platform.WEATHER]
@@ -88,6 +91,7 @@ DATA_CLIENT: HassKey[MeteoSwissOGD] = HassKey(f"{DOMAIN}_client")
 DATA_ALERTS: HassKey[MeteoAlarm] = HassKey(f"{DOMAIN}_alerts")
 DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}_downloads")
 DATA_RADAR: HassKey[Radar] = HassKey(f"{DOMAIN}_radar")
+DATA_MONTH: HassKey[MonthToDate] = HassKey(f"{DOMAIN}_month")
 # Radar images come every 5 minutes, a minute or so after their interval.
 RADAR_UPDATE_INTERVAL = datetime.timedelta(minutes=1)
 # A place this close to the home is taken to be the home's: the radar is then
@@ -147,12 +151,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         * 60
     )
     if DATA_CLIENT not in hass.data:
+        # What all entries download this month, counted from here on.
+        month = MonthToDate(Store(hass, 1, f"{DOMAIN}.usage"), dt_util.now)
+        await month.async_load()
+        hass.data[DATA_MONTH] = month
         # One client for all entries, so that they share what they download.
         hass.data[DATA_CLIENT] = MeteoSwissOGD(
             async_get_clientsession(hass), USER_AGENT
         )
         hass.data[DATA_DOWNLOADS] = SharedDownloads(hass.data[DATA_CLIENT])
         hass.data[DATA_ALERTS] = MeteoAlarm(async_get_clientsession(hass), USER_AGENT)
+        hass.data[DATA_CLIENT].usage.on_count = month.add
+        hass.data[DATA_ALERTS].usage.on_count = month.add
     coordinator = MeteoSwissDataUpdateCoordinator(
         hass,
         entry,
@@ -187,6 +197,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
     if entry.options.get(CONF_RADAR, DEFAULT_RADAR) and point is not None:
         if DATA_RADAR not in hass.data:
             hass.data[DATA_RADAR] = Radar(async_get_clientsession(hass), USER_AGENT)
+            hass.data[DATA_RADAR].usage.on_count = hass.data[DATA_MONTH].add
         coordinator.radar = MeteoSwissRadarCoordinator(
             hass, entry, hass.data[DATA_RADAR], point.name, radar_location(hass, point)
         )
@@ -235,6 +246,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) 
             hass.data.pop(DATA_CLIENT)
             hass.data.pop(DATA_ALERTS)
             hass.data.pop(DATA_RADAR, None)
+            await hass.data.pop(DATA_MONTH).async_save()
 
     return unload_ok
 
@@ -466,6 +478,22 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             )
         else:
             ir.async_delete_issue(self.hass, DOMAIN, HIGH_USAGE_ISSUE)
+
+    @property
+    def downloaded(self) -> int:
+        """Bytes downloaded for all entries in the last day: forecasts and
+        measurements, warnings and the radar."""
+        radar = self.hass.data.get(DATA_RADAR)
+        return (
+            self.client.downloaded
+            + self.alerts.downloaded
+            + (radar.downloaded if radar is not None else 0)
+        )
+
+    @property
+    def downloaded_this_month(self) -> int:
+        """Bytes downloaded for all entries this calendar month, local time."""
+        return self.hass.data[DATA_MONTH].downloaded
 
     @property
     def device_info(self) -> DeviceInfo:

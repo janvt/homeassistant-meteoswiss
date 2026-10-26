@@ -70,6 +70,15 @@ def test_file_names_end_with_the_interval():
     assert url(HAIL_PROBABILITY, variant="vl").endswith("bzc262941230vl.845.h5")
 
 
+async def test_what_is_downloaded_is_counted():
+    meteo, session = client({url(RAIN_RATE): image({ZURICH: 2.5})})
+
+    await meteo.get(*ZURICH, NOW)
+
+    # Including the lists and images not published, which cost their headers.
+    assert meteo.downloaded == session.transferred() > 0
+
+
 async def test_the_rain_at_the_place():
     meteo, _ = client({url(RAIN_RATE): image({ZURICH: 2.5})})
 

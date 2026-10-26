@@ -252,6 +252,12 @@
             },
             "radar_hail_size": {
                 "name": "Radar hail size"
+            },
+            "downloaded": {
+                "name": "Downloaded last 24 hours"
+            },
+            "downloaded_this_month": {
+                "name": "Downloaded this month"
             }
         }
     }

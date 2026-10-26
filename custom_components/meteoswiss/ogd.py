@@ -9,7 +9,6 @@ Source: MeteoSwiss.
 from __future__ import annotations
 
 import asyncio
-import collections
 import csv
 import datetime
 import io
@@ -24,6 +23,11 @@ from typing import Any, TypedDict
 import aiohttp
 
 from custom_components.meteoswiss import climate
+from custom_components.meteoswiss.usage import (
+    REQUEST_OVERHEAD,
+    USAGE_PERIOD,
+    Usage,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,16 +78,12 @@ BLOCK_LIMIT = 1000  # more blocks than any file has
 SMALL_FILE = 8 * 1024 * 1024
 # Searching a file stops, and it is downloaded whole, as soon as the search has
 # cost as much as that would; and it does not start if it is expected to.
-# Each request costs about this many bytes of headers, and whole files up to
-# SMALL_FILE are sent compressed, to about this share of their size.
-REQUEST_OVERHEAD = 650
+# Whole files up to SMALL_FILE are sent compressed, to about this share of
+# their size.  (Each request also costs REQUEST_OVERHEAD bytes of headers.)
 COMPRESSED_SHARE = 0.17
 # A cold start costs the head and then walking the blocks: about this much
 # more than the head alone, at most.
 COLD_START_SHARE = 1.25
-# What was downloaded is counted over this long, for the repair notice when
-# it is far more than usual.
-USAGE_PERIOD = datetime.timedelta(hours=24)
 # Station measurements and the latest run are shared by entries this long.
 STATION_CACHE_SECONDS = 60
 RUN_CACHE = datetime.timedelta(minutes=5)
@@ -557,8 +557,9 @@ class MeteoSwissOGD:
         self._block_files: dict[str, tuple[str, bytes]] = {}
         # When files were downloaded whole because they could not be searched.
         self._whole_downloads: list[float] = []
-        # When each response came, and what it cost in bytes.
-        self._received: collections.deque[tuple[float, int]] = collections.deque()
+        # What responses cost, for the repair notice when it is far more than
+        # usual.
+        self.usage = Usage()
         # Whether the server sent a whole file when asked for part of it, the
         # last time it was.
         self.ranges_ignored = False
@@ -1133,10 +1134,7 @@ class MeteoSwissOGD:
         return len(self._whole_downloads)
 
     def _count(self, response: aiohttp.ClientResponse, body: int) -> None:
-        """Remember what a response cost, as transferred if it can be told."""
-        raw = getattr(response.content, "total_raw_bytes", None)
-        size = raw if isinstance(raw, int) else body
-        self._received.append((time.monotonic(), REQUEST_OVERHEAD + size))
+        self.usage.count(response, body)
 
     def diagnostics(self) -> dict[str, Any]:
         """How MeteoSwiss's files were read lately, for a diagnostics download."""
@@ -1156,10 +1154,7 @@ class MeteoSwissOGD:
     @property
     def downloaded(self) -> int:
         """Bytes downloaded from MeteoSwiss in the last USAGE_PERIOD."""
-        since = time.monotonic() - USAGE_PERIOD.total_seconds()
-        while self._received and self._received[0][0] < since:
-            self._received.popleft()
-        return sum(size for _, size in self._received)
+        return self.usage.downloaded
 
     async def _learn_blocks(self, url: str, budget: _Budget):
         """Read the first block of a file for the order of the points.

@@ -252,6 +252,12 @@
             },
             "radar_hail_size": {
                 "name": "Radar haglstørrelse"
+            },
+            "downloaded": {
+                "name": "Lastet ned siste 24 timer"
+            },
+            "downloaded_this_month": {
+                "name": "Lastet ned denne måneden"
             }
         }
     }
