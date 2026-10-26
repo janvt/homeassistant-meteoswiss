@@ -71,11 +71,12 @@ from custom_components.meteoswiss.ogd import (
     UnknownPointError,
     distance_km,
 )
+from custom_components.meteoswiss.pause import Pauses
 from custom_components.meteoswiss.radar import Radar
 from custom_components.meteoswiss.usage import MonthToDate
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.SENSOR, Platform.WEATHER]
+PLATFORMS = [Platform.SENSOR, Platform.SWITCH, Platform.WEATHER]
 MAX_CONTINUOUS_ERROR_TIME = 60 * 60
 # MeteoSwiss publishes a new forecast run every hour.  Look for one this often
 # rather than on every (much more frequent) station update.
@@ -92,6 +93,7 @@ DATA_ALERTS: HassKey[MeteoAlarm] = HassKey(f"{DOMAIN}_alerts")
 DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}_downloads")
 DATA_RADAR: HassKey[Radar] = HassKey(f"{DOMAIN}_radar")
 DATA_MONTH: HassKey[MonthToDate] = HassKey(f"{DOMAIN}_month")
+DATA_PAUSES: HassKey[Pauses] = HassKey(f"{DOMAIN}_pauses")
 # Radar images come every 5 minutes, a minute or so after their interval.
 RADAR_UPDATE_INTERVAL = datetime.timedelta(minutes=1)
 # A place this close to the home is taken to be the home's: the radar is then
@@ -155,6 +157,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         month = MonthToDate(Store(hass, 1, f"{DOMAIN}.usage"), dt_util.now)
         await month.async_load()
         hass.data[DATA_MONTH] = month
+        pauses = Pauses(Store(hass, 1, f"{DOMAIN}.paused"))
+        await pauses.async_load()
+        hass.data[DATA_PAUSES] = pauses
         # One client for all entries, so that they share what they download.
         hass.data[DATA_CLIENT] = MeteoSwissOGD(
             async_get_clientsession(hass), USER_AGENT
@@ -191,6 +196,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         real_time_precipitation_station_name=entry.data.get(
             CONF_REAL_TIME_PRECIPITATION_NAME, None
         ),
+        paused=entry.entry_id in hass.data[DATA_PAUSES],
     )
     await coordinator.async_config_entry_first_refresh()
     point = coordinator.data["point"]
@@ -217,8 +223,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Remove the notices of a removed entry, which would stay until a restart."""
+    """Remove the notices of a removed entry, which would stay until a restart,
+    and its pause."""
     async_delete_issues(hass, entry.data)
+    pauses = hass.data.get(DATA_PAUSES)
+    if pauses is None:
+        # It was the last entry.
+        pauses = Pauses(Store(hass, 1, f"{DOMAIN}.paused"))
+        await pauses.async_load()
+    if entry.entry_id in pauses:
+        await pauses.async_set(entry.entry_id, False)
 
 
 async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -247,6 +261,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) 
             hass.data.pop(DATA_ALERTS)
             hass.data.pop(DATA_RADAR, None)
             await hass.data.pop(DATA_MONTH).async_save()
+            hass.data.pop(DATA_PAUSES)
 
     return unload_ok
 
@@ -305,8 +320,11 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         freezing_level: bool = False,
         foehn: dict[str, Any] | None = None,
         climate_normals: bool = False,
+        paused: bool = False,
     ) -> None:
         """Initialize."""
+        # Downloads paused by the user: the entities keep their last values.
+        self.paused = paused
         self.first_error: dict[str, float | None] = {
             CONF_REAL_TIME_NAME: None,
             CONF_REAL_TIME_PRECIPITATION_NAME: None,
@@ -658,8 +676,49 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             _LOGGER.warning("Pollen station %s: %s", self.pollen_station, exc)
             return {}
 
+    async def async_set_paused(self, paused: bool) -> None:
+        """Pause or resume this entry's downloads, until changed again."""
+        entry_id = self.config_entry.entry_id
+        await self.hass.data[DATA_PAUSES].async_set(entry_id, paused)
+        self.paused = paused
+        if self.radar is not None:
+            self.radar.paused = paused
+        if paused:
+            # The shared files are no longer read for its place.
+            self.downloads.unregister(entry_id)
+            self.async_update_listeners()
+        elif self._point is None:
+            # Paused since it was set up, so it has nothing yet: set it up
+            # again, with the radar if it is turned on.
+            self.hass.config_entries.async_schedule_reload(entry_id)
+        else:
+            self.downloads.register(entry_id, self._point, self._large_parameters)
+            # Now rather than debounced: the values may be days old.
+            await self.async_refresh()
+            if self.radar is not None:
+                await self.radar.async_refresh()
+
+    def _paused_data(self) -> MeteoSwissClientResult:
+        """The last data, or none if paused since it was set up."""
+        if self.data is not None:
+            return self.data
+        return self._with_entry_attributes(
+            {
+                "forecast": None,
+                "condition_by_station": {},
+                "condition": [],
+                "pollen": {},
+                "warnings": None,
+                "foehn": None,
+                "today": {},
+                "climate": None,
+            }
+        )
+
     async def _async_update_data(self) -> MeteoSwissClientResult:
         """Update data from MeteoSwiss open data."""
+        if self.paused:
+            return self._paused_data()
         condition_by_station: dict[str, dict[str, float | None]] = {}
         # Only the first forecast is waited for: there is none to show before.
         first = self._forecast is None
@@ -778,6 +837,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             self.first_error[CONF_POSTCODE] = None
             self.error_raised[CONF_POSTCODE] = False
 
+        return self._with_entry_attributes(data)
+
+    def _with_entry_attributes(self, data: dict[str, Any]) -> MeteoSwissClientResult:
         newdata = cast(MeteoSwissClientResult, data)
         newdata[CONF_POSTCODE] = self.postcode
         newdata["point"] = self._point
@@ -814,8 +876,12 @@ class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
         )
         self._radar = radar
         self.location = location
+        # Set by the entry's coordinator; see its async_set_paused.
+        self.paused = False
 
     async def _async_update_data(self) -> RadarReadings:
+        if self.paused:
+            return self.data or {}
         now = datetime.datetime.now(datetime.timezone.utc)
         return await self._radar.get(*self.location, now)
 

@@ -273,6 +273,7 @@ class FakeOGD:
     instances: list[FakeOGD] = []
     forecast_calls = 0
     run_checks = 0
+    station_calls = 0
     temperature_calls = 0
     temperature_error: Exception | None = None
     climate_calls = 0
@@ -298,6 +299,7 @@ class FakeOGD:
         cls.instances = []
         cls.forecast_calls = 0
         cls.run_checks = 0
+        cls.station_calls = 0
         cls.temperature_calls = 0
         cls.temperature_error = None
         cls.climate_calls = 0
@@ -360,6 +362,7 @@ class FakeOGD:
         return dict(POLLEN_NOW) if abbr == "PZH" else {}
 
     async def get_station_now(self, abbr, station_type):
+        FakeOGD.station_calls += 1
         if self.station_error:
             raise self.station_error
         if station_type == StationType.PRECIPITATION:

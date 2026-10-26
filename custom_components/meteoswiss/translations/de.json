@@ -259,6 +259,11 @@
             "downloaded_this_month": {
                 "name": "Heruntergeladen diesen Monat"
             }
+        },
+        "switch": {
+            "downloads": {
+                "name": "Downloads"
+            }
         }
     }
 }

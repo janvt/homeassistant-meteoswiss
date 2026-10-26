@@ -289,6 +289,39 @@ places together: forecasts, measurements, warnings and the radar.
 time), and is kept across restarts, for automations on a monthly data
 allowance.
 
+Each forecast's device also has a *Downloads* switch.  Turned off, that place
+downloads nothing (no measurements, forecasts, warnings or radar) and its
+entities keep their last values, until it is turned on again; a restart
+keeps it off.  For example, to stop at 3 GB a month and start again on the
+first:
+
+```yaml
+automation:
+  - alias: MeteoSwiss data allowance
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.zurich_downloaded_this_month
+        above: 3000  # MB
+        id: over
+      - trigger: time
+        at: "00:05:00"
+        id: day
+    conditions:
+      - condition: or
+        conditions:
+          - condition: trigger
+            id: over
+          - condition: template
+            value_template: "{{ now().day == 1 }}"
+    actions:
+      - action: "switch.turn_{{ 'off' if trigger.id == 'over' else 'on' }}"
+        target:
+          entity_id: switch.zurich_downloads
+```
+
+Weather warnings stop too while it is off, so think twice before relying on
+them with a tight allowance.
+
 If MeteoSwiss changes how it publishes its files, the integration downloads
 them whole rather than stop working, until it is updated: **at worst several GB
 a day**.  It is checked against MeteoSwiss's files twice a day, so
