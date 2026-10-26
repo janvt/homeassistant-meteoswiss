@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Druckdifferenz, ab der der Föhn stark weht; etwa 8 hPa.",
                     "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), aus der nur die Zeilen dieses Orts gelesen werden: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag.",
                     "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden.",
-                    "radar": "Sensoren für Regen und Hagel jetzt an diesem Ort, vom Wetterradar von MeteoSchweiz, alle 5 Minuten: schneller und näher als die Niederschlagsstation, etwa um Fenster zu schliessen. Lädt 15 bis 35 MB pro Tag herunter, für alle Orte zusammen."
+                    "radar": "Sensoren für Regen und Hagel jetzt an diesem Ort, vom Wetterradar von MeteoSchweiz, alle 5 Minuten: schneller und näher als die Niederschlagsstation, etwa um Fenster zu schliessen. Dazu der Regen der letzten Stunde, das Radar an die Regenmesser angeglichen, und ein animiertes Bild der letzten 20 Minuten Regen rund um den Ort. Lädt 15 bis 50 MB pro Tag herunter, für alle Orte zusammen."
                 }
             }
         },
@@ -252,6 +252,14 @@
             },
             "radar_hail_size": {
                 "name": "Radar Hagelkorngrösse"
+            },
+            "radar_rain_last_hour": {
+                "name": "Radar Regen letzte Stunde"
+            }
+        },
+        "image": {
+            "radar_loop": {
+                "name": "Radar-Animation"
             }
         }
     }

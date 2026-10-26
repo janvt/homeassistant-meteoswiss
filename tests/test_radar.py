@@ -13,6 +13,7 @@ from custom_components.meteoswiss.radar import (
     HAIL_PROBABILITY,
     HAIL_SIZE,
     PRODUCTS,
+    RAIN_LAST_HOUR,
     RAIN_RATE,
     Radar,
 )
@@ -23,6 +24,8 @@ UTC = datetime.timezone.utc
 # A minute after the image of 12:30 is due.
 NOW = datetime.datetime(2026, 10, 21, 12, 31, 30, tzinfo=UTC)
 SLOT = datetime.datetime(2026, 10, 21, 12, 30, tzinfo=UTC)
+# The rain of the last hour comes about 4 minutes after its slot.
+HOUR_SLOT = SLOT - radar.INTERVAL
 ZURICH = (47.3769, 8.5417)
 
 
@@ -52,6 +55,12 @@ def image(values=None, quantity="RATE") -> bytes:
 
 def url(key, slot=SLOT, variant="rl"):
     return radar._url(PRODUCTS[key], slot, variant)
+
+
+def downloads(session, key):
+    """The URLs requested for one product's images."""
+    stem = PRODUCTS[key].stem
+    return [u for _, u, _ in session.requests if u.rsplit("/", 1)[-1].startswith(stem)]
 
 
 def client(files):
@@ -92,7 +101,9 @@ async def test_no_hail_images_while_it_is_dry():
 
     assert readings[HAIL_PROBABILITY] == (0.0, SLOT)
     assert readings[HAIL_SIZE] == (0.0, SLOT)
-    assert [u for _, u, _ in session.requests] == [url(RAIN_RATE)]
+    assert downloads(session, RAIN_RATE) == [url(RAIN_RATE)]
+    assert downloads(session, HAIL_PROBABILITY) == []
+    assert downloads(session, HAIL_SIZE) == []
 
 
 async def test_hail_while_it_rains():
@@ -119,7 +130,12 @@ async def test_an_image_not_published_yet_gives_the_one_before():
 
 
 async def test_each_image_is_downloaded_once():
-    meteo, session = client({url(RAIN_RATE): image()})
+    meteo, session = client(
+        {
+            url(RAIN_RATE): image(),
+            url(RAIN_LAST_HOUR, HOUR_SLOT, "0"): image(quantity="ACRR"),
+        }
+    )
     await meteo.get(*ZURICH, NOW)
     session.clear()
 
@@ -151,7 +167,7 @@ async def test_the_variant_that_worked_is_tried_first():
 
     await meteo.get(*ZURICH, NOW + radar.INTERVAL)
 
-    assert [u for _, u, _ in session.requests] == [url(RAIN_RATE, later, "vl")]
+    assert downloads(session, RAIN_RATE) == [url(RAIN_RATE, later, "vl")]
 
 
 def index(*names) -> bytes:
@@ -177,7 +193,7 @@ async def test_an_unusual_variant_is_looked_up_once_the_image_is_late():
     readings = await meteo.get(*ZURICH, late)
 
     assert readings[RAIN_RATE] == (3.0, SLOT)
-    assert meteo._variants[radar.PRECIPITATION] == "pl"
+    assert meteo._variants[PRODUCTS[RAIN_RATE].family] == "pl"
 
 
 async def test_the_list_of_files_is_read_at_most_every_half_hour():
@@ -190,3 +206,92 @@ async def test_the_list_of_files_is_read_at_most_every_half_hour():
         await meteo.get(*ZURICH, SLOT + datetime.timedelta(minutes=minutes))
 
     assert session.count("GET", item) == 2
+
+
+def hourly(slot, value=0.0, variant="0"):
+    return {url(RAIN_LAST_HOUR, slot, variant): image({ZURICH: value}, "ACRR")}
+
+
+async def test_the_rain_of_the_last_hour():
+    meteo, _ = client({url(RAIN_RATE): image(), **hourly(HOUR_SLOT, 4.2)})
+
+    readings = await meteo.get(*ZURICH, NOW)
+
+    assert readings[RAIN_LAST_HOUR] == (pytest.approx(4.2), HOUR_SLOT)
+
+
+def test_the_rain_of_the_last_hour_is_named_with_a_digit():
+    assert url(RAIN_LAST_HOUR, HOUR_SLOT, "9").endswith(
+        "ogd-radar-precip/20261021-ch/cpc2629412259_00060.001.h5"
+    )
+
+
+async def test_its_digit_is_found_and_tried_first_after():
+    later = HOUR_SLOT + radar.INTERVAL
+    files = {
+        url(RAIN_RATE): image({ZURICH: 1.0}),
+        url(RAIN_RATE, SLOT + radar.INTERVAL): image({ZURICH: 1.0}),
+        **hourly(HOUR_SLOT, 1.0, "9"),
+        **hourly(later, 2.0, "9"),
+    }
+    meteo, session = client(files)
+    assert (await meteo.get(*ZURICH, NOW))[RAIN_LAST_HOUR] == (1.0, HOUR_SLOT)
+    session.clear()
+
+    readings = await meteo.get(*ZURICH, NOW + radar.INTERVAL)
+
+    assert readings[RAIN_LAST_HOUR] == (2.0, later)
+    assert downloads(session, RAIN_LAST_HOUR) == [url(RAIN_LAST_HOUR, later, "9")]
+
+
+async def test_its_digits_are_never_looked_up_in_the_list_of_files():
+    # The rain images are all there; those of the last hour never come.
+    meteo, session = client(
+        {
+            url(RAIN_RATE, SLOT + k * radar.INTERVAL): image({ZURICH: 1.0})
+            for k in range(7)
+        }
+    )
+    item = radar.ITEM_URL.format(collection=radar.PRECIPITATION, day="20261021")
+
+    for minutes in range(0, 30):
+        await meteo.get(*ZURICH, NOW + datetime.timedelta(minutes=minutes))
+
+    assert session.count("GET", item) == 0
+
+
+async def test_none_after_a_dry_hour_and_no_more_downloads():
+    files = {}
+    for k in range(14):
+        files[url(RAIN_RATE, SLOT + k * radar.INTERVAL)] = image()
+        files.update(hourly(HOUR_SLOT + k * radar.INTERVAL, 0.3 if k < 2 else 0.0))
+    meteo, session = client(files)
+    for k in range(12):
+        readings = await meteo.get(*ZURICH, NOW + k * radar.INTERVAL)
+        assert readings[RAIN_LAST_HOUR][1] == HOUR_SLOT + k * radar.INTERVAL
+    session.clear()
+
+    # An hour after the first dry rain image.
+    readings = await meteo.get(*ZURICH, NOW + 12 * radar.INTERVAL)
+
+    assert readings[RAIN_LAST_HOUR] == (0.0, SLOT + 12 * radar.INTERVAL)
+    assert downloads(session, RAIN_LAST_HOUR) == []
+
+
+async def test_downloaded_again_once_it_rains():
+    files = {}
+    for k in range(14):
+        files[url(RAIN_RATE, SLOT + k * radar.INTERVAL)] = image(
+            {ZURICH: 2.0} if k == 13 else None
+        )
+        files.update(hourly(HOUR_SLOT + k * radar.INTERVAL))
+    meteo, session = client(files)
+    for k in range(13):
+        await meteo.get(*ZURICH, NOW + k * radar.INTERVAL)
+    session.clear()
+
+    readings = await meteo.get(*ZURICH, NOW + 13 * radar.INTERVAL)
+
+    later = HOUR_SLOT + 13 * radar.INTERVAL
+    assert readings[RAIN_LAST_HOUR] == (0.0, later)
+    assert downloads(session, RAIN_LAST_HOUR) == [url(RAIN_LAST_HOUR, later, "0")]

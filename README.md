@@ -233,8 +233,8 @@ unavailable when the station has reported nothing for six hours.
 
 ### Radar
 
-Turn on *Radar* under *Configure* for three sensors from MeteoSwiss's weather
-radar, every 5 minutes, at the 1 km square of your Home Assistant home if the
+Turn on *Radar* under *Configure* for four sensors and an image from
+MeteoSwiss's weather radar, every 5 minutes, at the 1 km square of your Home Assistant home if the
 place is within 10 km of it, and otherwise of the place (for a mountain, its
 summit):
 
@@ -242,6 +242,12 @@ summit):
 * *Radar hail probability*, in %.
 * *Radar hail size*: the largest hail expected, in mm; 0 below 20 mm, the
   smallest size the radar reports.
+* *Radar rain last hour*: the rain of the hour to the image's time, in mm,
+  from CombiPrecip, the radar adjusted to the rain gauges.  It comes about 4
+  minutes after its hour ends, a new one every 5 minutes.
+* *Radar loop*: an animated image of the rain rate over 60 km around the
+  place, the last 20 minutes, on a swisstopo map.  It is cut from the rain
+  images the sensors download anyway, and drawn only when it is looked at.
 
 The radar knows within a minute or two that rain has started at your place,
 where the nearest precipitation station is typically 5 km away and reports
@@ -257,8 +263,9 @@ trigger:
 
 Its amounts are estimates, often off by a factor of two over a few minutes,
 and less reliable in the mountains: for how much it rained, use the
-precipitation station.  Hail is only looked at while it rains at or next to
-the place.
+precipitation station, or the rain of the last hour, which is checked against
+the gauges.  Hail is only looked at while it rains at or next to the place,
+and the rain of the last hour until it has been dry there for an hour.
 
 ## Download volumes
 
@@ -267,7 +274,8 @@ Switzerland.  The integration reads only the part for your place, so one
 entry with the default settings downloads **about 20 MB a day**, up to 55 MB
 on days with many weather warnings, and each further place about 15 MB more.
 Starting Home Assistant costs a few MB extra.  The radar, when turned on, adds
-15 to 35 MB a day, the same for any number of places.
+15 to 35 MB a day, the same for any number of places, and up to 15 MB more
+on a day of rain.
 
 If MeteoSwiss changes how it publishes its files, the integration downloads
 them whole rather than stop working, until it is updated: **at worst several GB
@@ -290,7 +298,9 @@ All data is from MeteoSwiss (Source: MeteoSwiss), under its
   (SwissMetNet), for the current conditions, Föhn and climate normals.
 * [Pollen stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations).
 * [Weather radar](https://opendatadocs.meteoswiss.ch/d-radar-data): the rain
-  rate (RZC), probability of hail (POH) and maximum expected hail size (MESHS).
+  rate (RZC), probability of hail (POH), maximum expected hail size (MESHS)
+  and the rain of the last hour (CombiPrecip); the map under the radar loop
+  is swisstopo's.
 * Weather warnings, from MeteoSwiss's warnings as published by
   [MeteoAlarm](https://meteoalarm.org) (EUMETNET).
 

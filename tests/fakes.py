@@ -437,6 +437,7 @@ class FakeRadar:
     """Replacement for Radar with fixed readings."""
 
     readings: dict = {}
+    images: dict = {}
     calls: list = []
 
     def __init__(self, session, user_agent) -> None:
@@ -445,8 +446,12 @@ class FakeRadar:
     @classmethod
     def reset(cls) -> None:
         cls.readings = {}
+        cls.images = {}
         cls.calls = []
 
     async def get(self, lat, lon, now):
         FakeRadar.calls.append((lat, lon))
         return dict(self.readings)
+
+    def image(self, key):
+        return self.images.get(key)

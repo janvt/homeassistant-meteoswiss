@@ -3,11 +3,13 @@
 import asyncio
 import datetime
 
+import numpy as np
 import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers.entity_component import DATA_INSTANCES
 from pytest_homeassistant_custom_component.common import (
     MockConfigEntry,
     async_fire_time_changed,
@@ -17,6 +19,8 @@ from custom_components.meteoswiss import DATA_ALERTS, DATA_CLIENT, DATA_DOWNLOAD
 from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
+from custom_components.meteoswiss.radar import Image
+from custom_components.meteoswiss.radar_loop import MAP_URL
 
 from .fakes import (
     FOEHN_PRESSURES,
@@ -958,7 +962,7 @@ async def test_what_entries_share_lasts_until_the_last_is_unloaded(hass, entry):
         assert key not in hass.data
 
 
-RADAR_KEYS = ("rain_rate", "hail_probability", "hail_size")
+RADAR_KEYS = ("rain_rate", "hail_probability", "hail_size", "rain_last_hour")
 
 
 async def test_no_radar_unless_turned_on(hass, entry):
@@ -969,6 +973,9 @@ async def test_no_radar_unless_turned_on(hass, entry):
             "sensor", DOMAIN, f"sensor.{entry.entry_id}-{key}"
         )
     assert FakeRadar.calls == []
+    assert not er.async_get(hass).async_get_entity_id(
+        "image", DOMAIN, f"image.{entry.entry_id}-radar_loop"
+    )
 
 
 async def test_radar_sensors(hass, entry, frozen_now):
@@ -977,6 +984,7 @@ async def test_radar_sensors(hass, entry, frozen_now):
         "rain_rate": (2.5, NOW),
         "hail_probability": (0.0, NOW),
         "hail_size": None,  # no recent image
+        "rain_last_hour": (1.2, NOW),
     }
     await setup(hass, entry)
 
@@ -990,6 +998,8 @@ async def test_radar_sensors(hass, entry, frozen_now):
     assert states["rain_rate"].attributes["unit_of_measurement"] == "mm/h"
     assert states["hail_probability"].state == "0.0"
     assert states["hail_size"].state == "unavailable"
+    assert states["rain_last_hour"].state == "1.2"
+    assert states["rain_last_hour"].attributes["unit_of_measurement"] == "mm"
     # At the forecast's place, every minute.
     assert FakeRadar.calls == [(47.3875, 8.521)]
     FakeRadar.readings = {**FakeRadar.readings, "rain_rate": (0.0, NOW)}
@@ -1014,3 +1024,20 @@ async def test_a_mountain_s_radar_is_read_at_its_summit(hass):
     await setup(hass, entry)
 
     assert entry.runtime_data.radar.location == (46.7526, 8.7062)
+
+
+async def test_radar_loop(hass, entry, frozen_now, aioclient_mock):
+    aioclient_mock.get(MAP_URL.split("?")[0], status=403)
+    hass.config_entries.async_update_entry(entry, options={"radar": True})
+    await setup(hass, entry)
+    loop_id = entity_id(hass, "image", f"image.{entry.entry_id}-radar_loop")
+    # Nothing to show before the first rain image.
+    assert hass.states.get(loop_id).state == "unavailable"
+
+    values = np.zeros((640, 710), dtype=np.float32)
+    FakeRadar.images = {"rain_rate": Image(NOW, values, 2255000, 1480000, 1000)}
+    await refresh_after(hass, frozen_now, 1)
+
+    assert hass.states.get(loop_id).state == NOW.isoformat()
+    image = hass.data[DATA_INSTANCES]["image"].get_entity(loop_id)
+    assert (await image.async_image()).startswith(b"GIF89a")

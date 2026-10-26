@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Differenza di pressione da cui il favonio soffia forte; circa 8 hPa.",
                     "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un file per tutta la Svizzera (33 MB), di cui vengono lette solo le righe di questa località: circa 0,5 MB ogni tre ore, 4 MB al giorno.",
                     "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 1,4 MB) viene scaricata all'avvio di Home Assistant e poi solo controllata una volta alla settimana; i giorni di quest'anno ogni sei ore.",
-                    "radar": "Sensori di pioggia e grandine in questo momento in questa località, dal radar meteorologico di MeteoSvizzera, ogni 5 minuti: più rapidi e vicini della stazione pluviometrica, ad esempio per chiudere le finestre. Scarica da 15 a 35 MB al giorno, per tutte le località insieme."
+                    "radar": "Sensori di pioggia e grandine in questo momento in questa località, dal radar meteorologico di MeteoSvizzera, ogni 5 minuti: più rapidi e vicini della stazione pluviometrica, ad esempio per chiudere le finestre. Inoltre la pioggia dell'ultima ora, il radar corretto con i pluviometri, e un'immagine animata degli ultimi 20 minuti di pioggia intorno alla località. Scarica da 15 a 50 MB al giorno, per tutte le località insieme."
                 }
             }
         },
@@ -252,6 +252,14 @@
             },
             "radar_hail_size": {
                 "name": "Radar dimensione della grandine"
+            },
+            "radar_rain_last_hour": {
+                "name": "Radar pioggia ultima ora"
+            }
+        },
+        "image": {
+            "radar_loop": {
+                "name": "Radar animazione"
             }
         }
     }

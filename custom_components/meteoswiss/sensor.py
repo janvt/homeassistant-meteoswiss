@@ -67,6 +67,7 @@ from custom_components.meteoswiss.ogd import (
 from custom_components.meteoswiss.radar import (
     HAIL_PROBABILITY,
     HAIL_SIZE,
+    RAIN_LAST_HOUR,
     RAIN_RATE,
 )
 
@@ -682,6 +683,15 @@ RADAR_SENSORS = (
         native_unit_of_measurement=UnitOfLength.MILLIMETERS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
+    ),
+    SensorEntityDescription(
+        key=RAIN_LAST_HOUR,
+        translation_key="radar_rain_last_hour",
+        # The total of a moving hour: neither a rate nor ever increasing.
+        device_class=SensorDeviceClass.PRECIPITATION,
+        native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
     ),
 )
 

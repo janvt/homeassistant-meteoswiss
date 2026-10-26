@@ -69,10 +69,11 @@ from custom_components.meteoswiss.ogd import (
     UnknownPointError,
     distance_km,
 )
-from custom_components.meteoswiss.radar import Radar
+from custom_components.meteoswiss.radar import RAIN_RATE, Radar
+from custom_components.meteoswiss.radar_loop import RadarLoop
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.SENSOR, Platform.WEATHER]
+PLATFORMS = [Platform.IMAGE, Platform.SENSOR, Platform.WEATHER]
 MAX_CONTINUOUS_ERROR_TIME = 60 * 60
 # MeteoSwiss publishes a new forecast run every hour.  Look for one this often
 # rather than on every (much more frequent) station update.
@@ -786,10 +787,14 @@ class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
         )
         self._radar = radar
         self.location = location
+        self.loop = RadarLoop(hass, location)
 
     async def _async_update_data(self) -> RadarReadings:
         now = datetime.datetime.now(datetime.timezone.utc)
-        return await self._radar.get(*self.location, now)
+        readings = await self._radar.get(*self.location, now)
+        if (rain := self._radar.image(RAIN_RATE)) is not None:
+            self.loop.add(rain)
+        return readings
 
 
 def radar_location(hass: HomeAssistant, point: Point) -> tuple[float, float]:
