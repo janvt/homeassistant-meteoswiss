@@ -468,6 +468,17 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             ir.async_delete_issue(self.hass, DOMAIN, HIGH_USAGE_ISSUE)
 
     @property
+    def downloaded(self) -> int:
+        """Bytes downloaded for all entries in the last day: forecasts and
+        measurements, warnings and the radar."""
+        radar = self.hass.data.get(DATA_RADAR)
+        return (
+            self.client.downloaded
+            + self.alerts.downloaded
+            + (radar.downloaded if radar is not None else 0)
+        )
+
+    @property
     def device_info(self) -> DeviceInfo:
         """The device that groups the entities of the entry."""
         return DeviceInfo(

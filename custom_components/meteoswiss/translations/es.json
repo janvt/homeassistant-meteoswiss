@@ -252,6 +252,9 @@
             },
             "radar_hail_size": {
                 "name": "Radar tamaño del granizo"
+            },
+            "downloaded": {
+                "name": "Descargado en 24 horas"
             }
         }
     }

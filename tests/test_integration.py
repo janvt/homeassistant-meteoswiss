@@ -22,13 +22,14 @@ from .fakes import (
     FOEHN_PRESSURES,
     NOW,
     STATION_MEASUREMENTS,
+    FakeMeteoAlarm,
     FakeRadar,
     make_warning,
 )
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
-# The entity IDs of the summaries and warnings, after the device's name.
+# The entity IDs of the sensors every forecast has, after the device's name.
 SUMMARY_NAMES = (
     "snow_tonight",
     "snow_next_24_hours",
@@ -43,6 +44,7 @@ SUMMARY_NAMES = (
     "weather_warning_next_24_hours",
     "fohn_pressure_difference",
     "fohn_outlook",
+    "downloaded_last_24_hours",
 )
 
 
@@ -919,6 +921,22 @@ async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_
 
     await refresh_after(hass, frozen_now, 35)
     assert fake_ogd.climate_calls == 2
+
+
+async def test_downloaded_sensor(hass, entry_data, fake_ogd, monkeypatch):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, options={"radar": True})
+    entry.add_to_hass(hass)
+    monkeypatch.setattr(fake_ogd, "downloaded", 20_000_000)
+    monkeypatch.setattr(FakeMeteoAlarm, "downloaded", 3_000_000)
+    monkeypatch.setattr(FakeRadar, "downloaded", 25_000_000)
+    await setup(hass, entry)
+
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-downloaded")
+    state = hass.states.get(sensor)
+    # The forecasts and measurements, warnings and radar, in MB.
+    assert float(state.state) == 48.0
+    assert state.attributes["unit_of_measurement"] == "MB"
+    assert er.async_get(hass).async_get(sensor).entity_category == "diagnostic"
 
 
 async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(

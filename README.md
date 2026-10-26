@@ -269,6 +269,10 @@ on days with many weather warnings, and each further place about 15 MB more.
 Starting Home Assistant costs a few MB extra.  The radar, when turned on, adds
 15 to 35 MB a day, the same for any number of places.
 
+The diagnostic sensor *Downloaded last 24 hours*, on each forecast's device,
+shows what the integration actually downloaded over the last 24 hours, for all
+places together: forecasts, measurements, warnings and the radar.
+
 If MeteoSwiss changes how it publishes its files, the integration downloads
 them whole rather than stop working, until it is updated: **at worst several GB
 a day**.  It is checked against MeteoSwiss's files twice a day, so

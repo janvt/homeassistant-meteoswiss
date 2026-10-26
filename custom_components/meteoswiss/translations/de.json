@@ -252,6 +252,9 @@
             },
             "radar_hail_size": {
                 "name": "Radar Hagelkorngrösse"
+            },
+            "downloaded": {
+                "name": "Heruntergeladen in 24 Stunden"
             }
         }
     }

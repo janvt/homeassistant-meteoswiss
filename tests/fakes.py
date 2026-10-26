@@ -413,6 +413,8 @@ def make_warning(type_, level, onset, expires, event=None):
 class FakeMeteoAlarm:
     """Replacement for MeteoAlarm with fixed warnings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     warnings: list = []
     error: Exception | None = None
     calls: list = []
@@ -436,6 +438,8 @@ class FakeMeteoAlarm:
 class FakeRadar:
     """Replacement for Radar with fixed readings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     readings: dict = {}
     calls: list = []
 

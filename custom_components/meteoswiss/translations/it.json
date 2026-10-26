@@ -252,6 +252,9 @@
             },
             "radar_hail_size": {
                 "name": "Radar dimensione della grandine"
+            },
+            "downloaded": {
+                "name": "Scaricato nelle ultime 24 ore"
             }
         }
     }

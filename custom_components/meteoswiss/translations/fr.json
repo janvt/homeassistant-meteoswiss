@@ -252,6 +252,9 @@
             },
             "radar_hail_size": {
                 "name": "Radar taille des grêlons"
+            },
+            "downloaded": {
+                "name": "Téléchargé en 24 heures"
             }
         }
     }

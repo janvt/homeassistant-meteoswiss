@@ -133,6 +133,17 @@ def test_level_between_takes_the_most_severe_in_force():
 
 
 class TestGetWarnings:
+    async def test_what_is_downloaded_is_counted(self):
+        files = {
+            alerts.FEED_URL: feed(WIND),
+            "https://cap.test/wind": details(),
+        }
+        meteoalarm, session = client(files)
+
+        await meteoalarm.get_warnings(*ALTDORF, "de", NOW)
+
+        assert meteoalarm.downloaded == session.transferred() > 0
+
     async def test_the_warnings_of_the_region_in_the_language(self):
         files = {
             alerts.FEED_URL: feed(
