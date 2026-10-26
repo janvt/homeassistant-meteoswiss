@@ -57,6 +57,8 @@ Copy `custom_components/meteoswiss` from the
 the `custom_components` folder of your Home Assistant configuration, and restart
 Home Assistant.
 
+Either way, it needs Home Assistant 2024.11 or newer.
+
 ### Coming from Rudd-O's or websylv's version
 
 This integration has the same domain (`meteoswiss`) as Rudd-O's, so it replaces
