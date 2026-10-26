@@ -74,6 +74,12 @@ _LOGGER = logging.getLogger(__name__)
 
 # Precipitation stations only measure rain.
 PRECIPITATION_SENSOR_TYPES = ("10minrain",)
+# Created turned off, to keep the device tidy: the pressures that are not
+# reduced as weather maps are (QFF is), and the dew point, which the weather
+# entity has.
+STATION_SENSORS_OFF_BY_DEFAULT = ("pressure", "pressure_qnh", "dew_point")
+# The pollen most people are allergic to; the others are created turned off.
+POLLEN_ON_BY_DEFAULT = ("birch", "grasses")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -604,6 +610,7 @@ class MeteoSwissPollenSensor(
         self._kind = kind
         self._attr_translation_key = f"pollen_{kind}"
         self._attr_unique_id = f"sensor.{integration_id}-pollen_{kind}"
+        self._attr_entity_registry_enabled_default = kind in POLLEN_ON_BY_DEFAULT
         self._attr_device_info = coordinator.station_device_info(StationType.POLLEN)
 
     @property
@@ -783,6 +790,9 @@ class MeteoSwissSensor(
         self._attr_device_info = coordinator.station_device_info(station_type)
         self._state = None
         self._type = sensor_type
+        self._attr_entity_registry_enabled_default = (
+            sensor_type not in STATION_SENSORS_OFF_BY_DEFAULT
+        )
         self._attr_native_unit_of_measurement = SENSOR_TYPES[self._type][
             SENSOR_TYPE_UNIT
         ]
