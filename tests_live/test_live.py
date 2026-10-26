@@ -13,6 +13,7 @@ its budget: see .github/workflows/live.yaml, which runs them twice a day.
 
 from __future__ import annotations
 
+import collections
 import datetime
 import json
 
@@ -234,9 +235,13 @@ async def test_radar_agrees_with_rain_gauges(http):
     """North is up: where gauges measure rain, the radar sees it."""
     async with http.get(RAIN_GAUGES, headers={"User-Agent": USER_AGENT}) as response:
         gauges = json.loads(await response.read())["features"]
-    end = datetime.datetime.fromisoformat(
-        gauges[0]["properties"]["reference_ts"].replace("Z", "+00:00")
-    )
+    # Gauges report at different times, and those without a reading give
+    # 99999 at "-": only those of the time most report at are compared.
+    stamp = collections.Counter(
+        g["properties"]["reference_ts"] for g in gauges
+    ).most_common(1)[0][0]
+    gauges = [g for g in gauges if g["properties"]["reference_ts"] == stamp]
+    end = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
     meteo = radar.Radar(http, USER_AGENT)
     rates = []
     for slot in (end, end - radar.INTERVAL):  # the gauges' 10 minutes
