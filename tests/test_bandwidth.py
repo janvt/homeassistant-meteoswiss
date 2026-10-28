@@ -360,6 +360,23 @@ class TestFilesOrderedByPlace:
         assert len(session.requests) <= 16 * len(keys)
         assert session.transferred() <= 50_000 * len(keys)
 
+    @pytest.mark.usefixtures("head_like_the_real_files")
+    async def test_a_file_ordered_by_time_for_a_few_runs(self):
+        # As the precipitation files were on 28 October 2026, from 00:00 to
+        # 09:00: by time, then by place again.
+        client, session, files = self.setup()
+        files[url("p", RUNS[1])] = by_time("p", 1)
+        for run in RUNS:
+            session.clear()
+
+            rows = await client._point_values(url("p", run), point(MIDDLE))
+
+            assert rows == expected(files[url("p", run)], MIDDLE)
+        # A binary search again, not a walk through blocks that are not there.
+        assert len(session.requests) <= 16
+        assert client.whole_downloads == 0
+        assert "p" not in client.diagnostics()["ordered_by_time"]
+
     async def test_a_place_not_in_the_file_is_not_looked_for_in_the_whole_file(self):
         client, session, _ = self.setup()
 
