@@ -559,8 +559,10 @@ class MeteoSwissOGD:
         self._stations: dict[StationType, list[Station]] = {}
         # The index in POINT_ORDERS that worked last, by parameter.
         self._orders: dict[str, int] = {}
-        # Parameters whose files are ordered by time rather than by point.
-        self._by_time: set[str] = set()
+        # Parameters whose latest file was ordered by time rather than by
+        # point, and that file: MeteoSwiss changes the order of some files
+        # from one run to the next, so each run's is checked afresh.
+        self._by_time: dict[str, str] = {}
         # The latest file of each parameter and its size.
         self._files: dict[str, tuple[str, int]] = {}
         # Files ordered by time, by parameter: their layout, and where each
@@ -1011,7 +1013,7 @@ class MeteoSwissOGD:
     async def _searched_point_values(self, url: str, point: Point) -> dict[str, str]:
         prefix = f"{point.point_id};{point.point_type};"
         parameter = _parameter(url)
-        if parameter in self._by_time:
+        if self._by_time.get(parameter) == url:
             return (await self._blocked_rows(url, [point]))[point.key]
         head, total = await self._get(url, (0, HEAD_BYTES - 1))
         self._note_size(url, total)
@@ -1019,8 +1021,9 @@ class MeteoSwissOGD:
             lines = head.decode("latin-1").splitlines()[1:3]
             keys = [_key(line) for line in lines]
             if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
+                self._by_time.pop(parameter, None)
                 return await self._ordered_point_values(url, total, point, prefix)
-            self._by_time.add(parameter)
+            self._by_time[parameter] = url
             return (await self._blocked_rows(url, [point]))[point.key]
         return _rows_with_prefix(head.decode("latin-1"), prefix)
 
