@@ -155,6 +155,20 @@ async def test_forecast(http, client, counting, places, latest_run):
         for place in places:
             await client.get_forecast(place, run)
         costs.append((counting.requests, counting.transferred))
+        requests = collections.Counter(e.url for e in counting.log)
+        parameters = (*ogd.DAILY_PARAMETERS.values(), *ogd.HOURLY_PARAMETERS.values())
+        for parameter in parameters:
+            file = MeteoSwissOGD._run_url(run, parameter)
+            if client._by_time.get(parameter) == file:
+                # A small request per block (an hour), as for tre200h0.  Some
+                # runs of other files are ordered by time too, as on 28
+                # October 2026 the precipitation from 00:00 to 09:00.
+                limit = 300
+            else:
+                # A binary search, for files ordered by place: about 13
+                # probes in 33 MB, then the rows.
+                limit = 25
+            assert requests[file] <= limit * len(places), (run, parameter)
     whole = 0
     for parameter in (*ogd.DAILY_PARAMETERS.values(), *ogd.HOURLY_PARAMETERS.values()):
         whole += await whole_cost(http, MeteoSwissOGD._run_url(end, parameter))
@@ -168,9 +182,6 @@ async def test_forecast(http, client, counting, places, latest_run):
             assert await client._point_values(file, place) == whole_rows(body, place)
     cold, *warm = costs
     within_budget("forecast", "cold", cold[1], whole, len(places))
-    for requests, transferred in costs:
-        # A binary search of about 16 requests in each file ordered by place.
-        assert requests <= 250 * len(places)
     for _, transferred in warm:
         within_budget("forecast", "next run", transferred, whole, len(places))
     # Nothing downloaded whole for lack of a way to search it.
