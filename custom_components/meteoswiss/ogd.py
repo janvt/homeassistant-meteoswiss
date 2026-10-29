@@ -289,6 +289,13 @@ def _key(line: bytes | str) -> tuple[int, int] | None:
         return None
 
 
+def _ordered_by_point(head: bytes) -> bool:
+    """Whether a file starting with these bytes is ordered by point: its first
+    two rows are of the same point, where a file ordered by time has two."""
+    keys = [_key(line) for line in head.decode("latin-1").splitlines()[1:3]]
+    return len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]
+
+
 # The orders of the files that are ordered by point, as sort keys of
 # (point_id, point_type_id).  Some files are sorted by number; others by type,
 # then by point ID as text (1, 10, 10101, ..., 2).
@@ -353,6 +360,14 @@ class _Lost(Exception):
 
 class _OverBudget(_Lost):
     """Searching has cost as much as downloading the whole file."""
+
+
+class _OrderedByPoint(Exception):
+    """A file read by block turned out to be ordered by point."""
+
+    def __init__(self, size: int) -> None:
+        super().__init__(size)
+        self.size = size
 
 
 def _whole_cost(size: int) -> int:
@@ -1018,9 +1033,7 @@ class MeteoSwissOGD:
         head, total = await self._get(url, (0, HEAD_BYTES - 1))
         self._note_size(url, total)
         if total > len(head):
-            lines = head.decode("latin-1").splitlines()[1:3]
-            keys = [_key(line) for line in lines]
-            if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
+            if _ordered_by_point(head):
                 self._by_time.pop(parameter, None)
                 return await self._ordered_point_values(url, total, point, prefix)
             self._by_time[parameter] = url
@@ -1101,6 +1114,16 @@ class MeteoSwissOGD:
                 try:
                     learned = await self._learn_blocks(url, budget)
                 except _OverBudget:
+                    break
+                except _OrderedByPoint as reordered:
+                    # MeteoSwiss reorders a file now and then, as it did the
+                    # precipitation files on 28 October 2026: a binary search
+                    # finds each point instead of the whole file.
+                    for p in todo:
+                        found[p.key] = await self._ordered_point_values(
+                            url, reordered.size, p, f"{p.point_id};{p.point_type};"
+                        )
+                    todo = []
                     break
                 if learned is None:
                     _LOGGER.debug("%s cannot be read by block", url)
@@ -1220,7 +1243,8 @@ class MeteoSwissOGD:
         """Read the first block of a file for the order of the points.
 
         Returns the layout, the rows read, the file's size and whether that was
-        all of it; None if the file is not laid out in blocks.
+        all of it; None if the file is not laid out in blocks.  Raises
+        _OrderedByPoint if it is ordered by point instead.
         """
         parameter = _parameter(url)
         head, total = await self._get(url, (0, BLOCK_HEAD - 1))
@@ -1229,6 +1253,8 @@ class MeteoSwissOGD:
             budget.spend(len(head), total)
         parsed = _parse_blocks(head, total, _run_of(url)[:8])
         if parsed is None:
+            if total > len(head) and _ordered_by_point(head):
+                raise _OrderedByPoint(total)
             return None
         blocks, known = parsed
         self._adopt_blocks(parameter, blocks)
