@@ -255,12 +255,98 @@
             },
             "radar_rain_last_hour": {
                 "name": "Radar Regen letzte Stunde"
+            },
+            "downloaded": {
+                "name": "Heruntergeladen in 24 Stunden"
+            },
+            "downloaded_this_month": {
+                "name": "Heruntergeladen diesen Monat"
+            },
+            "max_temperature_today": {
+                "name": "Höchsttemperatur heute"
+            },
+            "min_temperature_today": {
+                "name": "Tiefsttemperatur heute"
+            },
+            "precipitation_today": {
+                "name": "Niederschlag heute"
+            },
+            "sunshine_today": {
+                "name": "Sonnenschein heute"
+            },
+            "lowest_freezing_level_48h": {
+                "name": "Tiefste Nullgradgrenze nächste 48 Stunden"
+            },
+            "snow_depth": {
+                "name": "Schneehöhe"
+            },
+            "temperature_5cm": {
+                "name": "Temperatur 5 cm über Boden"
+            },
+            "soil_temperature_5cm": {
+                "name": "Bodentemperatur 5 cm"
+            },
+            "soil_temperature_10cm": {
+                "name": "Bodentemperatur 10 cm"
+            },
+            "soil_temperature_20cm": {
+                "name": "Bodentemperatur 20 cm"
+            },
+            "wind_chill": {
+                "name": "Windchill"
+            },
+            "diffuse_radiation": {
+                "name": "Diffuse Strahlung"
+            },
+            "longwave_radiation": {
+                "name": "Langwellige Strahlung"
+            },
+            "measurement_time": {
+                "name": "Messzeitpunkt"
             }
         },
         "image": {
             "radar_loop": {
                 "name": "Radar-Animation"
             }
+        },
+        "switch": {
+            "downloads": {
+                "name": "Downloads"
+            }
+        }
+    },
+    "services": {
+        "import_history": {
+            "name": "Stationsverlauf importieren",
+            "description": "Importiert die stündlichen Messungen der Wetterstation von MeteoSchweiz in die Langzeitstatistik ihrer Sensoren, für die Stunden, bevor Home Assistant sie aufgezeichnet hat. Lädt etwa 1 MB für dieses Jahr und 7 bis 13 MB pro früherem Jahrzehnt herunter.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Eintrag",
+                    "description": "Der MeteoSchweiz-Eintrag, dessen Wetterstation importiert wird."
+                },
+                "since": {
+                    "name": "Ab",
+                    "description": "Der erste zu importierende Tag. Standardmässig der Beginn dieses Jahrzehnts; alle Sensoren der Station belegen etwa 9 MB Statistik pro Jahr, dauerhaft."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "Der MeteoSchweiz-Eintrag ist nicht eingerichtet."
+        },
+        "no_weather_station": {
+            "message": "Dieser Eintrag hat keine Wetterstation."
+        },
+        "downloads_paused": {
+            "message": "Downloads sind für diesen Eintrag pausiert: Schalte zuerst seinen Schalter Downloads ein."
+        },
+        "no_recorder": {
+            "message": "Der Recorder läuft nicht, es gibt also keine Statistik zum Importieren."
+        },
+        "history_unavailable": {
+            "message": "Der Stationsverlauf konnte nicht heruntergeladen werden: {error}"
         }
     }
 }

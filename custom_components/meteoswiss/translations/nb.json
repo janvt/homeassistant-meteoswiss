@@ -255,12 +255,98 @@
             },
             "radar_rain_last_hour": {
                 "name": "Radar regn siste time"
+            },
+            "downloaded": {
+                "name": "Lastet ned siste 24 timer"
+            },
+            "downloaded_this_month": {
+                "name": "Lastet ned denne måneden"
+            },
+            "max_temperature_today": {
+                "name": "Høyeste temperatur i dag"
+            },
+            "min_temperature_today": {
+                "name": "Laveste temperatur i dag"
+            },
+            "precipitation_today": {
+                "name": "Nedbør i dag"
+            },
+            "sunshine_today": {
+                "name": "Solskinn i dag"
+            },
+            "lowest_freezing_level_48h": {
+                "name": "Laveste nullgradsgrense neste 48 timer"
+            },
+            "snow_depth": {
+                "name": "Snødybde"
+            },
+            "temperature_5cm": {
+                "name": "Temperatur 5 cm over bakken"
+            },
+            "soil_temperature_5cm": {
+                "name": "Jordtemperatur 5 cm"
+            },
+            "soil_temperature_10cm": {
+                "name": "Jordtemperatur 10 cm"
+            },
+            "soil_temperature_20cm": {
+                "name": "Jordtemperatur 20 cm"
+            },
+            "wind_chill": {
+                "name": "Vindavkjøling"
+            },
+            "diffuse_radiation": {
+                "name": "Diffus stråling"
+            },
+            "longwave_radiation": {
+                "name": "Langbølget stråling"
+            },
+            "measurement_time": {
+                "name": "Måletidspunkt"
             }
         },
         "image": {
             "radar_loop": {
                 "name": "Radar animasjon"
             }
+        },
+        "switch": {
+            "downloads": {
+                "name": "Nedlastinger"
+            }
+        }
+    },
+    "services": {
+        "import_history": {
+            "name": "Importer stasjonshistorikk",
+            "description": "Importerer værstasjonens timesmålinger fra MeteoSveits til langtidsstatistikken til sensorene, for timene før Home Assistant registrerte dem. Laster ned omtrent 1 MB for i år og 7 til 13 MB for hvert tiår før.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Oppføring",
+                    "description": "MeteoSveits-oppføringen hvis værstasjon skal importeres."
+                },
+                "since": {
+                    "name": "Fra",
+                    "description": "Den første dagen som importeres. Som standard starten av dette tiåret; alle stasjonens sensorer tar omtrent 9 MB statistikk i året, som beholdes for godt."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "MeteoSveits-oppføringen er ikke satt opp."
+        },
+        "no_weather_station": {
+            "message": "Denne oppføringen har ingen værstasjon."
+        },
+        "downloads_paused": {
+            "message": "Nedlastinger er satt på pause for denne oppføringen: slå først på bryteren Nedlastinger."
+        },
+        "no_recorder": {
+            "message": "Opptakeren kjører ikke, så det finnes ingen statistikk å importere til."
+        },
+        "history_unavailable": {
+            "message": "Stasjonshistorikken kunne ikke lastes ned: {error}"
         }
     }
 }

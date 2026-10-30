@@ -9,7 +9,6 @@ Source: MeteoSwiss.
 from __future__ import annotations
 
 import asyncio
-import collections
 import csv
 import datetime
 import io
@@ -24,6 +23,13 @@ from typing import Any, TypedDict
 import aiohttp
 
 from custom_components.meteoswiss import climate
+from custom_components.meteoswiss.usage import (
+    REQUEST_OVERHEAD,
+    USAGE_PERIOD,
+    Usage,
+)
+
+HOUR = datetime.timedelta(hours=1)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,16 +80,12 @@ BLOCK_LIMIT = 1000  # more blocks than any file has
 SMALL_FILE = 8 * 1024 * 1024
 # Searching a file stops, and it is downloaded whole, as soon as the search has
 # cost as much as that would; and it does not start if it is expected to.
-# Each request costs about this many bytes of headers, and whole files up to
-# SMALL_FILE are sent compressed, to about this share of their size.
-REQUEST_OVERHEAD = 650
+# Whole files up to SMALL_FILE are sent compressed, to about this share of
+# their size.  (Each request also costs REQUEST_OVERHEAD bytes of headers.)
 COMPRESSED_SHARE = 0.17
 # A cold start costs the head and then walking the blocks: about this much
 # more than the head alone, at most.
 COLD_START_SHARE = 1.25
-# What was downloaded is counted over this long, for the repair notice when
-# it is far more than usual.
-USAGE_PERIOD = datetime.timedelta(hours=24)
 # Station measurements and the latest run are shared by entries this long.
 STATION_CACHE_SECONDS = 60
 RUN_CACHE = datetime.timedelta(minutes=5)
@@ -469,6 +471,24 @@ def _rows_with_needle(rows: list[bytes], data: bytes, needle: bytes) -> None:
         start = data.find(needle, end)
 
 
+def parse_station_hours(
+    text: str, columns: set[str], since: datetime.datetime
+) -> list[tuple[datetime.datetime, dict[str, float | None]]]:
+    """The rows of an hourly station history file from `since` on, by the
+    start of their hour (UTC), with only the given columns.
+
+    A row's timestamp is the end of its hour: its rain and sunshine are the
+    sums of the six 10-minute values up to it.
+    """
+    hours = []
+    for row in csv.DictReader(io.StringIO(text), delimiter=";"):
+        end = _station_time(row.get("reference_timestamp"))
+        if end is None or end - HOUR < since:
+            continue
+        hours.append((end - HOUR, {c: _number(row.get(c)) for c in columns}))
+    return hours
+
+
 def _station_time(timestamp: str | None) -> datetime.datetime | None:
     """The time of a station row, e.g. 20.10.2026 11:40 (UTC)."""
     try:
@@ -539,8 +559,10 @@ class MeteoSwissOGD:
         self._stations: dict[StationType, list[Station]] = {}
         # The index in POINT_ORDERS that worked last, by parameter.
         self._orders: dict[str, int] = {}
-        # Parameters whose files are ordered by time rather than by point.
-        self._by_time: set[str] = set()
+        # Parameters whose latest file was ordered by time rather than by
+        # point, and that file: MeteoSwiss changes the order of some files
+        # from one run to the next, so each run's is checked afresh.
+        self._by_time: dict[str, str] = {}
         # The latest file of each parameter and its size.
         self._files: dict[str, tuple[str, int]] = {}
         # Files ordered by time, by parameter: their layout, and where each
@@ -557,8 +579,9 @@ class MeteoSwissOGD:
         self._block_files: dict[str, tuple[str, bytes]] = {}
         # When files were downloaded whole because they could not be searched.
         self._whole_downloads: list[float] = []
-        # When each response came, and what it cost in bytes.
-        self._received: collections.deque[tuple[float, int]] = collections.deque()
+        # What responses cost, for the repair notice when it is far more than
+        # usual.
+        self.usage = Usage()
         # Whether the server sent a whole file when asked for part of it, the
         # last time it was.
         self.ranges_ignored = False
@@ -752,8 +775,9 @@ class MeteoSwissOGD:
         abbr: str,
         station_type: StationType,
         now: datetime.datetime | None = None,
-    ) -> dict[str, float | None]:
-        """The latest measurements of a station, empty if it has none recently."""
+    ) -> dict[str, Any]:
+        """The latest measurements of a station by parameter, and "measured",
+        the time of the latest; empty if it has none recently."""
         low = abbr.lower()
         weather_url = f"{SMN_URL}/{low}/ogd-smn_{low}_t_now.csv"
         if station_type == StationType.WEATHER:
@@ -782,13 +806,15 @@ class MeteoSwissOGD:
         ]
         # The newest row is often incomplete, so every parameter comes from the
         # most recent of the last few rows that has a value for it.
-        latest: dict[str, float | None] = {}
+        latest: dict[str, Any] = {}
         for row in reversed(rows[-STATION_ROWS_LOOKBACK:]):
             for key, value in row.items():
                 if key in ("station_abbr", "reference_timestamp"):
                     continue
                 if latest.get(key) is None:
                     latest[key] = _number(value)
+        if rows:
+            latest["measured"] = _station_time(rows[-1]["reference_timestamp"])
         return latest
 
     async def get_pollen_now(
@@ -892,6 +918,40 @@ class MeteoSwissOGD:
                 self._climates[abbr] = cached = (key, computed)
             return cached[1], recent
 
+    def station_history_urls(
+        self, abbr: str, since: datetime.datetime, now: datetime.datetime
+    ) -> list[str]:
+        """The hourly history files of a weather station from `since` on,
+        oldest first: one per decade up to last year, then this year's."""
+        low = abbr.lower()
+        decades = range(since.year // 10 * 10, (now.year - 1) // 10 * 10 + 1, 10)
+        return [
+            f"{SMN_URL}/{low}/ogd-smn_{low}_h_historical_{d}-{d + 9}.csv"
+            for d in decades
+        ] + [f"{SMN_URL}/{low}/ogd-smn_{low}_h_recent.csv"]
+
+    async def get_station_hours(
+        self, url: str, columns: set[str], since: datetime.datetime
+    ) -> list[tuple[datetime.datetime, dict[str, float | None]]]:
+        """The hours of a station history file (see parse_station_hours), none
+        if there is no such file, e.g. for a decade before the station."""
+        try:
+            async with self._session.get(
+                url, headers=self._headers, timeout=STREAM_TIMEOUT
+            ) as response:
+                # The file store answers 403 for files it does not have.
+                if response.status in (403, 404):
+                    self._count(response, 0)
+                    return []
+                response.raise_for_status()
+                body = await response.read()
+                self._count(response, len(body))
+        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            raise OGDError(f"Cannot fetch {url}: {exc}") from exc
+        return await asyncio.get_running_loop().run_in_executor(
+            None, parse_station_hours, body.decode("windows-1252"), columns, since
+        )
+
     async def _get_station_file(
         self, url: str, cache_seconds: float = STATION_CACHE_SECONDS
     ) -> bytes:
@@ -953,7 +1013,7 @@ class MeteoSwissOGD:
     async def _searched_point_values(self, url: str, point: Point) -> dict[str, str]:
         prefix = f"{point.point_id};{point.point_type};"
         parameter = _parameter(url)
-        if parameter in self._by_time:
+        if self._by_time.get(parameter) == url:
             return (await self._blocked_rows(url, [point]))[point.key]
         head, total = await self._get(url, (0, HEAD_BYTES - 1))
         self._note_size(url, total)
@@ -961,8 +1021,9 @@ class MeteoSwissOGD:
             lines = head.decode("latin-1").splitlines()[1:3]
             keys = [_key(line) for line in lines]
             if len(keys) == 2 and keys[0] is not None and keys[0] == keys[1]:
+                self._by_time.pop(parameter, None)
                 return await self._ordered_point_values(url, total, point, prefix)
-            self._by_time.add(parameter)
+            self._by_time[parameter] = url
             return (await self._blocked_rows(url, [point]))[point.key]
         return _rows_with_prefix(head.decode("latin-1"), prefix)
 
@@ -1133,18 +1194,27 @@ class MeteoSwissOGD:
         return len(self._whole_downloads)
 
     def _count(self, response: aiohttp.ClientResponse, body: int) -> None:
-        """Remember what a response cost, as transferred if it can be told."""
-        raw = getattr(response.content, "total_raw_bytes", None)
-        size = raw if isinstance(raw, int) else body
-        self._received.append((time.monotonic(), REQUEST_OVERHEAD + size))
+        self.usage.count(response, body)
+
+    def diagnostics(self) -> dict[str, Any]:
+        """How MeteoSwiss's files were read lately, for a diagnostics download."""
+        return {
+            "downloaded_last_24h": self.downloaded,
+            "whole_downloads_last_24h": self.whole_downloads,
+            "ranges_ignored": self.ranges_ignored,
+            "latest_run": self._latest_run[1] if self._latest_run else None,
+            "files": {
+                parameter: {"url": url, "size": size}
+                for parameter, (url, size) in self._files.items()
+            },
+            "ordered_by_time": sorted(self._by_time),
+            "point_orders": dict(self._orders),
+        }
 
     @property
     def downloaded(self) -> int:
         """Bytes downloaded from MeteoSwiss in the last USAGE_PERIOD."""
-        since = time.monotonic() - USAGE_PERIOD.total_seconds()
-        while self._received and self._received[0][0] < since:
-            self._received.popleft()
-        return sum(size for _, size in self._received)
+        return self.usage.downloaded
 
     async def _learn_blocks(self, url: str, budget: _Budget):
         """Read the first block of a file for the order of the points.

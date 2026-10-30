@@ -43,6 +43,11 @@ and is now maintained on its own: see [Credits](#credits).
 
 ### HACS
 
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=janvt&repository=homeassistant-meteoswiss&category=integration)
+
+The button opens this repository in your HACS, adding it as a custom
+repository if needed, so you can skip step 1:
+
 1. In HACS, open the menu → *Custom repositories*, add
    `https://github.com/janvt/homeassistant-meteoswiss` with the type
    *Integration*.
@@ -56,6 +61,8 @@ Copy `custom_components/meteoswiss` from the
 [latest release](https://github.com/janvt/homeassistant-meteoswiss/releases) to
 the `custom_components` folder of your Home Assistant configuration, and restart
 Home Assistant.
+
+Either way, it needs Home Assistant 2024.11 or newer.
 
 ### Coming from Rudd-O's or websylv's version
 
@@ -136,6 +143,23 @@ shown; a value missing from the latest measurement is taken from the half
 hour before.  A
 precipitation station has only the 10-minute rain.
 
+The station pressure, QNH and dew point (which the weather entity also has)
+are created turned off: turn them on from the device's page, under *entities
+not shown*.
+
+Some stations measure more, and their sensors are created for the stations
+that report them when the entry is set up:
+
+* *Snow depth*, in cm, measured automatically.
+* *Temperature 5 cm above ground*, which shows ground frost before the
+  temperature at 2 m does.
+* *Soil temperature 5 cm*, *10 cm* and *20 cm* (turned off).
+* *Wind chill*, the temperature felt in the wind (turned off).
+* *Diffuse radiation* and *Longwave radiation*, in W/m² (turned off).
+
+*Measurement time* (diagnostic, turned off) is when the station's latest
+measurement was made.
+
 ### Forecast summaries
 
 Every forecast has sensors summarising it.  All times are local
@@ -149,7 +173,10 @@ Every forecast has sensors summarising it.  All times are local
 | Strongest gust tomorrow 9–15 | km/h |
 | Precipitation next hour, Chance of rain next hour | For the hour after the current one; the chance of rain is MeteoSwiss's for the three hours up to its end |
 | Lowest temperature tonight | °C, 18:00 to 08:00 from the current hour on |
+| Highest temperature today, Lowest temperature today, Precipitation today | MeteoSwiss's forecast for the day |
+| Sunshine today | Hours of sunshine over the whole day, the hours already past included |
 | Freezing level | Forecast height of the 0 °C line for the current hour, in m (when turned on) |
+| Lowest freezing level next 48 hours | The lowest of those heights from the current hour on, in m, with the hour it is forecast for as `at` (when turned on) |
 
 The snow and temperature sensors need *Hourly temperatures*.  A sensor is
 unavailable when any hour of its window, or a value it needs, is missing,
@@ -230,6 +257,8 @@ One sensor per type of pollen (alder, ash, beech, birch, grasses, hazel and
 oak) with the latest hourly concentration in pollen/m³ at the chosen station,
 one of MeteoSwiss's 15.  They are measurements, not forecasts, and are
 unavailable when the station has reported nothing for six hours.
+Birch and grasses are turned on; the others are created turned off, to be
+turned on from the device's page by those who need them.
 
 ### Radar
 
@@ -267,6 +296,35 @@ precipitation station, or the rain of the last hour, which is checked against
 the gauges.  Hail is only looked at while it rains at or next to the place,
 and the rain of the last hour until it has been dry there for an hour.
 
+## Station history
+
+The action *MeteoSwiss: Import station history* (`meteoswiss.import_history`)
+fills the long-term statistics of the weather station's sensors with the
+station's hourly measurements from MeteoSwiss, so that their history graphs
+reach back before you installed the integration:
+
+```yaml
+action: meteoswiss.import_history
+data:
+  config_entry_id: 0123456789abcdef0123456789abcdef
+  since: "2020-01-01"
+```
+
+* It imports only the hours before Home Assistant started recording each
+  sensor: what Home Assistant recorded itself is left as it is, and importing
+  again adds nothing.  A sensor needs to have been recorded for an hour first.
+* `since` is the first day; by default the start of this decade.  Each year
+  adds about 9 MB to Home Assistant's database for all the station's sensors,
+  and long-term statistics are kept for good, so go further back only if you
+  want it.
+* It downloads the station's history files: compressed, about 0.4 MB a year.
+* Temperatures get the hour's mean, lowest and highest; the other sensors the
+  mean only, so their lowest and highest show from your install on.  Gusts,
+  the wind direction and wind chill are not imported.
+* It is the history of the weather station the entry has now.  If you chose
+  another station before, the older part of the graphs is the new station's.
+* It is refused while the entry's *Downloads* switch is off.
+
 ## Download volumes
 
 MeteoSwiss publishes its forecast as large files covering all of
@@ -276,6 +334,46 @@ on days with many weather warnings, and each further place about 15 MB more.
 Starting Home Assistant costs a few MB extra.  The radar, when turned on, adds
 15 to 35 MB a day, the same for any number of places, and up to 15 MB more
 on a day of rain.
+
+The diagnostic sensor *Downloaded last 24 hours*, on each forecast's device,
+shows what the integration actually downloaded over the last 24 hours, for all
+places together: forecasts, measurements, warnings and the radar.
+*Downloaded this month* does the same from the first of the month (local
+time), and is kept across restarts, for automations on a monthly data
+allowance.
+
+Each forecast's device also has a *Downloads* switch.  Turned off, that place
+downloads nothing (no measurements, forecasts, warnings or radar) and its
+entities keep their last values, until it is turned on again; a restart
+keeps it off.  For example, to stop at 3 GB a month and start again on the
+first:
+
+```yaml
+automation:
+  - alias: MeteoSwiss data allowance
+    triggers:
+      - trigger: numeric_state
+        entity_id: sensor.zurich_downloaded_this_month
+        above: 3000  # MB
+        id: over
+      - trigger: time
+        at: "00:05:00"
+        id: day
+    conditions:
+      - condition: or
+        conditions:
+          - condition: trigger
+            id: over
+          - condition: template
+            value_template: "{{ now().day == 1 }}"
+    actions:
+      - action: "switch.turn_{{ 'off' if trigger.id == 'over' else 'on' }}"
+        target:
+          entity_id: switch.zurich_downloads
+```
+
+Weather warnings stop too while it is off, so think twice before relying on
+them with a tight allowance.
 
 If MeteoSwiss changes how it publishes its files, the integration downloads
 them whole rather than stop working, until it is updated: **at worst several GB
@@ -323,7 +421,9 @@ Radar images cover all of Switzerland and are downloaded whole.
 ## Troubleshooting
 
 Please report problems in the
-[issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with a debug
+[issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with the
+entry's diagnostics (*Download diagnostics* in the entry's menu: what it read
+from MeteoSwiss and how, without your coordinates or postal code) and a debug
 log.  To get one, turn on debug logging in the entry's menu, or add this to
 `configuration.yaml` and restart:
 

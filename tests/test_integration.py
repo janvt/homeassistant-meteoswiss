@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -15,24 +16,31 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_time_changed,
 )
 
-from custom_components.meteoswiss import DATA_ALERTS, DATA_CLIENT, DATA_DOWNLOADS
+from custom_components.meteoswiss import (
+    DATA_ALERTS,
+    DATA_CLIENT,
+    DATA_DOWNLOADS,
+    DATA_RADAR,
+)
 from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
 from custom_components.meteoswiss.radar import Image
 from custom_components.meteoswiss.radar_loop import MAP_URL
+from custom_components.meteoswiss.usage import REQUEST_OVERHEAD
 
 from .fakes import (
     FOEHN_PRESSURES,
     NOW,
     STATION_MEASUREMENTS,
+    FakeMeteoAlarm,
     FakeRadar,
     make_warning,
 )
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
-# The entity IDs of the summaries and warnings, after the device's name.
+# The entity IDs of the sensors every forecast has, after the device's name.
 SUMMARY_NAMES = (
     "snow_tonight",
     "snow_next_24_hours",
@@ -47,6 +55,12 @@ SUMMARY_NAMES = (
     "weather_warning_next_24_hours",
     "fohn_pressure_difference",
     "fohn_outlook",
+    "downloaded_last_24_hours",
+    "downloaded_this_month",
+    "highest_temperature_today",
+    "lowest_temperature_today",
+    "precipitation_today",
+    "sunshine_today",
 )
 
 
@@ -82,7 +96,8 @@ async def test_weather_entity(hass, entry):
     assert state.state == "sunny"
     assert state.attributes["temperature"] == 13.4
     assert state.attributes["humidity"] == 80  # rounded by Home Assistant
-    assert state.attributes["pressure"] == 940.5
+    # At sea level, not the station's 940.5 hPa.
+    assert state.attributes["pressure"] == 1012.3
     assert state.attributes["wind_speed"] == 8.6
     assert state.attributes["wind_bearing"] == 31.0
     assert state.attributes["wind_gust_speed"] == 25.2
@@ -90,6 +105,7 @@ async def test_weather_entity(hass, entry):
     assert "Forecasts from postal code 8005" in state.attributes["attribution"]
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_sensors(hass, entry):
     await setup(hass, entry)
 
@@ -170,14 +186,21 @@ async def test_hourly_forecast_starts_with_the_current_hour(hass, entry):
     assert hours[7]["condition"] is None  # symbol 999 is unknown
 
 
-async def test_unrecognised_symbol_is_unavailable(hass, entry, frozen_now):
+async def test_unrecognised_symbol_is_unknown(hass, entry, frozen_now, caplog):
     await setup(hass, entry)
     frozen_now.move_to("2026-10-20T19:30:00+00:00")
 
     await entry.runtime_data.async_refresh()
     await hass.async_block_till_done()
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
 
-    assert hass.states.get(weather_id(hass, entry)).state == "unavailable"
+    state = hass.states.get(weather_id(hass, entry))
+    assert state.state == "unknown"
+    # The measurements are still shown.
+    assert state.attributes["temperature"] == 13.4
+    # Logged once, not on every update.
+    assert caplog.text.count("Unknown MeteoSwiss weather symbol 999") == 1
 
 
 async def test_forecast_is_fetched_once_per_run(hass, entry, fake_ogd, frozen_now):
@@ -616,6 +639,7 @@ async def test_summaries_needing_hourly_temperatures(hass, entry_data, fake_ogd)
     assert summary(hass, entry, "precipitation_next_hour").state == "0.4"
 
 
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
 async def test_pollen_sensors(hass, entry_data):
     entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "pollen_station": "PZH"})
     entry.add_to_hass(hass)
@@ -637,6 +661,89 @@ async def test_pollen_sensors(hass, entry_data):
         er.async_get(hass).async_get(birch.entity_id).device_id
     )
     assert (device.name, device.model) == ("Zürich pollen", "Pollen station")
+
+
+async def test_less_used_sensors_are_off_by_default(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data={**entry_data, "pollen_station": "PZH"})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    registry = er.async_get(hass)
+    off = {
+        e.unique_id.removeprefix(f"sensor.{entry.entry_id}-")
+        for e in er.async_entries_for_config_entry(registry, entry.entry_id)
+        if e.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    }
+    assert off == {
+        "pressure",
+        "pressure_qnh",
+        "dew_point",
+        "wind_chill",
+        "longwave_radiation",
+        "measurement_time",
+        "pollen_alder",
+        "pollen_ash",
+        "pollen_beech",
+        "pollen_hazel",
+        "pollen_oak",
+    }
+
+
+@pytest.mark.usefixtures("entity_registry_enabled_by_default")
+async def test_station_sensors_for_what_the_station_measures(hass, entry):
+    await setup(hass, entry)
+
+    def state(key):
+        found = er.async_get(hass).async_get_entity_id(
+            "sensor", DOMAIN, f"sensor.{entry.entry_id}-{key}"
+        )
+        return found and hass.states.get(found)
+
+    assert state("snow_depth").state == "0.0"
+    assert state("snow_depth").attributes["unit_of_measurement"] == "cm"
+    assert state("temperature_5cm").state == "11.2"
+    assert (
+        state("temperature_5cm").attributes["friendly_name"]
+        == "Fluntern Temperature 5 cm above ground"
+    )
+    assert state("wind_chill").state == "12.1"
+    assert state("longwave_radiation").state == "335.0"
+    assert state("measurement_time").state == "2026-10-20T12:20:00+00:00"
+    # Not measured at this station, so not created.
+    for key in (
+        "soil_temperature_5cm",
+        "soil_temperature_10cm",
+        "soil_temperature_20cm",
+        "diffuse_radiation",
+    ):
+        assert state(key) is None, key
+
+
+async def test_today_sensors(hass, entry):
+    await setup(hass, entry)
+
+    def state(key):
+        return hass.states.get(
+            entity_id(hass, "sensor", f"sensor.{entry.entry_id}-{key}")
+        )
+
+    assert state("max_temperature_today").state == "15.0"
+    assert state("min_temperature_today").state == "8.0"
+    assert state("precipitation_today").state == "0.0"
+    # The fake forecast starts at 11:00 local, so today is incomplete.
+    assert state("sunshine_today").state == "unavailable"
+
+
+async def test_lowest_freezing_level_next_48_hours(hass, fake_ogd, frozen_now):
+    fake_ogd.hours = 60
+    entry = await add_mountain(hass)
+
+    state = hass.states.get(
+        entity_id(hass, "sensor", f"sensor.{entry.entry_id}-lowest_freezing_level_48h")
+    )
+    assert state.state == "2900.0"
+    assert state.attributes["at"] == "2026-10-20T12:00:00+00:00"
+    assert state.attributes["unit_of_measurement"] == "m"
 
 
 async def test_pollen_station_without_recent_data(hass, entry_data):
@@ -923,6 +1030,68 @@ async def test_climate_normals_are_checked_hourly(hass, entry, fake_ogd, frozen_
 
     await refresh_after(hass, frozen_now, 35)
     assert fake_ogd.climate_calls == 2
+
+
+async def test_downloaded_sensor(hass, entry_data, fake_ogd, monkeypatch):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, options={"radar": True})
+    entry.add_to_hass(hass)
+    monkeypatch.setattr(fake_ogd, "downloaded", 20_000_000)
+    monkeypatch.setattr(FakeMeteoAlarm, "downloaded", 3_000_000)
+    monkeypatch.setattr(FakeRadar, "downloaded", 25_000_000)
+    await setup(hass, entry)
+
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-downloaded")
+    state = hass.states.get(sensor)
+    # The forecasts and measurements, warnings and radar, in MB.
+    assert float(state.state) == 48.0
+    assert state.attributes["unit_of_measurement"] == "MB"
+    assert er.async_get(hass).async_get(sensor).entity_category == "diagnostic"
+
+
+async def test_downloaded_this_month_sensor(hass, entry_data, frozen_now, hass_storage):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, options={"radar": True})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-downloaded_this_month")
+
+    def download(client, size):
+        # Each response costs its headers on top.
+        client.usage.count(SimpleNamespace(content=None), size - REQUEST_OVERHEAD)
+
+    # From the forecast and station client, the warnings and the radar.
+    download(hass.data[DATA_CLIENT], 4_000_000)
+    download(hass.data[DATA_ALERTS], 1_000_000)
+    download(hass.data[DATA_RADAR], 2_000_000)
+    await refresh_after(hass, frozen_now, 5)
+    state = hass.states.get(sensor)
+    assert float(state.state) == 7.0
+    assert state.attributes["unit_of_measurement"] == "MB"
+    assert state.attributes["state_class"] == "total_increasing"
+
+    # Kept across a restart.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert hass_storage["meteoswiss.usage"]["data"]["downloaded"] == 7_000_000
+    await setup(hass, entry)
+    assert float(hass.states.get(sensor).state) == 7.0
+
+    # And back to 0 when the next month starts.
+    frozen_now.move_to("2026-11-01T12:00:00+00:00")
+    await refresh_after(hass, frozen_now, 5)
+    assert float(hass.states.get(sensor).state) == 0.0
+
+
+async def test_downloaded_this_month_starts_over_after_a_month_away(
+    hass, entry, hass_storage
+):
+    hass_storage["meteoswiss.usage"] = {
+        "version": 1,
+        "key": "meteoswiss.usage",
+        "data": {"month": "2026-09", "downloaded": 900_000_000},
+    }
+    await setup(hass, entry)
+
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-downloaded_this_month")
+    assert float(hass.states.get(sensor).state) == 0.0
 
 
 async def test_a_notice_to_update_when_far_more_is_downloaded_than_usual(

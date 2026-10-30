@@ -255,12 +255,98 @@
             },
             "radar_rain_last_hour": {
                 "name": "Radar lluvia última hora"
+            },
+            "downloaded": {
+                "name": "Descargado en 24 horas"
+            },
+            "downloaded_this_month": {
+                "name": "Descargado este mes"
+            },
+            "max_temperature_today": {
+                "name": "Temperatura máxima hoy"
+            },
+            "min_temperature_today": {
+                "name": "Temperatura mínima hoy"
+            },
+            "precipitation_today": {
+                "name": "Precipitación hoy"
+            },
+            "sunshine_today": {
+                "name": "Horas de sol hoy"
+            },
+            "lowest_freezing_level_48h": {
+                "name": "Nivel de congelación más bajo en 48 horas"
+            },
+            "snow_depth": {
+                "name": "Espesor de nieve"
+            },
+            "temperature_5cm": {
+                "name": "Temperatura a 5 cm del suelo"
+            },
+            "soil_temperature_5cm": {
+                "name": "Temperatura del suelo 5 cm"
+            },
+            "soil_temperature_10cm": {
+                "name": "Temperatura del suelo 10 cm"
+            },
+            "soil_temperature_20cm": {
+                "name": "Temperatura del suelo 20 cm"
+            },
+            "wind_chill": {
+                "name": "Sensación térmica por viento"
+            },
+            "diffuse_radiation": {
+                "name": "Radiación difusa"
+            },
+            "longwave_radiation": {
+                "name": "Radiación de onda larga"
+            },
+            "measurement_time": {
+                "name": "Hora de la medición"
             }
         },
         "image": {
             "radar_loop": {
                 "name": "Radar animación"
             }
+        },
+        "switch": {
+            "downloads": {
+                "name": "Descargas"
+            }
+        }
+    },
+    "services": {
+        "import_history": {
+            "name": "Importar el historial de la estación",
+            "description": "Importa las mediciones horarias de la estación meteorológica de MeteoSuiza a las estadísticas a largo plazo de sus sensores, para las horas anteriores a que Home Assistant las registrara. Descarga unos 1 MB para este año y de 7 a 13 MB por cada década anterior.",
+            "fields": {
+                "config_entry_id": {
+                    "name": "Entrada",
+                    "description": "La entrada de MeteoSuiza cuya estación meteorológica se importa."
+                },
+                "since": {
+                    "name": "Desde",
+                    "description": "El primer día a importar. Por defecto, el inicio de esta década; todos los sensores de la estación ocupan unos 9 MB de estadísticas al año, que se conservan para siempre."
+                }
+            }
+        }
+    },
+    "exceptions": {
+        "entry_not_loaded": {
+            "message": "La entrada de MeteoSuiza no está configurada."
+        },
+        "no_weather_station": {
+            "message": "Esta entrada no tiene estación meteorológica."
+        },
+        "downloads_paused": {
+            "message": "Las descargas están en pausa para esta entrada: activa primero su interruptor Descargas."
+        },
+        "no_recorder": {
+            "message": "El registrador no está en marcha, así que no hay estadísticas donde importar."
+        },
+        "history_unavailable": {
+            "message": "No se pudo descargar el historial de la estación: {error}"
         }
     }
 }

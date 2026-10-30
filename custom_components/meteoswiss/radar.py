@@ -20,6 +20,8 @@ from dataclasses import dataclass
 import aiohttp
 import numpy as np
 
+from custom_components.meteoswiss.usage import Usage
+
 _LOGGER = logging.getLogger(__name__)
 
 FILE_URL = "https://data.geo.admin.ch/{collection}/{day}-ch/{name}"
@@ -36,11 +38,13 @@ INTERVAL = datetime.timedelta(minutes=5)
 MAX_AGE = datetime.timedelta(minutes=20)
 # File names end in letters telling which radars contributed: usually the same
 # for days at a time, so the last that worked is tried first, then these.
-VARIANTS = ("rl", "vl")
+VARIANTS = ("rl", "vl", "pl")
 # An image this late is looked up in the day's list of files (up to 280 kB),
-# at most this often for each collection.
+# at most this often for each collection.  The list lags the files by 4 to 6
+# minutes, so the latest image it lists gives the variant; it is read again
+# each minute while that does not find the image, rather than wait.
 LOOKUP_AFTER = datetime.timedelta(minutes=3)
-LOOKUP_EVERY = datetime.timedelta(minutes=30)
+LOOKUP_EVERY = datetime.timedelta(minutes=1)
 # After this long without rain at or next to a place, the rain of the last
 # hour there is nothing, and its images are not downloaded.
 DRY_HOUR = datetime.timedelta(hours=1)
@@ -209,6 +213,12 @@ class Radar:
         # Since when the rain images have shown no rain at or next to a place.
         self._dry_since: dict[tuple[float, float], datetime.datetime] = {}
         self._lock = asyncio.Lock()
+        self.usage = Usage()
+
+    @property
+    def downloaded(self) -> int:
+        """Bytes of radar images and lists downloaded in the last day."""
+        return self.usage.downloaded
 
     def image(self, key: str) -> Image | None:
         """The latest image of a product, if one was downloaded."""
@@ -222,25 +232,39 @@ class Radar:
             ) as response:
                 # The file store answers 403 for files it does not have.
                 if response.status in (403, 404):
+                    self.usage.count(response, 0)
                     return None
                 response.raise_for_status()
-                return await response.read()
+                body = await response.read()
+                self.usage.count(response, len(body))
+                return body
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise RadarError(f"Cannot fetch {url}: {exc}") from exc
 
     async def _variant(self, product: Product, slot: datetime.datetime) -> str | None:
-        """An image's variant, from the day's list of files."""
-        url = ITEM_URL.format(collection=product.collection, day=f"{slot:%Y%m%d}")
-        body = await self._fetch(url)
-        if body is None:
-            return None
-        try:
-            assets = json.loads(body).get("assets", {})
-        except ValueError as exc:
-            raise RadarError(f"Cannot read {url}: {exc}") from exc
+        """An image's likely variant: that of the latest image listed up to it.
+
+        The day's list may not have the image yet; early in the day it may
+        have none, so the day before's is read then.
+        """
         stamp = _stamp(product, slot)
-        for name in sorted(assets):
-            if name.startswith(stamp) and name.endswith(product.suffix):
+        for day in (slot, slot - datetime.timedelta(days=1)):
+            url = ITEM_URL.format(collection=product.collection, day=f"{day:%Y%m%d}")
+            if (body := await self._fetch(url)) is None:
+                continue
+            try:
+                assets = json.loads(body).get("assets", {})
+            except ValueError as exc:
+                raise RadarError(f"Cannot read {url}: {exc}") from exc
+            names = [
+                name
+                for name in assets
+                if name.startswith(product.stem)
+                and name.endswith(product.suffix)
+                and name[: len(stamp)] <= stamp
+            ]
+            if names:
+                name = max(names)
                 return name[len(stamp) : -len(product.suffix)]
         return None
 

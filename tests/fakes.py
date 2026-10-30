@@ -20,6 +20,7 @@ from custom_components.meteoswiss.ogd import (
     UnknownPostcodeError,
     distance_km,
 )
+from custom_components.meteoswiss.usage import Usage
 
 UTC = datetime.timezone.utc
 
@@ -187,6 +188,21 @@ POLLEN_NOW = {
 
 NOW = datetime.datetime(2026, 10, 20, 12, 30, tzinfo=UTC)
 
+# The station's history: hours from midnight UTC on the 19th to 14:00 on the
+# 20th, past NOW, all alike.
+HISTORY_HOURS = [
+    datetime.datetime(2026, 10, 19, tzinfo=UTC) + datetime.timedelta(hours=i)
+    for i in range(38)
+]
+STATION_HOURS = {
+    "tre200h0": 5.0,
+    "tre200hn": 4.0,
+    "tre200hx": 6.5,
+    "ure200h0": 90.0,
+    "rre150h0": 0.6,  # mm in the hour: 0.1 per 10 minutes
+    # No pressures, so those sensors get nothing.
+}
+
 
 def make_forecast(
     run: str = "202610201200", with_temperature: bool = True, hours: int = 12
@@ -233,12 +249,20 @@ STATION_MEASUREMENTS = {
     "tre200s0": 13.4,
     "ure200s0": 79.9,
     "prestas0": 940.5,
+    "pp0qffs0": 1012.3,
     "fu3010z0": 8.6,
     "dkl010z0": 31.0,
     "fu3010z1": 25.2,
     "tde200s0": 9.9,
     "wcc006s0": 2.0,  # MeteoSwiss's Föhn index: Föhn
     "rre150z0": 0.0,
+    # Only some stations measure these; this one has no soil temperatures
+    # or diffuse radiation.
+    "htoauts0": 0.0,
+    "tre005s0": 11.2,
+    "xchills0": 12.1,
+    "oli000z0": 335.0,
+    "measured": datetime.datetime(2026, 10, 20, 12, 20, tzinfo=datetime.timezone.utc),
 }
 
 
@@ -271,6 +295,8 @@ class FakeOGD:
     instances: list[FakeOGD] = []
     forecast_calls = 0
     run_checks = 0
+    station_calls = 0
+    history_calls: list = []
     temperature_calls = 0
     temperature_error: Exception | None = None
     climate_calls = 0
@@ -286,6 +312,7 @@ class FakeOGD:
 
     def __init__(self, session, user_agent) -> None:
         FakeOGD.instances.append(self)
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:
@@ -295,6 +322,8 @@ class FakeOGD:
         cls.instances = []
         cls.forecast_calls = 0
         cls.run_checks = 0
+        cls.station_calls = 0
+        cls.history_calls = []
         cls.temperature_calls = 0
         cls.temperature_error = None
         cls.climate_calls = 0
@@ -303,6 +332,9 @@ class FakeOGD:
         cls.download_gate = None
         cls.hours = 12
         cls.downloaded = 0
+
+    def diagnostics(self):
+        return {"downloaded_last_24h": self.downloaded}
 
     async def get_postcode_points(self, postcode):
         return [p for p in POINTS if p.point_type == 2 and p.postcode == str(postcode)]
@@ -354,6 +386,7 @@ class FakeOGD:
         return dict(POLLEN_NOW) if abbr == "PZH" else {}
 
     async def get_station_now(self, abbr, station_type):
+        FakeOGD.station_calls += 1
         if self.station_error:
             raise self.station_error
         if station_type == StationType.PRECIPITATION:
@@ -361,6 +394,17 @@ class FakeOGD:
         if abbr in FOEHN_PRESSURES:
             return {"pp0qffs0": FOEHN_PRESSURES[abbr]}
         return dict(STATION_MEASUREMENTS)
+
+    def station_history_urls(self, abbr, since, now):
+        return [f"https://fake/{abbr.lower()}/ogd-smn_{abbr.lower()}_h_recent.csv"]
+
+    async def get_station_hours(self, url, columns, since):
+        FakeOGD.history_calls.append((url, frozenset(columns), since))
+        return [
+            (start, {c: STATION_HOURS.get(c) for c in columns})
+            for start in HISTORY_HOURS
+            if start >= since
+        ]
 
     async def latest_run(self, now=None):
         FakeOGD.run_checks += 1
@@ -413,12 +457,14 @@ def make_warning(type_, level, onset, expires, event=None):
 class FakeMeteoAlarm:
     """Replacement for MeteoAlarm with fixed warnings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     warnings: list = []
     error: Exception | None = None
     calls: list = []
 
     def __init__(self, session, user_agent) -> None:
-        pass
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:
@@ -436,12 +482,14 @@ class FakeMeteoAlarm:
 class FakeRadar:
     """Replacement for Radar with fixed readings."""
 
+    # Like the real ones': bytes downloaded lately.
+    downloaded = 0
     readings: dict = {}
     images: dict = {}
     calls: list = []
 
     def __init__(self, session, user_agent) -> None:
-        pass
+        self.usage = Usage()
 
     @classmethod
     def reset(cls) -> None:

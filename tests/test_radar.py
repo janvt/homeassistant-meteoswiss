@@ -79,6 +79,15 @@ def test_file_names_end_with_the_interval():
     assert url(HAIL_PROBABILITY, variant="vl").endswith("bzc262941230vl.845.h5")
 
 
+async def test_what_is_downloaded_is_counted():
+    meteo, session = client({url(RAIN_RATE): image({ZURICH: 2.5})})
+
+    await meteo.get(*ZURICH, NOW)
+
+    # Including the lists and images not published, which cost their headers.
+    assert meteo.downloaded == session.transferred() > 0
+
+
 async def test_the_rain_at_the_place():
     meteo, _ = client({url(RAIN_RATE): image({ZURICH: 2.5})})
 
@@ -174,38 +183,98 @@ def index(*names) -> bytes:
     return json.dumps({"assets": {n: {} for n in names}}).encode()
 
 
+def item(day="20261021", collection=radar.PRECIPITATION):
+    return radar.ITEM_URL.format(collection=collection, day=day)
+
+
+async def test_pl_is_tried_without_the_list():
+    meteo, session = client({url(RAIN_RATE, SLOT, "pl"): image({ZURICH: 3.0})})
+
+    readings = await meteo.get(*ZURICH, NOW)
+
+    assert readings[RAIN_RATE] == (3.0, SLOT)
+    assert session.count("GET", item()) == 0
+
+
 async def test_an_unusual_variant_is_looked_up_once_the_image_is_late():
-    name = "rzc262941230pl.001.h5"
+    name = "rzc262941230zl.001.h5"
     files = {
-        url(RAIN_RATE, SLOT, "pl"): image({ZURICH: 3.0}),
-        radar.ITEM_URL.format(collection=radar.PRECIPITATION, day="20261021"): index(
-            "rzc262941225pl.001.h5", name
-        ),
+        url(RAIN_RATE, SLOT, "zl"): image({ZURICH: 3.0}),
+        item(): index("rzc262941225zl.001.h5", name),
     }
     meteo, session = client(files)
 
-    item = list(files)[1]
     # Not yet: it may just be late.
     assert (await meteo.get(*ZURICH, NOW))[RAIN_RATE] is None
-    assert session.count("GET", item) == 0
+    assert session.count("GET", item()) == 0
 
     late = SLOT + radar.LOOKUP_AFTER
     readings = await meteo.get(*ZURICH, late)
 
     assert readings[RAIN_RATE] == (3.0, SLOT)
-    assert meteo._variants[PRODUCTS[RAIN_RATE].family] == "pl"
+    assert meteo._variants[PRODUCTS[RAIN_RATE].family] == "zl"
 
 
-async def test_the_list_of_files_is_read_at_most_every_half_hour():
-    meteo, session = client(
-        {radar.ITEM_URL.format(collection=radar.PRECIPITATION, day="20261021"): index()}
-    )
-    item = radar.ITEM_URL.format(collection=radar.PRECIPITATION, day="20261021")
+async def test_the_latest_listed_image_gives_the_variant():
+    # The list lags the files: it does not have the image of 12:30 yet.
+    files = {
+        url(RAIN_RATE, SLOT, "zl"): image({ZURICH: 3.0}),
+        item(): index("rzc262941220rl.001.h5", "rzc262941225zl.001.h5"),
+    }
+    meteo, _ = client(files)
 
-    for minutes in range(3, 60):
-        await meteo.get(*ZURICH, SLOT + datetime.timedelta(minutes=minutes))
+    readings = await meteo.get(*ZURICH, SLOT + radar.LOOKUP_AFTER)
 
-    assert session.count("GET", item) == 2
+    assert readings[RAIN_RATE] == (3.0, SLOT)
+
+
+async def test_images_after_the_slot_do_not_give_the_variant():
+    files = {item(): index("rzc262941225rl.001.h5", "rzc262941235zl.001.h5")}
+    meteo, session = client(files)
+
+    await meteo.get(*ZURICH, SLOT + radar.LOOKUP_AFTER)
+
+    assert "zl" not in [u[-9:-7] for _, u, _ in session.requests]
+
+
+async def test_a_lookup_that_finds_nothing_new_is_tried_again_a_minute_later():
+    # The variant changed with the image of 12:30, which is not listed yet.
+    files = {
+        url(RAIN_RATE, SLOT, "zl"): image({ZURICH: 3.0}),
+        item(): index("rzc262941225rl.001.h5"),
+    }
+    meteo, session = client(files)
+    late = SLOT + radar.LOOKUP_AFTER
+    assert (await meteo.get(*ZURICH, late))[RAIN_RATE] is None
+
+    session.files[item()] = index("rzc262941225rl.001.h5", "rzc262941230zl.001.h5")
+    readings = await meteo.get(*ZURICH, late + datetime.timedelta(minutes=1))
+
+    assert readings[RAIN_RATE] == (3.0, SLOT)
+    assert session.count("GET", item()) == 2
+
+
+async def test_early_in_the_day_the_list_of_the_day_before_is_read():
+    slot = datetime.datetime(2026, 10, 22, 0, 0, tzinfo=UTC)
+    files = {
+        url(RAIN_RATE, slot, "zl"): image({ZURICH: 3.0}),
+        item("20261021"): index("rzc262942355zl.001.h5"),
+    }
+    meteo, _ = client(files)
+
+    readings = await meteo.get(*ZURICH, slot + radar.LOOKUP_AFTER)
+
+    assert readings[RAIN_RATE] == (3.0, slot)
+
+
+async def test_the_list_of_files_is_read_at_most_every_minute():
+    meteo, session = client({item(): index()})
+
+    for seconds in range(0, 120, 20):
+        late = SLOT + radar.LOOKUP_AFTER + datetime.timedelta(seconds=seconds)
+        await meteo.get(*ZURICH, late)
+
+    assert session.count("GET", item()) == 2
 
 
 def hourly(slot, value=0.0, variant="0"):
