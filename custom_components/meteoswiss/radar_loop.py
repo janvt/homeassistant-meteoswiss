@@ -62,6 +62,9 @@ RAMP = (
     (70.0, (176, 25, 158), 235),
 )
 
+# Where the radars do not reach: grey hatching.
+NO_DATA = (90, 90, 90, 150)
+
 type Box = tuple[float, float, float, float]
 
 
@@ -97,6 +100,7 @@ class RadarLoop:
         self._location = location
         self._frames: dict[datetime.datetime, np.ndarray] = {}
         self._box: Box | None = None
+        # None until a map is in hand: the loop is drawn on a blank one then.
         self._map: PILImage.Image | None = None
         self._drawn: tuple[datetime.datetime, bytes] | None = None
         self._lock = asyncio.Lock()
@@ -127,16 +131,14 @@ class RadarLoop:
             if self._drawn is not None and self._drawn[0] == newest:
                 return self._drawn[1]
             if self._map is None:
+                # Tried again with each new frame until it works.
                 content = await self._fetch_map(self._box)
-                base = await self._hass.async_add_executor_job(prepare_map, content)
-                # A blank stand-in is not kept, so the map is tried again.
-                if content:
-                    self._map = base
-            else:
-                base = self._map
+                self._map = await self._hass.async_add_executor_job(
+                    prepare_map, content
+                )
             frames = sorted(self._frames.items())
             gif = await self._hass.async_add_executor_job(
-                draw, frames, base, self._hass.config.time_zone
+                draw, frames, self._map, self._hass.config.time_zone
             )
             self._drawn = (newest, gif)
             return gif
@@ -149,14 +151,22 @@ class RadarLoop:
                 timeout=REQUEST_TIMEOUT,
             ) as response:
                 response.raise_for_status()
+                # An error is answered with status 200 and an XML report.
+                if not (response.content_type or "").startswith("image/"):
+                    _LOGGER.debug(
+                        "No map for the radar loop: %s %s",
+                        response.content_type,
+                        (await response.read())[:300],
+                    )
+                    return None
                 return await response.read()
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             _LOGGER.debug("Cannot fetch the map of the radar loop: %s", exc)
             return None
 
 
-def prepare_map(content: bytes | None) -> PILImage.Image:
-    """Lighten and flatten the map, or a blank one without it.
+def prepare_map(content: bytes | None) -> PILImage.Image | None:
+    """Lighten and flatten the map; None without one that can be read.
 
     Flattening is not only cosmetic: without the hillshade's texture the GIF
     is a third of the size.
@@ -164,8 +174,12 @@ def prepare_map(content: bytes | None) -> PILImage.Image:
     from PIL import Image as PILImage  # noqa: PLC0415
 
     if not content:
-        return PILImage.new("RGB", (SIZE, SIZE), (235, 235, 235))
-    grey = PILImage.open(io.BytesIO(content)).convert("L").resize((SIZE, SIZE))
+        return None
+    try:
+        grey = PILImage.open(io.BytesIO(content)).convert("L").resize((SIZE, SIZE))
+    except OSError as exc:  # PIL's UnidentifiedImageError is one
+        _LOGGER.debug("Cannot read the map of the radar loop: %s", exc)
+        return None
     grey = PILImage.blend(grey, PILImage.new("L", grey.size, 255), 0.45)
     step = 256 // 12
     grey = grey.point(lambda v: min(255, (v // step) * step + step // 2))
@@ -181,8 +195,12 @@ def _colours(rate: np.ndarray) -> PILImage.Image:
         mask = values >= low
         rgba[mask, :3] = rgb
         rgba[mask, 3] = alpha
-    layer = PILImage.fromarray(rgba, "RGBA")
-    return layer.resize((SIZE, SIZE), PILImage.Resampling.NEAREST)
+    rgba = rgba.repeat(SCALE, axis=0).repeat(SCALE, axis=1)
+    # Hatched where the radars do not reach, so it does not look dry.
+    rows, columns = np.indices(rgba.shape[:2])
+    nodata = np.isnan(rate).repeat(SCALE, axis=0).repeat(SCALE, axis=1)
+    rgba[nodata & ((rows + columns) % 12 < 2)] = NO_DATA
+    return PILImage.fromarray(rgba, "RGBA")
 
 
 def _legend(font: ImageFont.ImageFont) -> PILImage.Image:
@@ -202,12 +220,15 @@ def _legend(font: ImageFont.ImageFont) -> PILImage.Image:
 
 def draw(
     frames: list[tuple[datetime.datetime, np.ndarray]],
-    base: PILImage.Image,
+    base: PILImage.Image | None,
     time_zone: str,
 ) -> bytes:
-    """An animated GIF of the frames, oldest first."""
+    """An animated GIF of the frames, oldest first, on a blank map without base."""
     from PIL import Image as PILImage  # noqa: PLC0415
     from PIL import ImageDraw, ImageFont  # noqa: PLC0415
+
+    if base is None:
+        base = PILImage.new("RGB", (SIZE, SIZE), (235, 235, 235))
 
     zone = zoneinfo.ZoneInfo(time_zone)
     font = ImageFont.load_default(size=18)
@@ -226,9 +247,10 @@ def draw(
         )
         pen.ellipse((centre - 3, centre - 3, centre + 3, centre + 3), fill=0)
 
+        # No words, to need no translation: the newest frame is its time.
         minutes = int((newest - time).total_seconds() // 60)
         label = time.astimezone(zone).strftime("%H:%M") + (
-            "  latest" if minutes == 0 else f"  -{minutes} min"
+            f"  -{minutes} min" if minutes else ""
         )
         pen.rounded_rectangle(
             (8, 8, 24 + pen.textlength(label, font=font), 40), 6, fill=(255, 255, 255)

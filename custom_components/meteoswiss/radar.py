@@ -45,6 +45,11 @@ VARIANTS = ("rl", "vl", "pl")
 # each minute while that does not find the image, rather than wait.
 LOOKUP_AFTER = datetime.timedelta(minutes=3)
 LOOKUP_EVERY = datetime.timedelta(minutes=1)
+# A product whose variants are all tried each time is looked up only in case
+# MeteoSwiss starts naming its images otherwise, so this seldom: its images
+# are late only when MeteoSwiss's publishing is (CombiPrecip came 4.3 to 5.8
+# minutes after its slot all through 29 October 2026).
+ALL_VARIANTS_LOOKUP_EVERY = datetime.timedelta(minutes=30)
 # After this long without rain at or next to a place, the rain of the last
 # hour there is nothing, and its images are not downloaded.
 DRY_HOUR = datetime.timedelta(hours=1)
@@ -58,7 +63,9 @@ class Product:
     # Values are multiplied by this: hail probability is a fraction.
     scale: float = 1.0
     # The variants to try, the last that worked first.  If these are all the
-    # variants there are, a late image is not looked up in the day's list.
+    # variants there are, a late image is looked up in the day's list only
+    # every ALL_VARIANTS_LOOKUP_EVERY, and the variants nearest the last that
+    # worked are tried first.
     variants: tuple[str, ...] = VARIANTS
     all_variants: bool = False
     # How long after its interval ends an image is usually published.
@@ -84,7 +91,8 @@ PRODUCTS = {
     HAIL_SIZE: Product(HAIL, "mzc", ".850.h5"),  # mm
     # CombiPrecip: the radar adjusted to the rain gauges, the best estimate of
     # the rain that reached the ground in the hour to the image's time, in mm.
-    # Its variant is a digit that changes from hour to hour.
+    # Its variant is a digit that changes now and then through the day, by one
+    # or two at a time (9, 7, 6, 5, 4, 3 and back on 25 October 2026).
     RAIN_LAST_HOUR: Product(
         PRECIPITATION,
         "cpc",
@@ -111,6 +119,19 @@ def _url(product: Product, slot: datetime.datetime, variant: str) -> str:
         day=f"{slot:%Y%m%d}",
         name=f"{_stamp(product, slot)}{variant}{product.suffix}",
     )
+
+
+def _likely_variants(product: Product, known: str | None) -> list[str]:
+    """The variants to try, the last that worked first.
+
+    Where they are all the variants there are, the nearest to it come next:
+    CombiPrecip's digit moves by one or two at a time.
+    """
+    variants = product.variants
+    if known in variants and product.all_variants:
+        at = variants.index(known)
+        return sorted(variants, key=lambda v: abs(variants.index(v) - at))
+    return list(dict.fromkeys((*((known,) if known else ()), *variants)))
 
 
 def lv95(lat: float, lon: float) -> tuple[float, float]:
@@ -210,8 +231,12 @@ class Radar:
         # By Product.family.
         self._variants: dict[tuple[str, tuple[str, ...]], str] = {}
         self._looked_up: dict[tuple[str, tuple[str, ...]], datetime.datetime] = {}
-        # Since when the rain images have shown no rain at or next to a place.
+        # The last day's list read, by URL, with when.
+        self._lists: dict[str, tuple[datetime.datetime, dict]] = {}
+        # Since when the rain images have shown no rain at or next to a place,
+        # and the time of the last rain image looked at for it.
         self._dry_since: dict[tuple[float, float], datetime.datetime] = {}
+        self._noted: dict[tuple[float, float], datetime.datetime] = {}
         self._lock = asyncio.Lock()
         self.usage = Usage()
 
@@ -241,7 +266,9 @@ class Radar:
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise RadarError(f"Cannot fetch {url}: {exc}") from exc
 
-    async def _variant(self, product: Product, slot: datetime.datetime) -> str | None:
+    async def _variant(
+        self, product: Product, slot: datetime.datetime, now: datetime.datetime
+    ) -> str | None:
         """An image's likely variant: that of the latest image listed up to it.
 
         The day's list may not have the image yet; early in the day it may
@@ -250,12 +277,8 @@ class Radar:
         stamp = _stamp(product, slot)
         for day in (slot, slot - datetime.timedelta(days=1)):
             url = ITEM_URL.format(collection=product.collection, day=f"{day:%Y%m%d}")
-            if (body := await self._fetch(url)) is None:
+            if (assets := await self._assets(url, now)) is None:
                 continue
-            try:
-                assets = json.loads(body).get("assets", {})
-            except ValueError as exc:
-                raise RadarError(f"Cannot read {url}: {exc}") from exc
             names = [
                 name
                 for name in assets
@@ -267,6 +290,23 @@ class Radar:
                 name = max(names)
                 return name[len(stamp) : -len(product.suffix)]
         return None
+
+    async def _assets(self, url: str, now: datetime.datetime) -> dict | None:
+        """The files in a day's list, read once however many products look.
+
+        The rain rate and the rain of the last hour share a collection, so
+        both may look it up in the same refresh.
+        """
+        if (listed := self._lists.get(url)) is not None and listed[0] == now:
+            return listed[1]
+        if (body := await self._fetch(url)) is None:
+            return None
+        try:
+            assets = json.loads(body).get("assets", {})
+        except ValueError as exc:
+            raise RadarError(f"Cannot read {url}: {exc}") from exc
+        self._lists = {url: (now, assets)}
+        return assets
 
     async def _image(
         self,
@@ -281,23 +321,31 @@ class Radar:
         """
         family = product.family
         known = self._variants.get(family)
-        for variant in dict.fromkeys((*((known,) if known else ()), *product.variants)):
+        for variant in _likely_variants(product, known):
             if (body := await self._fetch(_url(product, slot, variant))) is not None:
                 self._variants[family] = variant
                 return body
         looked_up = self._looked_up.get(family)
+        every = ALL_VARIANTS_LOOKUP_EVERY if product.all_variants else LOOKUP_EVERY
         if (
             not look_up
-            or product.all_variants
             or now - slot < product.delay + LOOKUP_AFTER
-            or (looked_up is not None and now - looked_up < LOOKUP_EVERY)
+            or (looked_up is not None and now - looked_up < every)
         ):
             return None
         self._looked_up[family] = now
-        variant = await self._variant(product, slot)
+        variant = await self._variant(product, slot, now)
         if variant is None or variant in (known, *product.variants):
             return None
-        _LOGGER.debug("Radar images of %s now end in %s", product.stem, variant)
+        if product.all_variants:
+            _LOGGER.warning(
+                "Radar images of %s end in %s, not one of %s",
+                product.stem,
+                variant,
+                "".join(product.variants),
+            )
+        else:
+            _LOGGER.debug("Radar images of %s now end in %s", product.stem, variant)
         self._variants[family] = variant
         return await self._fetch(_url(product, slot, variant))
 
@@ -327,7 +375,7 @@ class Radar:
         """
         async with self._lock:
             for key in PRODUCTS:  # the rain first
-                if key != RAIN_RATE and not self._wanted(key, lat, lon):
+                if key != RAIN_RATE and not self._wanted(key, lat, lon, now):
                     continue
                 try:
                     await self._refresh(key, now)
@@ -342,11 +390,11 @@ class Radar:
             if (
                 key != RAIN_RATE
                 and rain is not None
-                and self._dry(key, lat, lon)
+                and self._dry(key, lat, lon, now)
                 and (image is None or image.time < rain.time)
             ):
                 # Nothing, as of the latest rain image.
-                values[key] = (0.0, rain.time) if now - rain.time <= MAX_AGE else None
+                values[key] = (0.0, rain.time)
             elif image is None or now - image.time > MAX_AGE:
                 values[key] = None
             else:
@@ -357,27 +405,41 @@ class Radar:
         """Keep since when the latest rain images are dry at a place."""
         if (rain := self._images.get(RAIN_RATE)) is None:
             return
-        if rain.around(lat, lon) > 0:
-            self._dry_since.pop((lat, lon), None)
-        else:
-            # After a start, the first dry image: the hour before is unknown.
-            self._dry_since.setdefault((lat, lon), rain.time)
+        place = (lat, lon)
+        noted = self._noted.get(place)
+        if noted == rain.time:
+            return
+        self._noted[place] = rain.time
+        if rain.around(lat, lon) > 0 or (
+            noted is not None and rain.time - noted > INTERVAL
+        ):
+            # Rain, or images missed, in which it may have rained.
+            self._dry_since.pop(place, None)
+        if rain.around(lat, lon) <= 0:
+            # After a start or a gap, the first dry image: the hour before is
+            # unknown.
+            self._dry_since.setdefault(place, rain.time)
 
-    def _dry(self, key: str, lat: float, lon: float) -> bool:
-        """Whether the rain images say a product is nothing at a place."""
-        if (rain := self._images.get(RAIN_RATE)) is None:
+    def _dry(self, key: str, lat: float, lon: float, now: datetime.datetime) -> bool:
+        """Whether the rain images say a product is nothing at a place.
+
+        A rain image too old to be a reading says nothing, so that hail and
+        the rain of the last hour are still downloaded while the rain images
+        are not.
+        """
+        if (rain := self._images.get(RAIN_RATE)) is None or now - rain.time > MAX_AGE:
             return False
         if key == RAIN_LAST_HOUR:
             since = self._dry_since.get((lat, lon))
             return since is not None and rain.time - since >= DRY_HOUR
         return rain.around(lat, lon) <= 0
 
-    def _wanted(self, key: str, lat: float, lon: float) -> bool:
+    def _wanted(self, key: str, lat: float, lon: float, now: datetime.datetime) -> bool:
         """Whether to download a product's images for a place.
 
         Not hail without a rain image to say it rains; the rain of the last
         hour unless it is known to be nothing.
         """
         if key == RAIN_LAST_HOUR:
-            return not self._dry(key, lat, lon)
-        return RAIN_RATE in self._images and not self._dry(key, lat, lon)
+            return not self._dry(key, lat, lon, now)
+        return RAIN_RATE in self._images and not self._dry(key, lat, lon, now)

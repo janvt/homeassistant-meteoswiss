@@ -5,15 +5,17 @@ from __future__ import annotations
 import datetime
 
 from homeassistant.components.image import ImageEntity
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from custom_components.meteoswiss import (
     MeteoSwissConfigEntry,
     MeteoSwissDataUpdateCoordinator,
     MeteoSwissRadarCoordinator,
 )
+from custom_components.meteoswiss.radar import MAX_AGE
 
 
 async def async_setup_entry(
@@ -54,12 +56,16 @@ class MeteoSwissRadarLoop(
         ImageEntity.__init__(self, hass)
         self._attr_unique_id = f"image.{integration_id}-radar_loop"
         self._attr_device_info = coordinator.device_info
-        self._attr_image_last_updated = radar.loop.updated
 
     @property
     def available(self) -> bool:
-        """Only once there is a frame to show."""
-        return super().available and self.coordinator.loop.updated is not None
+        """Only while there is a recent frame to show, as for the sensors."""
+        updated = self.coordinator.loop.updated
+        return (
+            super().available
+            and updated is not None
+            and dt_util.utcnow() - updated <= MAX_AGE
+        )
 
     @property
     def image_last_updated(self) -> datetime.datetime | None:
@@ -67,8 +73,3 @@ class MeteoSwissRadarLoop(
 
     async def async_image(self) -> bytes | None:
         return await self.coordinator.loop.gif()
-
-    @callback
-    def _handle_coordinator_update(self) -> None:
-        self._attr_image_last_updated = self.coordinator.loop.updated
-        super()._handle_coordinator_update()

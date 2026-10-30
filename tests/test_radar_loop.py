@@ -3,13 +3,16 @@
 import math
 
 import numpy as np
+import pytest
 
 from custom_components.meteoswiss import radar
 from custom_components.meteoswiss.radar_loop import (
     FRAMES,
     MAP_URL,
     RADIUS_KM,
+    SCALE,
     RadarLoop,
+    _colours,
     crop,
 )
 
@@ -81,7 +84,11 @@ async def test_the_map_is_fetched_once(hass, aioclient_mock):
 
     png = BytesIO()
     PILImage.new("RGB", (16, 16), (128, 128, 128)).save(png, format="PNG")
-    aioclient_mock.get(MAP_URL.split("?")[0], content=png.getvalue())
+    aioclient_mock.get(
+        MAP_URL.split("?")[0],
+        content=png.getvalue(),
+        headers={"content-type": "image/png"},
+    )
     loop = RadarLoop(hass, ZURICH)
 
     for k in range(3):
@@ -89,3 +96,44 @@ async def test_the_map_is_fetched_once(hass, aioclient_mock):
         assert (await loop.gif()).startswith(b"GIF89a")
 
     assert aioclient_mock.call_count == 1
+
+
+# What wms.geo.admin.ch answers for a map it cannot draw (checked).
+WMS_ERROR = (
+    b'<?xml version="1.0" encoding="UTF-8"?>\n<ServiceExceptionReport '
+    b'version="1.3.0"><ServiceException code="LayerNotDefined">'
+    b"Invalid layer(s)</ServiceException></ServiceExceptionReport>"
+)
+
+
+@pytest.mark.parametrize(
+    ("content", "content_type"),
+    [(WMS_ERROR, "text/xml"), (b"not a png", "image/png")],
+    ids=["an error report", "an unreadable image"],
+)
+async def test_a_bad_map_is_a_blank_one_and_asked_again(
+    hass, aioclient_mock, content, content_type
+):
+    aioclient_mock.get(
+        MAP_URL.split("?")[0], content=content, headers={"content-type": content_type}
+    )
+    loop = RadarLoop(hass, ZURICH)
+    loop.add(rain({ZURICH: 3.0}))
+
+    gif = await loop.gif()
+
+    assert gif.startswith(b"GIF89a")
+    assert await loop.gif() is gif
+    loop.add(rain(time=SLOT + radar.INTERVAL))
+    assert (await loop.gif()).startswith(b"GIF89a")
+    assert aioclient_mock.call_count == 2
+
+
+def test_no_data_is_hatched_and_dry_is_clear():
+    frame, _ = crop(rain(), 49.3, 2.75)
+
+    alpha = np.array(_colours(frame))[..., 3]
+
+    nodata = np.isnan(frame).repeat(SCALE, axis=0).repeat(SCALE, axis=1)
+    assert alpha[nodata].any()
+    assert not alpha[~nodata].any()
