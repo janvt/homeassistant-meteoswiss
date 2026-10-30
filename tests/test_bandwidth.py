@@ -202,6 +202,33 @@ class TestHourlyFilesOrderedByTime:
         assert session.transferred() - len(body) <= whole + 2000
         assert client.whole_downloads == 1  # for the repair notice
 
+    async def test_a_file_ordered_by_place_for_a_run(self):
+        # As the precipitation files were on 28 October 2026, the other way
+        # round: by place for a run, then by time again.
+        keys = [FIRST, MIDDLE, LAST]
+        client, session, files = self.setup()
+        await client.get_hourly_rows([point(k) for k in keys], RUNS[0], "t")
+        files[url("t", RUNS[1])] = by_place("t", 1)
+        session.clear()
+
+        rows = await client.get_hourly_rows([point(k) for k in keys], RUNS[1], "t")
+
+        for key in keys:
+            assert rows[key] == expected(files[url("t", RUNS[1])], key)
+        # The places lost in the first block, its head read again, then a
+        # binary search for each place: a small share of the whole file.
+        body = files[url("t", RUNS[1])]
+        assert session.transferred() <= ogd._whole_cost(len(body)) // 20
+        assert client.whole_downloads == 0
+        session.clear()
+
+        rows = await client.get_hourly_rows([point(k) for k in keys], RUNS[2], "t")
+
+        for key in keys:
+            assert rows[key] == expected(files[url("t", RUNS[2])], key)
+        assert len(session.requests) <= len(keys) * 260
+        assert client.whole_downloads == 0
+
     async def test_longer_values(self):
         client, session, files = self.setup()
         await client.get_hourly_rows([point(MIDDLE)], RUNS[0], "t")
