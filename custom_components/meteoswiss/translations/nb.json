@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Trykkforskjell fra der føhnen blåser kraftig; omtrent 8 hPa.",
                     "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en fil for hele Sveits (33 MB), der bare radene for dette stedet leses: omtrent 0,5 MB hver tredje time, 4 MB per dag.",
                     "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 1,4 MB) lastes ned når Home Assistant starter, og sjekkes deretter bare for endringer én gang i uken; årets dager hver sjette time.",
-                    "radar": "Sensorer for regn og hagl akkurat nå på dette stedet, fra værradaren til MeteoSwiss, hvert 5. minutt: raskere og nærmere enn nedbørsstasjonen, for eksempel for å lukke vinduer. Laster ned 15 til 35 MB per dag, for alle steder samlet."
+                    "radar": "Sensorer for regn og hagl akkurat nå på dette stedet, fra værradaren til MeteoSwiss, hvert 5. minutt: raskere og nærmere enn nedbørsstasjonen, for eksempel for å lukke vinduer. Også regnet den siste timen, radaren justert etter regnmålerne, og et animert bilde av de siste 20 minuttene med regn rundt stedet. Laster ned 15 til 35 MB per dag, for alle steder samlet, og opptil 150 MB mer på en dag med vedvarende regn."
                 }
             }
         },
@@ -253,6 +253,9 @@
             "radar_hail_size": {
                 "name": "Radar haglstørrelse"
             },
+            "radar_rain_last_hour": {
+                "name": "Radar regn siste time"
+            },
             "downloaded": {
                 "name": "Lastet ned siste 24 timer"
             },
@@ -300,6 +303,11 @@
             },
             "measurement_time": {
                 "name": "Måletidspunkt"
+            }
+        },
+        "image": {
+            "radar_loop": {
+                "name": "Radar animasjon"
             }
         },
         "switch": {

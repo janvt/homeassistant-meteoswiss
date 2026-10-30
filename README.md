@@ -262,8 +262,8 @@ turned on from the device's page by those who need them.
 
 ### Radar
 
-Turn on *Radar* under *Configure* for three sensors from MeteoSwiss's weather
-radar, every 5 minutes, at the 1 km square of your Home Assistant home if the
+Turn on *Radar* under *Configure* for four sensors and an image from
+MeteoSwiss's weather radar, every 5 minutes, at the 1 km square of your Home Assistant home if the
 place is within 10 km of it, and otherwise of the place (for a mountain, its
 summit):
 
@@ -271,6 +271,16 @@ summit):
 * *Radar hail probability*, in %.
 * *Radar hail size*: the largest hail expected, in mm; 0 below 20 mm, the
   smallest size the radar reports.
+* *Radar rain last hour*: the rain of the hour to the image's time, in mm,
+  from CombiPrecip, the radar adjusted to the rain gauges.  It comes about 4
+  minutes after its hour ends, a new one every 5 minutes.
+* *Radar loop*: an animated image of the rain rate over 60 km around the
+  place, the last 20 minutes, on a swisstopo map; hatched where the radars do
+  not reach.  It is cut from the rain images the sensors download anyway, and
+  drawn only when it is looked at.  The image is 15 to 300 kB, more with more
+  rain, and each dashboard showing it loads it again every 5 minutes: worth
+  knowing for a phone on mobile data.  The map (about 250 kB) is downloaded
+  from swisstopo once per start, for each place.
 
 The radar knows within a minute or two that rain has started at your place,
 where the nearest precipitation station is typically 5 km away and reports
@@ -286,8 +296,12 @@ trigger:
 
 Its amounts are estimates, often off by a factor of two over a few minutes,
 and less reliable in the mountains: for how much it rained, use the
-precipitation station.  Hail is only looked at while it rains at or next to
-the place.
+precipitation station, or the rain of the last hour, which is checked against
+the gauges.  Hail is only looked at while it rains at or next to the place,
+and the rain of the last hour until it has been dry there for an hour.  Each
+image of the rain of the last hour is 30 to 60 kB on a dry day in Switzerland
+and up to about 625 kB on a wet one: while it rains at the place that is up to
+7.5 MB an hour.
 
 ## Station history
 
@@ -325,7 +339,9 @@ Switzerland.  The integration reads only the part for your place, so one
 entry with the default settings downloads **about 20 MB a day**, up to 55 MB
 on days with many weather warnings, and each further place about 15 MB more.
 Starting Home Assistant costs a few MB extra.  The radar, when turned on, adds
-15 to 35 MB a day, the same for any number of places.
+15 to 35 MB a day, the same for any number of places, and up to about 150 MB
+more on a day of steady rain, for the rain of the last hour.  The radar loop's
+map adds about 250 kB per place at each start.
 
 The diagnostic sensor *Downloaded last 24 hours*, on each forecast's device,
 shows what the integration actually downloaded over the last 24 hours, for all
@@ -388,7 +404,9 @@ All data is from MeteoSwiss (Source: MeteoSwiss), under its
   (SwissMetNet), for the current conditions, Föhn and climate normals.
 * [Pollen stations](https://opendatadocs.meteoswiss.ch/a-data-groundbased/a7-pollen-stations).
 * [Weather radar](https://opendatadocs.meteoswiss.ch/d-radar-data): the rain
-  rate (RZC), probability of hail (POH) and maximum expected hail size (MESHS).
+  rate (RZC), probability of hail (POH), maximum expected hail size (MESHS)
+  and the rain of the last hour (CombiPrecip); the map under the radar loop
+  is swisstopo's.
 * Weather warnings, from MeteoSwiss's warnings as published by
   [MeteoAlarm](https://meteoalarm.org) (EUMETNET).
 
@@ -401,12 +419,17 @@ with high cloud cover.  The measured values are described in the
 ### Privacy
 
 The integration contacts only `data.geo.admin.ch` (forecasts, measurements and
-the lists of places and stations) and `feeds.meteoalarm.org` (warnings).  Your
-coordinates never leave Home Assistant: the closest postal code, stations and
-warnings are worked out locally from those lists.  What it downloads still hints
+the lists of places and stations) and `feeds.meteoalarm.org` (warnings), and,
+with the radar turned on, `wms.geo.admin.ch` (the radar loop's map).  Your
+coordinates never leave Home Assistant, but for that map (below): the closest
+postal code, stations and warnings are worked out locally from those lists.
+What it downloads still hints
 at your approximate area: the files of the stations you chose, the parts of the
 forecast files holding your place, and the details of warnings that cover you.
-Radar images cover all of Switzerland and are downloaded whole.
+Radar images cover all of Switzerland and are downloaded whole.  The radar
+loop's map is the exception: it is the 60 km square centred on the place, so
+that request gives swisstopo the place to within about a kilometre, once per
+start.
 
 ## Troubleshooting
 

@@ -128,7 +128,7 @@
                     "foehn_strong_threshold": "Pressure difference from which the Föhn blows hard; about 8 hPa.",
                     "freezing_level": "A sensor for the forecast height of the 0 °C line. MeteoSwiss publishes it in a file for all of Switzerland (33 MB), of which only the rows of this place are read: about 0.5 MB every three hours, 4 MB a day.",
                     "climate_normals": "Sensors comparing today and this month at the weather station with its normals for 1991–2020, computed from the station's own history, and the record for the date. The history (about 1.4 MB) is downloaded when Home Assistant starts, then only checked for changes once a week; this year's days every six hours.",
-                    "radar": "Sensors for rain and hail right now at this place, from MeteoSwiss's weather radar, every 5 minutes: quicker and closer than the precipitation station, for automations such as closing windows. Downloads 15 to 35 MB a day, shared by all places."
+                    "radar": "Sensors for rain and hail right now at this place, from MeteoSwiss's weather radar, every 5 minutes: quicker and closer than the precipitation station, for automations such as closing windows. Also the rain of the last hour, the radar adjusted to the rain gauges, and an animated image of the last 20 minutes of rain around the place. Downloads 15 to 35 MB a day, shared by all places, and up to 150 MB more on a day of steady rain."
                 }
             }
         },
@@ -253,6 +253,9 @@
             "radar_hail_size": {
                 "name": "Radar hail size"
             },
+            "radar_rain_last_hour": {
+                "name": "Radar rain last hour"
+            },
             "downloaded": {
                 "name": "Downloaded last 24 hours"
             },
@@ -300,6 +303,11 @@
             },
             "measurement_time": {
                 "name": "Measurement time"
+            }
+        },
+        "image": {
+            "radar_loop": {
+                "name": "Radar loop"
             }
         },
         "switch": {
