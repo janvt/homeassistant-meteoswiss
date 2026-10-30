@@ -8,13 +8,18 @@ import pytest
 from custom_components.meteoswiss import radar
 from custom_components.meteoswiss.radar_loop import (
     FRAMES,
+    HALF_KM,
     MAP_URL,
     RADIUS_KM,
     SCALE,
+    SIZE,
     RadarLoop,
     _colours,
+    cell_centre,
     crop,
+    marker,
 )
+from custom_components.meteoswiss.usage import REQUEST_OVERHEAD, Usage
 
 from .test_radar import SLOT, ZURICH, image
 
@@ -23,18 +28,41 @@ def rain(values=None, time=SLOT) -> radar.Image:
     return radar.Image.parse(image(values), time, 1.0)
 
 
-def test_the_place_is_in_the_middle_of_the_square():
+def test_the_square_is_centred_on_the_place_s_cell():
     frame, box = crop(rain({ZURICH: 7.0}), *ZURICH)
 
-    assert frame.shape == (2 * RADIUS_KM, 2 * RADIUS_KM)
-    assert frame[RADIUS_KM, RADIUS_KM] == 7.0
+    assert frame.shape == (2 * HALF_KM, 2 * HALF_KM)
     assert np.nansum(frame) == 7.0
     west, south, east, north = box
-    assert east - west == north - south == 2 * RADIUS_KM * 1000
-    # The place's pixel is the one east and south of the box's centre.
+    assert east - west == north - south == 2 * HALF_KM * 1000
+    assert ((west + east) / 2, (south + north) / 2) == cell_centre(*ZURICH)
+    # The place's pixel holds its value, and at least RADIUS_KM shows around it.
     x, y = radar.lv95(*ZURICH)
-    assert math.floor((x - west) / 1000) == RADIUS_KM
-    assert math.floor((north - y) / 1000) == RADIUS_KM
+    column, row = math.floor((x - west) / 1000), math.floor((north - y) / 1000)
+    assert frame[row, column] == 7.0
+    assert RADIUS_KM <= min(
+        row, column, 2 * HALF_KM - 1 - row, 2 * HALF_KM - 1 - column
+    )
+
+
+def test_places_in_one_cell_ask_for_the_same_map():
+    """The map's square tells swisstopo the 10 km cell, not the place."""
+    near = (47.39, 8.56)  # 2 km north-east of ZURICH, in the same cell
+    assert cell_centre(*near) == cell_centre(*ZURICH)
+
+    assert crop(rain(), *near)[1] == crop(rain(), *ZURICH)[1]
+
+
+def test_the_marker_is_on_the_place():
+    _, box = crop(rain(), *ZURICH)
+    x, y = radar.lv95(*ZURICH)
+    west, _, _, north = box
+
+    column, row = marker(box, *ZURICH)
+
+    assert 0 <= column < SIZE and 0 <= row < SIZE
+    assert abs(column - (x - west) / 1000 * SCALE) <= 0.5
+    assert abs(row - (north - y) / 1000 * SCALE) <= 0.5
 
 
 def test_beyond_the_image_is_no_data():
@@ -96,6 +124,21 @@ async def test_the_map_is_fetched_once(hass, aioclient_mock):
         assert (await loop.gif()).startswith(b"GIF89a")
 
     assert aioclient_mock.call_count == 1
+
+
+async def test_the_map_counts_as_downloaded(hass, aioclient_mock):
+    aioclient_mock.get(
+        MAP_URL.split("?")[0],
+        content=b"\x89PNG" + bytes(996),
+        headers={"content-type": "image/png"},
+    )
+    usage = Usage()
+    loop = RadarLoop(hass, ZURICH, usage)
+    loop.add(rain())
+
+    await loop.gif()
+
+    assert usage.downloaded == 1000 + REQUEST_OVERHEAD
 
 
 # What wms.geo.admin.ch answers for a map it cannot draw (checked).
