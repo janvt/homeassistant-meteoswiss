@@ -1210,3 +1210,9 @@ async def test_radar_loop(hass, entry, frozen_now, aioclient_mock):
     assert hass.states.get(loop_id).state == NOW.isoformat()
     image = hass.data[DATA_INSTANCES]["image"].get_entity(loop_id)
     assert (await image.async_image()).startswith(b"GIF89a")
+
+    # No newer rain image: once its frames are too old, like the sensors.
+    await refresh_after(hass, frozen_now, 15)
+    assert hass.states.get(loop_id).state == NOW.isoformat()
+    await refresh_after(hass, frozen_now, 10)
+    assert hass.states.get(loop_id).state == "unavailable"
