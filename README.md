@@ -274,13 +274,14 @@ summit):
 * *Radar rain last hour*: the rain of the hour to the image's time, in mm,
   from CombiPrecip, the radar adjusted to the rain gauges.  It comes about 4
   minutes after its hour ends, a new one every 5 minutes.
-* *Radar loop*: an animated image of the rain rate over 60 km around the
+* *Radar loop*: an animated image of the rain rate at least 30 km around the
   place, the last 20 minutes, on a swisstopo map; hatched where the radars do
   not reach.  It is cut from the rain images the sensors download anyway, and
   drawn only when it is looked at.  The image is 15 to 300 kB, more with more
   rain, and each dashboard showing it loads it again every 5 minutes: worth
   knowing for a phone on mobile data.  The map (about 250 kB) is downloaded
-  from swisstopo once per start, for each place.
+  from swisstopo once per start, for each place, and counts in the download
+  sensors.
 
 The radar knows within a minute or two that rain has started at your place,
 where the nearest precipitation station is typically 5 km away and reports
@@ -421,15 +422,15 @@ with high cloud cover.  The measured values are described in the
 The integration contacts only `data.geo.admin.ch` (forecasts, measurements and
 the lists of places and stations) and `feeds.meteoalarm.org` (warnings), and,
 with the radar turned on, `wms.geo.admin.ch` (the radar loop's map).  Your
-coordinates never leave Home Assistant, but for that map (below): the closest
-postal code, stations and warnings are worked out locally from those lists.
+coordinates never leave Home Assistant: the closest postal code, stations and
+warnings are worked out locally from those lists.
 What it downloads still hints
 at your approximate area: the files of the stations you chose, the parts of the
 forecast files holding your place, and the details of warnings that cover you.
 Radar images cover all of Switzerland and are downloaded whole.  The radar
-loop's map is the exception: it is the 60 km square centred on the place, so
-that request gives swisstopo the place to within about a kilometre, once per
-start.
+loop's map is a 70 km square centred on the 10 km square the place is in, not
+on the place, so that request, once per start, tells swisstopo only which
+10 km square that is.
 
 ## Troubleshooting
 

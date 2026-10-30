@@ -880,7 +880,7 @@ class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
         )
         self._radar = radar
         self.location = location
-        self.loop = RadarLoop(hass, location)
+        self.loop = RadarLoop(hass, location, radar.usage)
         # Set by the entry's coordinator; see its async_set_paused.
         self.paused = False
 

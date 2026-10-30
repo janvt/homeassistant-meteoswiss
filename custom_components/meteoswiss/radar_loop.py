@@ -1,7 +1,9 @@
 """An animated loop of the latest rain radar images around a place.
 
-Each frame is the rain rate over a square centred on the place, drawn over a
-lightened swisstopo map, with its time and a colour legend.  The result is an
+Each frame is the rain rate over a square around the place, drawn over a
+lightened swisstopo map, with its time and a colour legend.  The square is
+centred on the 10 km cell the place is in, not on the place: the map is asked
+for that square, so swisstopo learns only the cell.  The result is an
 animated GIF, which every browser and the companion apps show without help.
 
 The frames are cut from the rain images the radar sensors download anyway,
@@ -25,6 +27,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from custom_components.meteoswiss.const import USER_AGENT
 from custom_components.meteoswiss.radar import INTERVAL, REQUEST_TIMEOUT, Image, lv95
+from custom_components.meteoswiss.usage import Usage
 
 if TYPE_CHECKING:
     from PIL import Image as PILImage
@@ -33,10 +36,14 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 FRAMES = 5
+# At least this much is shown around the place, whatever it is in its cell.
 RADIUS_KM = 30
+# The square is centred on the place's cell of this size in LV95.
+GRID_KM = 10
+HALF_KM = RADIUS_KM + GRID_KM // 2
 # Pixels per km of radar grid; the radar pixels are 1 km.
-SCALE = 8
-SIZE = 2 * RADIUS_KM * SCALE
+SCALE = 7
+SIZE = 2 * HALF_KM * SCALE
 LEGEND_HEIGHT = 34
 FOOTER_HEIGHT = 16
 FRAME_MS = 700
@@ -68,15 +75,22 @@ NO_DATA = (90, 90, 90, 150)
 type Box = tuple[float, float, float, float]
 
 
+def cell_centre(lat: float, lon: float) -> tuple[float, float]:
+    """The LV95 centre of the GRID_KM cell a place is in."""
+    east, north = lv95(lat, lon)
+    grid = GRID_KM * 1000
+    return (east // grid + 0.5) * grid, (north // grid + 0.5) * grid
+
+
 def crop(image: Image, lat: float, lon: float) -> tuple[np.ndarray, Box]:
-    """The rain rate over the square around a place, and its LV95 box.
+    """The rain rate over the square around a place's cell, and its LV95 box.
 
     Parts of the square outside the radar image read as no data.
     """
-    east, north = lv95(lat, lon)
-    row = int((image.north - north) // image.scale) - RADIUS_KM
-    column = int((east - image.west) // image.scale) - RADIUS_KM
-    side = 2 * RADIUS_KM
+    east, north = cell_centre(lat, lon)
+    row = int((image.north - north) // image.scale) - HALF_KM
+    column = int((east - image.west) // image.scale) - HALF_KM
+    side = 2 * HALF_KM
     out = np.full((side, side), np.nan, dtype=np.float32)
     rows, columns = image.values.shape
     r0, r1 = max(row, 0), min(row + side, rows)
@@ -92,12 +106,26 @@ def crop(image: Image, lat: float, lon: float) -> tuple[np.ndarray, Box]:
     return out, box
 
 
+def marker(box: Box, lat: float, lon: float) -> tuple[int, int]:
+    """Where a place is in the square of a box, in pixels from its top left."""
+    east, north = lv95(lat, lon)
+    west, _, _, top = box
+    return round((east - west) / 1000 * SCALE), round((top - north) / 1000 * SCALE)
+
+
 class RadarLoop:
     """The latest frames around a place, and the loop drawn from them."""
 
-    def __init__(self, hass: HomeAssistant, location: tuple[float, float]) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        location: tuple[float, float],
+        usage: Usage | None = None,
+    ) -> None:
         self._hass = hass
         self._location = location
+        # The map counts with the radar's own downloads.
+        self._usage = usage
         self._frames: dict[datetime.datetime, np.ndarray] = {}
         self._box: Box | None = None
         # None until a map is in hand: the loop is drawn on a blank one then.
@@ -138,7 +166,11 @@ class RadarLoop:
                 )
             frames = sorted(self._frames.items())
             gif = await self._hass.async_add_executor_job(
-                draw, frames, self._map, self._hass.config.time_zone
+                draw,
+                frames,
+                self._map,
+                self._hass.config.time_zone,
+                marker(self._box, *self._location),
             )
             self._drawn = (newest, gif)
             return gif
@@ -150,16 +182,19 @@ class RadarLoop:
                 headers={"User-Agent": USER_AGENT},
                 timeout=REQUEST_TIMEOUT,
             ) as response:
+                body = await response.read()
+                if self._usage is not None:
+                    self._usage.count(response, len(body))
                 response.raise_for_status()
                 # An error is answered with status 200 and an XML report.
                 if not (response.content_type or "").startswith("image/"):
                     _LOGGER.debug(
                         "No map for the radar loop: %s %s",
                         response.content_type,
-                        (await response.read())[:300],
+                        body[:300],
                     )
                     return None
-                return await response.read()
+                return body
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             _LOGGER.debug("Cannot fetch the map of the radar loop: %s", exc)
             return None
@@ -222,8 +257,12 @@ def draw(
     frames: list[tuple[datetime.datetime, np.ndarray]],
     base: PILImage.Image | None,
     time_zone: str,
+    place: tuple[int, int] | None = None,
 ) -> bytes:
-    """An animated GIF of the frames, oldest first, on a blank map without base."""
+    """An animated GIF of the frames, oldest first, on a blank map without base.
+
+    The place is marked at `place`, in pixels, or in the middle without it.
+    """
     from PIL import Image as PILImage  # noqa: PLC0415
     from PIL import ImageDraw, ImageFont  # noqa: PLC0415
 
@@ -235,17 +274,15 @@ def draw(
     small = ImageFont.load_default(size=12)
     legend = _legend(small)
     newest = frames[-1][0]
-    centre = SIZE // 2
+    x0, y0 = place if place is not None else (SIZE // 2, SIZE // 2)
     images = []
     for i, (time, rate) in enumerate(frames):
         frame = base.copy()
         layer = _colours(rate)
         frame.paste(layer, (0, 0), layer)
         pen = ImageDraw.Draw(frame)
-        pen.ellipse(
-            (centre - 7, centre - 7, centre + 7, centre + 7), outline=0, width=3
-        )
-        pen.ellipse((centre - 3, centre - 3, centre + 3, centre + 3), fill=0)
+        pen.ellipse((x0 - 7, y0 - 7, x0 + 7, y0 + 7), outline=0, width=3)
+        pen.ellipse((x0 - 3, y0 - 3, x0 + 3, y0 + 3), fill=0)
 
         # No words, to need no translation: the newest frame is its time.
         minutes = int((newest - time).total_seconds() // 60)
