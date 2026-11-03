@@ -123,3 +123,10 @@ def test_every_platform_sets_its_parallel_updates(platform):
     """parallel-updates, as hassfest checks it."""
     module = importlib.import_module(f"custom_components.meteoswiss.{platform}")
     assert isinstance(getattr(module, "PARALLEL_UPDATES", None), int)
+
+
+def test_the_readme_badge_shows_the_declared_tier():
+    manifest = json.loads((INTEGRATION / "manifest.json").read_text())
+    readme = (INTEGRATION.parent.parent / "README.md").read_text()
+    tier = manifest.get("quality_scale")
+    assert (f"badge/quality%20scale-{tier}-" in readme) == (tier is not None)
