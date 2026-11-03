@@ -545,9 +545,10 @@ async def test_entities_are_grouped_by_forecast_and_station(hass, entry):
     assert device_of(weather_id(hass, entry)) == devices["Postal code forecast"].id
     assert device_of(temperature) == devices["Weather station"].id
     assert device_of(rain) == devices["Precipitation station"].id
-    # The names stay, apart from Home Assistant capitalising after the device.
+    # The names stay, apart from newer Home Assistant versions capitalising
+    # after the device.
     assert hass.states.get(weather_id(hass, entry)).name == "Zurich"
-    assert hass.states.get(temperature).name == "Fluntern Temperature"
+    assert hass.states.get(temperature).name.lower() == "fluntern temperature"
     assert hass.states.get(rain).name == "Aarberg 10 minute rain"
 
 

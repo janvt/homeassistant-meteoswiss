@@ -9,9 +9,9 @@ from homeassistant import config_entries
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import (
     DEGREE,
+    PERCENTAGE,
     UnitOfIrradiance,
     UnitOfPressure,
-    UnitOfRatio,
     UnitOfSpeed,
     UnitOfTemperature,
     UnitOfTime,
@@ -272,7 +272,7 @@ _radiance_sensor: SensorTypedef = {
 }
 _humidity_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "humidity",
-    SENSOR_TYPE_UNIT: UnitOfRatio.PERCENTAGE,
+    SENSOR_TYPE_UNIT: PERCENTAGE,
     SENSOR_TYPE_ICON: "mdi:water-percent",
     SENSOR_TYPE_CLASS: SensorDeviceClass.HUMIDITY,
     SENSOR_DATA_ID: "ure200s0",

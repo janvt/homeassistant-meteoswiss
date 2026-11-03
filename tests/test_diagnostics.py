@@ -1,10 +1,13 @@
 """The diagnostics download of an entry."""
 
+from http import HTTPStatus
+
+# Imported before the time is frozen: the download imports it, and with the
+# time frozen it fails on Home Assistant 2024.12.
+import aiohasupervisor  # noqa: F401
 import pytest
+from homeassistant.setup import async_setup_component
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.components.diagnostics import (
-    get_diagnostics_for_config_entry,
-)
 
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.downloads import SharedDownloads
@@ -13,6 +16,17 @@ from custom_components.meteoswiss.ogd import MeteoSwissOGD
 from .fakes import FakeOGD, FakeSession
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
+
+
+async def get_diagnostics_for_config_entry(hass, hass_client, entry):
+    """The download, as the test harness's own helper does, which the harness
+    for older Home Assistant versions lacks."""
+    assert await async_setup_component(hass, "diagnostics", {})
+    await hass.async_block_till_done()
+    client = await hass_client()
+    response = await client.get(f"/api/diagnostics/config_entry/{entry.entry_id}")
+    assert response.status == HTTPStatus.OK
+    return (await response.json())["data"]
 
 
 async def test_diagnostics(hass, hass_client, entry_data):
