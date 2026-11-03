@@ -1,10 +1,13 @@
 """quality_scale.yaml, checked as hassfest checks it for core integrations."""
 
+import importlib
 import json
 from pathlib import Path
 
 import pytest
 import yaml
+
+from custom_components.meteoswiss import PLATFORMS
 
 INTEGRATION = Path(__file__).parent.parent / "custom_components" / "meteoswiss"
 
@@ -113,3 +116,10 @@ def test_the_declared_tier_is_met():
         if rules()[rule]["status"] == "todo"
     ]
     assert not open_rules, f"{tier} needs {open_rules}"
+
+
+@pytest.mark.parametrize("platform", PLATFORMS)
+def test_every_platform_sets_its_parallel_updates(platform):
+    """parallel-updates, as hassfest checks it."""
+    module = importlib.import_module(f"custom_components.meteoswiss.{platform}")
+    assert isinstance(getattr(module, "PARALLEL_UPDATES", None), int)

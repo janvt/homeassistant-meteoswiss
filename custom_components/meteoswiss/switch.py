@@ -15,6 +15,9 @@ from custom_components.meteoswiss.coordinator import (
 )
 from custom_components.meteoswiss.entity import MeteoSwissEntity
 
+# Turning downloads back on refreshes the entry: one at a time.
+PARALLEL_UPDATES = 1
+
 
 async def async_setup_entry(
     hass: HomeAssistant,

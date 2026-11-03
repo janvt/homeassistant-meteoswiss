@@ -17,6 +17,9 @@ from custom_components.meteoswiss.coordinator import (
 from custom_components.meteoswiss.entity import MeteoSwissEntity
 from custom_components.meteoswiss.radar import MAX_AGE
 
+# Updated by the radar's coordinator, so without limit.
+PARALLEL_UPDATES = 0
+
 
 async def async_setup_entry(
     hass: HomeAssistant,
