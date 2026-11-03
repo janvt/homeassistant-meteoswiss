@@ -6,7 +6,8 @@ from typing import Literal
 
 from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_NAME, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity
@@ -177,6 +178,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         entry.async_on_unload(entry.add_update_listener(update_listener))
 
     entry.runtime_data = coordinator
+    _async_remove_stale_devices(hass, entry)
 
     await hass.config_entries.async_forward_entry_setups(
         entry,
@@ -184,6 +186,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
     )
 
     return True
+
+
+@callback
+def _async_remove_stale_devices(
+    hass: HomeAssistant, entry: MeteoSwissConfigEntry
+) -> None:
+    """Remove the devices of stations no longer set up, with their entities.
+
+    Reconfiguring without a station reloads the entry, which ends up here.
+    """
+    current = entry.runtime_data.device_identifiers
+    registry = dr.async_get(hass)
+    for device in dr.async_entries_for_config_entry(registry, entry.entry_id):
+        if not device.identifiers & current:
+            registry.async_remove_device(device.id)
+
+
+async def async_remove_config_entry_device(
+    hass: HomeAssistant, entry: MeteoSwissConfigEntry, device: dr.DeviceEntry
+) -> bool:
+    """Let the user delete a device the entry no longer uses."""
+    coordinator = getattr(entry, "runtime_data", None)
+    # Not loaded: a device still in use is added again when it is.
+    return coordinator is None or not device.identifiers & (
+        coordinator.device_identifiers
+    )
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

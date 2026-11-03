@@ -13,6 +13,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_component import DATA_INSTANCES
 
+from custom_components.meteoswiss import async_remove_config_entry_device
 from custom_components.meteoswiss.alerts import AlertError
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.coordinator import (
@@ -595,6 +596,45 @@ async def test_entities_are_grouped_by_forecast_and_station(hass, entry):
     assert hass.states.get(weather_id(hass, entry)).name == "Zurich"
     assert hass.states.get(temperature).name.lower() == "fluntern temperature"
     assert hass.states.get(rain).name == "Aarberg 10 minute rain"
+
+
+async def test_a_station_no_longer_set_up_loses_its_device(hass, entry, entry_data):
+    await setup(hass, entry)
+    rain = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-10minrain-precipitation")
+
+    # As reconfiguring without a precipitation station does.
+    hass.config_entries.async_update_entry(
+        entry,
+        data={
+            k: v
+            for k, v in entry_data.items()
+            if k not in ("precipitation_station", "real_time_precipitation_name")
+        },
+    )
+    await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    devices = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+    assert sorted(d.model for d in devices) == [
+        "Postal code forecast",
+        "Weather station",
+    ]
+    assert er.async_get(hass).async_get(rain) is None
+
+
+async def test_only_a_device_no_longer_used_can_be_deleted(hass, entry):
+    await setup(hass, entry)
+    registry = dr.async_get(hass)
+    devices = dr.async_entries_for_config_entry(registry, entry.entry_id)
+    # Left behind, say, by a version that did not remove it.
+    stale = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, f"{entry.entry_id}-gone")},
+    )
+
+    assert await async_remove_config_entry_device(hass, entry, stale)
+    for device in devices:
+        assert not await async_remove_config_entry_device(hass, entry, device)
 
 
 async def test_each_entry_has_its_own_device(hass, entry):

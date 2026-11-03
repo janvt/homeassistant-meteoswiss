@@ -96,9 +96,7 @@ rules:
     comment: Tracked in #41.
   reconfiguration-flow: done
   repair-issues: done
-  stale-devices:
-    status: todo
-    comment: Tracked in #42.
+  stale-devices: done
 
   # Platinum
   async-dependency:
