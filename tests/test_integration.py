@@ -2,6 +2,7 @@
 
 import asyncio
 import datetime
+import logging
 from types import SimpleNamespace
 
 import numpy as np
@@ -254,6 +255,50 @@ async def test_station_failure_only_affects_the_sensors(hass, entry, fake_ogd):
     temperature = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-temperature")
     assert hass.states.get(temperature).state == "unavailable"
     assert hass.states.get(weather_id(hass, entry)).state == "sunny"
+
+
+def logged(caplog, level, text):
+    return [
+        r
+        for r in caplog.records
+        if r.levelno == level and r.getMessage().startswith(text)
+    ]
+
+
+async def test_a_station_outage_is_logged_once_and_so_is_its_end(
+    hass, entry, fake_ogd, frozen_now, caplog
+):
+    await setup(hass, entry)
+    fake_ogd.station_error = OGDError("down")
+
+    for _ in range(3):
+        await refresh_after(hass, frozen_now, 5)
+
+    assert len(logged(caplog, logging.WARNING, "Station SMA is unavailable")) == 1
+    assert not logged(caplog, logging.INFO, "Station SMA is available again")
+
+    fake_ogd.station_error = None
+    for _ in range(2):
+        await refresh_after(hass, frozen_now, 5)
+
+    assert len(logged(caplog, logging.INFO, "Station SMA is available again")) == 1
+
+
+async def test_an_unexpected_error_is_logged_with_its_traceback_once(
+    hass, entry, fake_ogd, frozen_now, caplog, monkeypatch
+):
+    await setup(hass, entry)
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(fake_ogd, "get_station_now", broken)
+    for _ in range(3):
+        await refresh_after(hass, frozen_now, 5)
+
+    assert not entry.runtime_data.last_update_success
+    (record,) = logged(caplog, logging.ERROR, "Unexpected error updating Zurich")
+    assert record.exc_info
 
 
 async def test_entry_without_stations_only_has_the_forecast(hass, entry_data):
@@ -847,7 +892,7 @@ async def test_stations_update_during_a_slow_download(
 
 
 async def test_a_failed_background_refresh_keeps_the_forecast(
-    hass, entry, fake_ogd, frozen_now, monkeypatch
+    hass, entry, fake_ogd, frozen_now, monkeypatch, caplog
 ):
     await setup(hass, entry)
 
@@ -857,15 +902,20 @@ async def test_a_failed_background_refresh_keeps_the_forecast(
     monkeypatch.setattr(fake_ogd, "latest_run", broken)
     fake_ogd.run = "202610201600"
     await refresh_after(hass, frozen_now, 20)
+    await refresh_after(hass, frozen_now, 20)
 
     coordinator = entry.runtime_data
     assert coordinator.last_update_success
     assert coordinator.data["forecast"]["run"] == "202610201200"
+    # Logged with its traceback, once however often it fails.
+    (record,) = logged(caplog, logging.WARNING, "Forecast is unavailable")
+    assert record.exc_info
     # The next due refresh tries again.
     monkeypatch.undo()
     fake_ogd.run = "202610201600"
     await refresh_after(hass, frozen_now, 20)
     assert coordinator.data["forecast"]["run"] == "202610201600"
+    assert logged(caplog, logging.INFO, "Forecast is available again")
 
 
 def foehn_state(hass, entry, key):

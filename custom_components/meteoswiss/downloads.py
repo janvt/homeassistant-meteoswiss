@@ -8,6 +8,7 @@ import logging
 from typing import Any
 
 from custom_components.meteoswiss.ogd import MeteoSwissOGD, OGDError, Point
+from custom_components.meteoswiss.outages import Outages
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ class SharedDownloads:
         self._rows: dict[str, dict[tuple[int, int], dict[str, str]]] = {}
         self._fetched: dict[str, datetime.datetime] = {}
         self._runs: dict[str, str] = {}
+        self._outages = Outages(_LOGGER)
 
     def register(self, owner: str, point: Point, parameters: set[str]) -> None:
         self._wanted[owner] = (point, frozenset(parameters))
@@ -86,5 +88,7 @@ class SharedDownloads:
                     )
                     self._rows[parameter] = {**rows, **more}
             except OGDError as exc:
-                _LOGGER.warning("Cannot update %s: %s", parameter, exc)
+                self._outages.failed(f"Forecast file {parameter}", exc)
+            else:
+                self._outages.worked(f"Forecast file {parameter}")
             return self._rows.get(parameter, {}).get(point.key)

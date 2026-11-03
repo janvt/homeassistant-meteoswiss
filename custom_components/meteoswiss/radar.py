@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import aiohttp
 import numpy as np
 
+from custom_components.meteoswiss.outages import Outages
 from custom_components.meteoswiss.usage import Usage
 
 _LOGGER = logging.getLogger(__name__)
@@ -238,6 +239,7 @@ class Radar:
         self._dry_since: dict[tuple[float, float], datetime.datetime] = {}
         self._noted: dict[tuple[float, float], datetime.datetime] = {}
         self._lock = asyncio.Lock()
+        self._outages = Outages(_LOGGER)
         self.usage = Usage()
 
     @property
@@ -383,7 +385,9 @@ class Radar:
                 try:
                     await self._refresh(key, now)
                 except RadarError as exc:
-                    _LOGGER.warning("Radar %s: %s", key, exc)
+                    self._outages.failed(f"Radar {key}", exc)
+                else:
+                    self._outages.worked(f"Radar {key}")
                 if key == RAIN_RATE:
                     self._note_rain(lat, lon)
         values: dict[str, tuple[float | None, datetime.datetime] | None] = {}
