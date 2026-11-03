@@ -19,9 +19,7 @@ rules:
     comment: The integration provides no conditions.
   docs-high-level-description: done
   docs-installation-instructions: done
-  docs-removal-instructions:
-    status: todo
-    comment: Tracked in #36.
+  docs-removal-instructions: done
   docs-triggers:
     status: exempt
     comment: The integration provides no triggers.

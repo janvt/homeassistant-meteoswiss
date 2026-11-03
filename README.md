@@ -129,7 +129,8 @@ The forecast and each station become a device of the entry:
 ![The entry with its forecast and station devices](docs/integration-entry.png)
 
 Home Assistant names entities after their device, so a station sensor shows as
-e.g. *Altdorf Temperature*.  Add the integration once more for each further place.
+e.g. *Altdorf Temperature*.  Add the integration once more for each further
+place; each place can be added once.
 
 ### Changing the setup
 
@@ -139,6 +140,25 @@ e.g. *Altdorf Temperature*.  Add the integration once more for each further plac
   normals and Föhn on or off, and sets the Föhn stations and thresholds.
 
   <img src="docs/options.png" alt="Options" width="460">
+
+### Removing
+
+1. Delete each place: *Settings → Devices & services → MeteoSwiss*, then
+   *Delete* in the entry's menu.  Its devices, entities and repair notices go
+   with it, and nothing more is downloaded for it.
+2. To uninstall the integration itself, remove it in HACS or the Marketplace,
+   or delete `custom_components/meteoswiss` if you installed it manually, and
+   restart Home Assistant.
+
+What stays behind:
+
+* The long-term statistics of the sensors, including history imported with
+  [`import_history`](#station-history), as for any integration: delete them
+  under *Developer tools → Statistics*, where they show as no longer provided.
+* Two small files in the `.storage` folder of your configuration:
+  `meteoswiss.usage`, what was downloaded this month, and `meteoswiss.paused`,
+  the places whose downloads are off.  They are only read by this integration;
+  delete them while Home Assistant is stopped if you want to start afresh.
 
 ## Entities
 
