@@ -18,6 +18,7 @@ from urllib.parse import quote
 
 import aiohttp
 
+from custom_components.meteoswiss.outages import Outages
 from custom_components.meteoswiss.usage import Usage
 
 _LOGGER = logging.getLogger(__name__)
@@ -211,6 +212,7 @@ class MeteoAlarm:
         self._fetched: datetime.datetime | None = None
         self._details: dict[str, _Details | None] = {}
         self._lock = asyncio.Lock()
+        self._outages = Outages(_LOGGER)
         self.usage = Usage()
 
     @property
@@ -249,7 +251,11 @@ class MeteoAlarm:
                 except (AlertError, ET.ParseError) as exc:
                     if self._entries is None:
                         raise AlertError(str(exc)) from exc
-                    _LOGGER.warning("Keeping the previous warnings: %s", exc)
+                    self._outages.failed(
+                        "Weather warning feed", f"{exc}; keeping the previous one"
+                    )
+                else:
+                    self._outages.worked("Weather warning feed")
             return self._entries
 
     async def _details_of(self, entry: _Entry) -> _Details | None:
@@ -257,12 +263,14 @@ class MeteoAlarm:
         if entry.identifier not in self._details:
             details = None
             if entry.details_url:
+                source = f"Details of the weather warning for {entry.region}"
                 try:
                     details = parse_details(await self._get(entry.details_url))
                 except (AlertError, ET.ParseError) as exc:
-                    _LOGGER.warning("Details of warning %s: %s", entry.region, exc)
+                    self._outages.failed(source, exc)
                     # Try again with the next update rather than keeping None.
                     return None
+                self._outages.worked(source)
             self._details[entry.identifier] = details
         return self._details[entry.identifier]
 
