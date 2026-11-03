@@ -3,9 +3,16 @@ name: Tests
 on:
   push:
   pull_request:
-  # For a new Home Assistant beta when nothing is pushed.
+  # For a new Home Assistant version when nothing is pushed. Its failures are
+  # reported as issues.
   schedule:
     - cron: "0 5 * * *"
+  # To try the reporting.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
 
 jobs:
   lint:
@@ -59,9 +66,39 @@ jobs:
         if: matrix.homeassistant == 'beta'
         run: pip install --pre --upgrade pytest-homeassistant-custom-component
       - name: Show the Home Assistant version
-        run: pip show homeassistant | head -2
+        id: version
+        run: |
+          version=$(pip show homeassistant | sed -n 's/^Version: //p')
+          echo "Home Assistant $version"
+          echo "homeassistant=$version" >> "$GITHUB_OUTPUT"
       - name: Run tests
         env:
           PYTHONASYNCIODEBUG: ${{ matrix.debug && '1' || '' }}
           PYTHONDEVMODE: ${{ matrix.debug && '1' || '' }}
         run: pytest --cov=custom_components.meteoswiss --cov-report=term-missing
+      # One issue for each job: opened when it fails, commented on while it
+      # keeps failing, and closed when it passes again.
+      - name: Report the result
+        if: >-
+          !cancelled()
+          && contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: Tests fail on Home Assistant ${{ matrix.homeassistant }}
+          VERSION: ${{ steps.version.outputs.homeassistant || 'unknown' }}
+          STATUS: ${{ job.status }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          number=$(gh issue list --state open --search "in:title \"$TITLE\"" \
+            --json number,title --jq 'map(select(.title == env.TITLE))[0].number // empty')
+          if [ "$STATUS" = success ]; then
+            if [ -n "$number" ]; then
+              gh issue close "$number" --comment "They pass again on $VERSION: $RUN"
+            fi
+          elif [ -n "$number" ]; then
+            gh issue comment "$number" --body "They still fail on $VERSION: $RUN"
+          else
+            gh issue create --title "$TITLE" --body "The daily tests fail on Home Assistant $VERSION: $RUN
+
+          This issue is closed when they pass again."
+          fi
