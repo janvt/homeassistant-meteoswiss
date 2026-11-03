@@ -1,5 +1,5 @@
 pytest-homeassistant-custom-component
 ruff
-pyfive==1.1.2
+pyfive==1.3.0
 # To write radar files for the tests.
 h5py
