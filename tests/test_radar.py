@@ -3,6 +3,7 @@
 import datetime
 import io
 import json
+import threading
 
 import h5py
 import numpy as np
@@ -94,6 +95,24 @@ async def test_the_rain_at_the_place():
     readings = await meteo.get(*ZURICH, NOW)
 
     assert readings[RAIN_RATE] == (2.5, SLOT)
+
+
+async def test_images_are_read_outside_the_event_loop(monkeypatch):
+    meteo, _ = client({url(RAIN_RATE): image({ZURICH: 2.5})})
+    loop = threading.get_ident()
+    threads = []
+    parse = radar.Image.parse
+
+    def recording(*args):
+        threads.append(threading.get_ident())
+        return parse(*args)
+
+    monkeypatch.setattr(radar.Image, "parse", recording)
+
+    readings = await meteo.get(*ZURICH, NOW)
+
+    assert readings[RAIN_RATE] == (2.5, SLOT)
+    assert threads and loop not in threads
 
 
 async def test_outside_the_radars_reach_there_is_no_reading():

@@ -360,7 +360,10 @@ class Radar:
                 return
             body = await self._image(product, candidate, now, candidate == slot)
             if body is not None:
-                self._images[key] = Image.parse(body, candidate, product.scale)
+                # Reading a whole image takes too long for the event loop.
+                self._images[key] = await asyncio.get_running_loop().run_in_executor(
+                    None, Image.parse, body, candidate, product.scale
+                )
                 return
 
     async def get(
