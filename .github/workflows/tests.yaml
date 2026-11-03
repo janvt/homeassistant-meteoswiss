@@ -1,7 +1,9 @@
 name: Tests
 
 on:
+  # Not for the other branches, whose pull requests run them.
   push:
+    branches: [main]
   pull_request:
   # For a new Home Assistant version when nothing is pushed. Its failures are
   # reported as issues.
