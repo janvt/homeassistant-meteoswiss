@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
+from typing import override
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -54,6 +55,7 @@ from custom_components.meteoswiss.const import (
     SENSOR_TYPES,
 )
 from custom_components.meteoswiss.coordinator import (
+    MeteoSwissClientResult,
     MeteoSwissConfigEntry,
     MeteoSwissDataUpdateCoordinator,
     MeteoSwissRadarCoordinator,
@@ -179,7 +181,9 @@ class SummaryDescription(SensorEntityDescription):
     value: Callable[[list[HourlyForecast], datetime], float | None]
 
 
-def _snow(description: str, window) -> SummaryDescription:
+def _snow(
+    description: str, window: Callable[[datetime], summaries.Window]
+) -> SummaryDescription:
     return SummaryDescription(
         key=description,
         translation_key=description,
@@ -190,7 +194,9 @@ def _snow(description: str, window) -> SummaryDescription:
     )
 
 
-def _sunshine(description: str, window) -> SummaryDescription:
+def _sunshine(
+    description: str, window: Callable[[datetime], summaries.Window]
+) -> SummaryDescription:
     return SummaryDescription(
         key=description,
         translation_key=description,
@@ -309,7 +315,9 @@ TODAY_SENSORS: tuple[ForecastDescription, ...] = (
 )
 
 
-def _lowest_freezing_level(forecast: LocalForecast, now: datetime):
+def _lowest_freezing_level(
+    forecast: LocalForecast, now: datetime
+) -> HourlyForecast | None:
     return summaries.lowest_hour(
         forecast["hourly"], summaries.coming_hours(now, 48), "freezing_level"
     )
@@ -424,6 +432,12 @@ async def async_setup_entry(
         async_add_entities([MeteoSwissRadarSensor(c.radar, d) for d in RADAR_SENSORS])
 
 
+# A climate sensor's value and attributes, from the data and the date.
+type ClimateValue = Callable[
+    [MeteoSwissClientResult, date], tuple[float | None, dict[str, typing.Any]]
+]
+
+
 @dataclass(frozen=True, kw_only=True)
 class ClimateDescription(SensorEntityDescription):
     """Today or this month at the weather station against its climate.
@@ -432,13 +446,13 @@ class ClimateDescription(SensorEntityDescription):
     and the UTC date (the station's days are UTC days).
     """
 
-    value: Callable[
-        [dict[str, typing.Any], date], tuple[float | None, dict[str, typing.Any]]
-    ]
+    value: ClimateValue
 
 
-def _against_normal(kind: str):
-    def value(data, today):
+def _against_normal(kind: str) -> ClimateValue:
+    def value(
+        data: MeteoSwissClientResult, today: date
+    ) -> tuple[float | None, dict[str, typing.Any]]:
         measured = data["today"].get(kind)
         if not data["climate"] or measured is None:
             return None, {}
@@ -453,8 +467,10 @@ def _against_normal(kind: str):
     return value
 
 
-def _month(key: str):
-    def value(data, today):
+def _month(key: str) -> ClimateValue:
+    def value(
+        data: MeteoSwissClientResult, today: date
+    ) -> tuple[float | None, dict[str, typing.Any]]:
         if not data["climate"]:
             return None, {}
         normals, recent = data["climate"]
@@ -476,7 +492,9 @@ def _month(key: str):
     return value
 
 
-def _record(data, today):
+def _record(
+    data: MeteoSwissClientResult, today: date
+) -> tuple[float | None, dict[str, typing.Any]]:
     if not data["climate"]:
         return None, {}
     normals = data["climate"][0]
@@ -568,14 +586,17 @@ class MeteoSwissClimateSensor(
         return self.entity_description.value(self.coordinator.data, today)
 
     @property
+    @override
     def native_value(self) -> float | None:
         return self._value()[0]
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, typing.Any]:
         return self._value()[1]
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -593,6 +614,7 @@ class _FoehnSensor(
         return foehn.difference(pressures.get("south"), pressures.get("north"))
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, typing.Any]:
         pressures = self.coordinator.data["foehn"] or {}
         settings = self.coordinator.foehn or {}
@@ -606,6 +628,7 @@ class _FoehnSensor(
         }
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -619,6 +642,7 @@ class MeteoSwissFoehnDifferenceSensor(_FoehnSensor):
     _attr_suggested_display_precision = 1
 
     @property
+    @override
     def native_value(self) -> float | None:
         return self._difference
 
@@ -631,6 +655,7 @@ class MeteoSwissFoehnOutlookSensor(_FoehnSensor):
     _attr_options = list(foehn.OUTLOOKS)
 
     @property
+    @override
     def native_value(self) -> str | None:
         settings = self.coordinator.foehn or {}
         return foehn.outlook(
@@ -654,13 +679,15 @@ class MeteoSwissStationFoehnSensor(
         super().__init__(coordinator, Platform.SENSOR, "foehn", StationType.WEATHER)
 
     @property
+    @override
     def native_value(self) -> str | None:
         measured = self.coordinator.data["condition_by_station"].get(
-            self.coordinator.weather_station
+            self.coordinator.weather_station or ""
         )
         return foehn.station_index((measured or {}).get("wcc006s0"))
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -694,6 +721,7 @@ class MeteoSwissWarningSensor(
         return now, now + (timedelta(hours=self._hours) or timedelta(seconds=1))
 
     @property
+    @override
     def native_value(self) -> str | None:
         warnings = self.coordinator.data["warnings"]
         if warnings is None:
@@ -701,6 +729,7 @@ class MeteoSwissWarningSensor(
         return level_between(warnings, *self._window())
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, typing.Any] | None:
         warnings = self.coordinator.data["warnings"]
         if warnings is None:
@@ -725,6 +754,7 @@ class MeteoSwissWarningSensor(
         }
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -748,15 +778,18 @@ class MeteoSwissPollenSensor(
         self._attr_entity_registry_enabled_default = kind in POLLEN_ON_BY_DEFAULT
 
     @property
+    @override
     def native_value(self) -> float | None:
         return self.coordinator.data["pollen"].get(self._kind)
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, str] | None:
         measured = self.coordinator.data["pollen"].get("measured")
         return {"measured": measured.isoformat()} if measured else None
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -781,6 +814,7 @@ class MeteoSwissSummarySensor(
         self.entity_description = description
 
     @property
+    @override
     def native_value(self) -> float | None:
         forecast = self.coordinator.data["forecast"]
         if not forecast:
@@ -790,6 +824,7 @@ class MeteoSwissSummarySensor(
         )
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -816,6 +851,7 @@ class MeteoSwissDownloadedSensor(
         super().__init__(coordinator, Platform.SENSOR, self._attr_translation_key)
 
     @property
+    @override
     def native_value(self) -> int:
         return self.coordinator.downloaded
 
@@ -832,6 +868,7 @@ class MeteoSwissDownloadedThisMonthSensor(MeteoSwissDownloadedSensor):
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
     @property
+    @override
     def native_value(self) -> int:
         return self.coordinator.downloaded_this_month
 
@@ -856,14 +893,16 @@ class MeteoSwissStationSensor(
 
     @property
     def _measured(self) -> dict[str, typing.Any]:
-        station = self.coordinator.weather_station
+        station = self.coordinator.weather_station or ""
         return self.coordinator.data["condition_by_station"].get(station) or {}
 
     @property
+    @override
     def native_value(self) -> float | None:
         return self._measured.get(self.entity_description.parameter)
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -885,6 +924,7 @@ class MeteoSwissMeasurementTimeSensor(MeteoSwissStationSensor):
         )
 
     @property
+    @override
     def native_value(self) -> datetime | None:  # type: ignore[override]
         return self._measured.get("measured")
 
@@ -910,6 +950,7 @@ class MeteoSwissForecastSensor(
         self.entity_description = description
 
     @property
+    @override
     def native_value(self) -> float | None:
         forecast = self.coordinator.data["forecast"]
         if not forecast:
@@ -917,6 +958,7 @@ class MeteoSwissForecastSensor(
         return self.entity_description.value(forecast, datetime.now(timezone.utc))
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, typing.Any] | None:
         forecast = self.coordinator.data["forecast"]
         attributes = self.entity_description.attributes
@@ -925,6 +967,7 @@ class MeteoSwissForecastSensor(
         return attributes(forecast, datetime.now(timezone.utc))
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -983,16 +1026,19 @@ class MeteoSwissRadarSensor(MeteoSwissEntity[MeteoSwissRadarCoordinator], Sensor
         return (self.coordinator.data or {}).get(self.entity_description.key)
 
     @property
+    @override
     def native_value(self) -> float | None:
         reading = self._reading()
         return reading[0] if reading else None
 
     @property
+    @override
     def extra_state_attributes(self) -> dict[str, typing.Any]:
         reading = self._reading()
         return {"time": reading[1].isoformat()} if reading else {}
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -1014,6 +1060,7 @@ class MeteoSwissFreezingLevelSensor(
         super().__init__(coordinator, Platform.SENSOR, "freezing_level")
 
     @property
+    @override
     def native_value(self) -> float | None:
         forecast = self.coordinator.data["forecast"]
         if not forecast:
@@ -1022,6 +1069,7 @@ class MeteoSwissFreezingLevelSensor(
         return current["freezing_level"] if current else None
 
     @property
+    @override
     def available(self) -> bool:
         return super().available and self.native_value is not None
 
@@ -1071,17 +1119,19 @@ class MeteoSwissSensor(
         self._attr_postcode = coordinator.data[CONF_POSTCODE]
 
     @property
+    @override
     def name(self) -> str:
         """Return the name of the sensor."""
         x = SENSOR_TYPES[self._type][SENSOR_TYPE_NAME]
-        name_key = (
-            CONF_REAL_TIME_NAME
+        station_name = (
+            self._data[CONF_REAL_TIME_NAME]
             if self._station_type == StationType.WEATHER
-            else CONF_REAL_TIME_PRECIPITATION_NAME
+            else self._data[CONF_REAL_TIME_PRECIPITATION_NAME]
         )
-        return f"{self._data[name_key]} {x}"
+        return f"{station_name} {x}"
 
     @property
+    @override
     def native_value(self) -> StateType | date | datetime | Decimal:
         dataId = SENSOR_TYPES[self._type][SENSOR_DATA_ID]
         data: StateType | date | datetime | Decimal = None
@@ -1102,6 +1152,7 @@ class MeteoSwissSensor(
         return data
 
     @property
+    @override
     def available(self) -> bool:
         """Return True if entity is available."""
         available = False
@@ -1122,6 +1173,7 @@ class MeteoSwissSensor(
         return available
 
     @callback
+    @override
     def _handle_coordinator_update(self) -> None:
         """Handle data update."""
         self._data = self.coordinator.data

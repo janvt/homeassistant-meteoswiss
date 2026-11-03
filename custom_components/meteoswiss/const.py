@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TypedDict
+from typing import TYPE_CHECKING, Final, TypedDict
 
 from homeassistant import config_entries
 from homeassistant.components.sensor import SensorDeviceClass
@@ -19,15 +19,15 @@ from homeassistant.const import (
 
 DOMAIN = "meteoswiss"
 CONF_PRECIPITATION_NAME = "precipitation_name"
-CONF_FORECAST_NAME = "forecast_name"
-CONF_POSTCODE = "postcode"
+CONF_FORECAST_NAME: Final = "forecast_name"
+CONF_POSTCODE: Final = "postcode"
 CONF_POINT_ID = "point_id"
 CONF_POINT_TYPE = "point_type"
-CONF_STATION = "station"
-CONF_REAL_TIME_NAME = "real_time_name"
-CONF_PRECIPITATION_STATION = "precipitation_station"
+CONF_STATION: Final = "station"
+CONF_REAL_TIME_NAME: Final = "real_time_name"
+CONF_PRECIPITATION_STATION: Final = "precipitation_station"
 CONF_POLLEN_STATION = "pollen_station"
-CONF_REAL_TIME_PRECIPITATION_NAME = "real_time_precipitation_name"
+CONF_REAL_TIME_PRECIPITATION_NAME: Final = "real_time_precipitation_name"
 CONF_FORECASTTYPE = "forecasttype"
 CONF_UPDATE_INTERVAL = "update_interval"
 CONF_HOURLY_TEMPERATURE = "hourly_temperature"
@@ -73,9 +73,12 @@ STATION_URL = (
 
 # Home Assistant 2025.8 reloads an entry after its options flow itself, and
 # warns about an update listener doing it.
-OptionsFlowBase = getattr(
-    config_entries, "OptionsFlowWithReload", config_entries.OptionsFlow
-)
+if TYPE_CHECKING:
+    OptionsFlowBase = config_entries.OptionsFlowWithReload
+else:
+    OptionsFlowBase = getattr(
+        config_entries, "OptionsFlowWithReload", config_entries.OptionsFlow
+    )
 RELOADS_ON_OPTIONS_CHANGE = hasattr(config_entries, "OptionsFlowWithReload")
 
 
@@ -191,10 +194,10 @@ CODE_TO_CONDITION_MAP = {
     142: (Condition.snowy, "very cloudly, thundery snow showers"),
 }
 
-SENSOR_TYPE_NAME = "name"
-SENSOR_TYPE_UNIT = "unit"
-SENSOR_TYPE_CLASS = "device_class"
-SENSOR_DATA_ID = "msDataId"
+SENSOR_TYPE_NAME: Final = "name"
+SENSOR_TYPE_UNIT: Final = "unit"
+SENSOR_TYPE_CLASS: Final = "device_class"
+SENSOR_DATA_ID: Final = "msDataId"
 
 """
 From https://data.geo.admin.ch/ch.meteoschweiz.messwerte-aktuell/info/VQHA80_de.txt :

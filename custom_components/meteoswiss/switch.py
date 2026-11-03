@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory, Platform
@@ -46,11 +46,14 @@ class MeteoSwissDownloadsSwitch(
         super().__init__(coordinator, Platform.SWITCH, "downloads")
 
     @property
+    @override
     def is_on(self) -> bool:
         return not self.coordinator.paused
 
+    @override
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_paused(False)
 
+    @override
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_paused(True)

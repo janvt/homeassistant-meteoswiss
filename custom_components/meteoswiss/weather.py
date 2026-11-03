@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+from typing import Any, override
 
 from homeassistant.components.weather import (
     ATTR_FORECAST_CLOUD_COVERAGE,
@@ -18,8 +19,8 @@ from homeassistant.components.weather import (
     ATTR_FORECAST_WIND_BEARING,
     Forecast,
     WeatherEntity,
-    WeatherEntityFeature,
 )
+from homeassistant.components.weather.const import WeatherEntityFeature
 from homeassistant.const import (
     Platform,
     UnitOfPressure,
@@ -61,8 +62,13 @@ async def async_setup_entry(
     async_add_entities([MeteoSwissWeather(c)], True)
 
 
+def _percent(value: float | None) -> int | None:
+    """A share in whole %, as Home Assistant's forecasts have them."""
+    return None if value is None else round(value)
+
+
 def condition_name_to_first_value(
-    condition: None | list[dict[str, float | None]], name: str
+    condition: None | list[dict[str, Any]], name: str
 ) -> float | None:
     if not condition:
         # Real-time weather station provides no data.
@@ -70,7 +76,7 @@ def condition_name_to_first_value(
         return None
     for n, row in enumerate(condition):
         try:
-            value = row[name]  # type:ignore[literal-required]
+            value = row[name]
         except Exception:
             _LOGGER.exception(
                 "Current condition %s (%s) has no value for %s", n, row, name
@@ -164,6 +170,7 @@ class MeteoSwissWeather(
         self._condition_for_all_stations = data["condition"]
 
     @callback
+    @override
     def _handle_coordinator_update(self) -> None:
         """Handle data update."""
         data = self.coordinator.data
@@ -182,10 +189,12 @@ class MeteoSwissWeather(
         )
 
     @property
+    @override
     def native_temperature(self) -> float | None:
         return self._measured_or_forecast("tre200s0", "temperature")
 
     @property
+    @override
     def native_pressure(self) -> float | None:
         # Reduced to sea level (QFF), as weather cards and other weather
         # integrations show it, rather than at the station's height.
@@ -194,30 +203,36 @@ class MeteoSwissWeather(
         )
 
     @property
+    @override
     def humidity(self) -> float | None:
         return condition_name_to_first_value(
             self._condition_for_all_stations, "ure200s0"
         )
 
     @property
+    @override
     def native_wind_speed(self) -> float | None:
         return self._measured_or_forecast("fu3010z0", "wind_speed")
 
     @property
+    @override
     def native_wind_gust_speed(self) -> float | None:
         return self._measured_or_forecast("fu3010z1", "wind_gust")
 
     @property
+    @override
     def native_dew_point(self) -> float | None:
         return condition_name_to_first_value(
             self._condition_for_all_stations, "tde200s0"
         )
 
     @property
+    @override
     def wind_bearing(self) -> float | None:
         return self._measured_or_forecast("dkl010z0", "wind_bearing")
 
     @property
+    @override
     def cloud_coverage(self) -> float | None:
         # Stations do not measure clouds.
         if not self._from_forecast:
@@ -233,6 +248,7 @@ class MeteoSwissWeather(
         return current_hour(self._forecastData["hourly"], now)
 
     @property
+    @override
     def condition(self) -> str | None:
         current = self._current_hour()
         symbolId = current["symbol"] if current else None
@@ -264,9 +280,9 @@ class MeteoSwissWeather(
                     else None
                 ),
                 ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
-                ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast[
-                    "precipitation_probability"
-                ],
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: _percent(
+                    forecast["precipitation_probability"]
+                ),
                 ATTR_FORECAST_NATIVE_WIND_GUST_SPEED: forecast["wind_gust"],
             }
             fcdata_out.append(data_out)
@@ -292,9 +308,9 @@ class MeteoSwissWeather(
                 ),
                 ATTR_FORECAST_NATIVE_TEMP: forecast["temperature"],
                 ATTR_FORECAST_NATIVE_PRECIPITATION: forecast["precipitation"],
-                ATTR_FORECAST_PRECIPITATION_PROBABILITY: forecast[
-                    "precipitation_probability"
-                ],
+                ATTR_FORECAST_PRECIPITATION_PROBABILITY: _percent(
+                    forecast["precipitation_probability"]
+                ),
                 ATTR_FORECAST_NATIVE_WIND_SPEED: forecast["wind_speed"],
                 ATTR_FORECAST_WIND_BEARING: forecast["wind_bearing"],
                 ATTR_FORECAST_NATIVE_WIND_GUST_SPEED: forecast["wind_gust"],
@@ -305,14 +321,17 @@ class MeteoSwissWeather(
         return fcdata_out
 
     @property
+    @override
     def available(self) -> bool:
         """Return True if entity is available."""
         return bool(self._daily_forecast())
 
+    @override
     async def async_forecast_daily(self) -> list[Forecast]:
         """Return the daily forecast in native units."""
         return self._daily_forecast() or []
 
+    @override
     async def async_forecast_hourly(self) -> list[Forecast]:
         """Return the hourly forecast in native units."""
         return self._hourly_forecast() or []

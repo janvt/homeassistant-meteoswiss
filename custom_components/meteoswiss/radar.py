@@ -16,6 +16,7 @@ import json
 import logging
 import math
 from dataclasses import dataclass
+from typing import Any
 
 import aiohttp
 import numpy as np
@@ -233,7 +234,7 @@ class Radar:
         self._variants: dict[tuple[str, tuple[str, ...]], str] = {}
         self._looked_up: dict[tuple[str, tuple[str, ...]], datetime.datetime] = {}
         # The last day's list read, by URL, with when.
-        self._lists: dict[str, tuple[datetime.datetime, dict]] = {}
+        self._lists: dict[str, tuple[datetime.datetime, dict[str, Any]]] = {}
         # Since when the rain images have shown no rain at or next to a place,
         # and the time of the last rain image looked at for it.
         self._dry_since: dict[tuple[float, float], datetime.datetime] = {}
@@ -293,7 +294,7 @@ class Radar:
                 return name[len(stamp) : -len(product.suffix)]
         return None
 
-    async def _assets(self, url: str, now: datetime.datetime) -> dict | None:
+    async def _assets(self, url: str, now: datetime.datetime) -> dict[str, Any] | None:
         """The files in a day's list, read once however many products look.
 
         The rain rate and the rain of the last hour share a collection, so
@@ -304,7 +305,7 @@ class Radar:
         if (body := await self._fetch(url)) is None:
             return None
         try:
-            assets = json.loads(body).get("assets", {})
+            assets: dict[str, Any] = json.loads(body).get("assets", {})
         except ValueError as exc:
             raise RadarError(f"Cannot read {url}: {exc}") from exc
         self._lists = {url: (now, assets)}
@@ -336,20 +337,20 @@ class Radar:
         ):
             return None
         self._looked_up[family] = now
-        variant = await self._variant(product, slot, now)
-        if variant is None or variant in (known, *product.variants):
+        found = await self._variant(product, slot, now)
+        if found is None or found in (known, *product.variants):
             return None
         if product.all_variants:
             _LOGGER.warning(
                 "Radar images of %s end in %s, not one of %s",
                 product.stem,
-                variant,
+                found,
                 "".join(product.variants),
             )
         else:
-            _LOGGER.debug("Radar images of %s now end in %s", product.stem, variant)
-        self._variants[family] = variant
-        return await self._fetch(_url(product, slot, variant))
+            _LOGGER.debug("Radar images of %s now end in %s", product.stem, found)
+        self._variants[family] = found
+        return await self._fetch(_url(product, slot, found))
 
     async def _refresh(self, key: str, now: datetime.datetime) -> None:
         """Download the latest image of a product, if it is newer."""

@@ -126,6 +126,11 @@ jobs:
         run: >-
           pytest --cov=custom_components.meteoswiss --cov-report=term-missing
           --cov-report=json
+      # The quality scale's strict typing, with Home Assistant core's settings
+      # (mypy.ini), against the latest release's types.
+      - name: Type-check
+        if: matrix.homeassistant == 'latest'
+        run: mypy
       # The quality scale's test coverage: more than 95% of each module, and
       # all of the config flow.  On the latest release only: older ones take
       # other paths for what changed since.

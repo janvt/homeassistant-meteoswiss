@@ -132,13 +132,19 @@ def compute(days: list[Day]) -> Climate:
     sunshine: dict[int, list[float]] = {}
     for (year, month), month_days in by_month.items():
         length = calendar.monthrange(year, month)[1]
-        for values, key in ((means, "mean"), (rains, "rain"), (sunshine, "sunshine")):
+        for values, attribute in (
+            (means, "mean"),
+            (rains, "rain"),
+            (sunshine, "sunshine"),
+        ):
             measured = [
-                getattr(d, key) for d in month_days if getattr(d, key) is not None
+                getattr(d, attribute)
+                for d in month_days
+                if getattr(d, attribute) is not None
             ]
             if len(measured) < length - MAX_MISSING_DAYS:
                 continue
-            total = statistics.mean(measured) if key == "mean" else sum(measured)
+            total = statistics.mean(measured) if attribute == "mean" else sum(measured)
             values.setdefault(month, []).append(total)
     climate.month_mean = {m: round(statistics.mean(v), 1) for m, v in means.items()}
     climate.month_rain = {m: round(statistics.mean(v), 1) for m, v in rains.items()}
@@ -176,7 +182,9 @@ def month_so_far(
         return None
     share = len(month_days) / calendar.monthrange(today.year, today.month)[1]
 
-    def against(key: str, normals: dict[int, float], scale: float = 1):
+    def against(
+        key: str, normals: dict[int, float], scale: float = 1
+    ) -> tuple[float | None, float | None, int | None]:
         measured = [getattr(d, key) for d in month_days if getattr(d, key) is not None]
         if len(measured) < len(month_days) or today.month not in normals:
             return None, None, None

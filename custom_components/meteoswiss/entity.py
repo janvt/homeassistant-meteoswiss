@@ -13,7 +13,7 @@ from custom_components.meteoswiss.ogd import StationType
 
 
 class MeteoSwissEntity[
-    _CoordinatorT: (MeteoSwissDataUpdateCoordinator, MeteoSwissRadarCoordinator)
+    _CoordinatorT: MeteoSwissDataUpdateCoordinator | MeteoSwissRadarCoordinator
 ](CoordinatorEntity[_CoordinatorT]):
     """An entity of an entry, on the device of its forecast or of a station.
 
@@ -37,7 +37,7 @@ class MeteoSwissEntity[
         if key:
             self._attr_unique_id += f"-{key}"
         # The entry's coordinator, also for the entities of its radar.
-        forecast: MeteoSwissDataUpdateCoordinator = entry.runtime_data
+        forecast = entry.runtime_data
         self._attr_device_info = (
             forecast.device_info
             if station_type is None

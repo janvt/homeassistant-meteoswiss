@@ -104,7 +104,7 @@ def _values(hours: list[HourlyForecast], key: str) -> list[float] | None:
     values = [h[key] for h in hours]  # type: ignore[literal-required]
     if not values or any(v is None for v in values):
         return None
-    return values  # type: ignore[return-value]
+    return values
 
 
 def snow(hourly: list[HourlyForecast], window: Window) -> float | None:
