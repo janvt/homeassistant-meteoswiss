@@ -1,11 +1,19 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
 version: 2
 updates:
-  - package-ecosystem: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  # The actions of the workflows, in one pull request a week.
+  - package-ecosystem: github-actions
+    directory: "/"
     schedule:
-      interval: "weekly"
+      interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # The pinned requirements of the tests. A pyfive update also has to change
+  # the pin in manifest.json, which Dependabot does not read; a test fails
+  # until it does.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
