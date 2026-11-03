@@ -52,6 +52,7 @@ from custom_components.meteoswiss.const import (
     FOEHN_DEFAULTS,
     STATION_URL,
     USER_AGENT,
+    OptionsFlowBase,
 )
 from custom_components.meteoswiss.issues import (
     async_delete_issues,
@@ -710,7 +711,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         )
 
 
-class MeteoSwissOptionsFlow(config_entries.OptionsFlow):
+class MeteoSwissOptionsFlow(OptionsFlowBase):
     """Change the options of a MeteoSwiss entry."""
 
     async def async_step_init(self, user_input=None):
