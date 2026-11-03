@@ -12,14 +12,14 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_component import DATA_INSTANCES
 
-from custom_components.meteoswiss import (
+from custom_components.meteoswiss.alerts import AlertError
+from custom_components.meteoswiss.const import DOMAIN
+from custom_components.meteoswiss.coordinator import (
     DATA_ALERTS,
     DATA_CLIENT,
     DATA_DOWNLOADS,
     DATA_RADAR,
 )
-from custom_components.meteoswiss.alerts import AlertError
-from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
 from custom_components.meteoswiss.radar import Image
 from custom_components.meteoswiss.radar_loop import MAP_URL

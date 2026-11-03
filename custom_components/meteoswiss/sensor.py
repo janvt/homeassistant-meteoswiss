@@ -15,6 +15,7 @@ from homeassistant.components.sensor import (
 from homeassistant.const import (
     PERCENTAGE,
     EntityCategory,
+    Platform,
     UnitOfInformation,
     UnitOfIrradiance,
     UnitOfLength,
@@ -28,16 +29,8 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.meteoswiss import (
-    MeteoSwissConfigEntry,
-    MeteoSwissDataUpdateCoordinator,
-    MeteoSwissRadarCoordinator,
-    climate,
-    foehn,
-    summaries,
-)
+from custom_components.meteoswiss import climate, foehn, summaries
 from custom_components.meteoswiss.alerts import (
     LEVELS,
     NO_WARNING,
@@ -61,6 +54,12 @@ from custom_components.meteoswiss.const import (
     SENSOR_TYPE_UNIT,
     SENSOR_TYPES,
 )
+from custom_components.meteoswiss.coordinator import (
+    MeteoSwissConfigEntry,
+    MeteoSwissDataUpdateCoordinator,
+    MeteoSwissRadarCoordinator,
+)
+from custom_components.meteoswiss.entity import MeteoSwissEntity
 from custom_components.meteoswiss.ogd import (
     POLLEN_PARAMETERS,
     HourlyForecast,
@@ -363,10 +362,7 @@ async def async_setup_entry(
 
     if c.weather_station:
         async_add_entities(
-            [
-                MeteoSwissSensor(entry.entry_id, typ, c, StationType.WEATHER)
-                for typ in SENSOR_TYPES
-            ],
+            [MeteoSwissSensor(typ, c, StationType.WEATHER) for typ in SENSOR_TYPES],
             True,
         )
     else:
@@ -378,17 +374,17 @@ async def async_setup_entry(
         measured = c.data["condition_by_station"].get(c.weather_station, {})
         async_add_entities(
             [
-                MeteoSwissStationSensor(entry.entry_id, c, d)
+                MeteoSwissStationSensor(c, d)
                 for d in STATION_SENSORS
                 if measured.get(d.parameter) is not None
             ]
-            + [MeteoSwissMeasurementTimeSensor(entry.entry_id, c)],
+            + [MeteoSwissMeasurementTimeSensor(c)],
             True,
         )
     if c.precipitation_station:
         async_add_entities(
             [
-                MeteoSwissSensor(entry.entry_id, typ, c, StationType.PRECIPITATION)
+                MeteoSwissSensor(typ, c, StationType.PRECIPITATION)
                 for typ in PRECIPITATION_SENSOR_TYPES
             ],
             True,
@@ -401,59 +397,47 @@ async def async_setup_entry(
     if c.freezing_level:
         async_add_entities(
             [
-                MeteoSwissFreezingLevelSensor(entry.entry_id, c),
-                MeteoSwissForecastSensor(entry.entry_id, c, LOWEST_FREEZING_LEVEL),
+                MeteoSwissFreezingLevelSensor(c),
+                MeteoSwissForecastSensor(c, LOWEST_FREEZING_LEVEL),
             ],
             True,
         )
-    async_add_entities(
-        [MeteoSwissForecastSensor(entry.entry_id, c, d) for d in TODAY_SENSORS], True
-    )
-    async_add_entities(
-        [MeteoSwissSummarySensor(entry.entry_id, c, d) for d in SUMMARIES], True
-    )
+    async_add_entities([MeteoSwissForecastSensor(c, d) for d in TODAY_SENSORS], True)
+    async_add_entities([MeteoSwissSummarySensor(c, d) for d in SUMMARIES], True)
     async_add_entities(
         [
-            MeteoSwissWarningSensor(entry.entry_id, c, key, hours)
+            MeteoSwissWarningSensor(c, key, hours)
             for key, hours in (("weather_warning", 0), ("weather_warning_next_24h", 24))
         ],
         True,
     )
     if c.foehn:
         foehn_sensors: list[SensorEntity] = [
-            MeteoSwissFoehnDifferenceSensor(entry.entry_id, c),
-            MeteoSwissFoehnOutlookSensor(entry.entry_id, c),
+            MeteoSwissFoehnDifferenceSensor(c),
+            MeteoSwissFoehnOutlookSensor(c),
         ]
         if c.weather_station:
-            foehn_sensors.append(MeteoSwissStationFoehnSensor(entry.entry_id, c))
+            foehn_sensors.append(MeteoSwissStationFoehnSensor(c))
         async_add_entities(foehn_sensors, True)
     if c.climate_normals:
         async_add_entities(
-            [MeteoSwissClimateSensor(entry.entry_id, c, d) for d in CLIMATE_SENSORS],
+            [MeteoSwissClimateSensor(c, d) for d in CLIMATE_SENSORS],
             True,
         )
     if c.pollen_station:
         async_add_entities(
-            [
-                MeteoSwissPollenSensor(entry.entry_id, c, kind)
-                for kind in POLLEN_PARAMETERS
-            ],
+            [MeteoSwissPollenSensor(c, kind) for kind in POLLEN_PARAMETERS],
             True,
         )
     async_add_entities(
         [
-            MeteoSwissDownloadedSensor(entry.entry_id, c),
-            MeteoSwissDownloadedThisMonthSensor(entry.entry_id, c),
+            MeteoSwissDownloadedSensor(c),
+            MeteoSwissDownloadedThisMonthSensor(c),
         ],
         True,
     )
     if c.radar is not None:
-        async_add_entities(
-            [
-                MeteoSwissRadarSensor(entry.entry_id, c, c.radar, d)
-                for d in RADAR_SENSORS
-            ]
-        )
+        async_add_entities([MeteoSwissRadarSensor(c.radar, d) for d in RADAR_SENSORS])
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -584,24 +568,22 @@ CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
 
 
 class MeteoSwissClimateSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """The weather station today or this month, against its normals."""
 
     entity_description: ClimateDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
-        integration_id: str,
         coordinator: MeteoSwissDataUpdateCoordinator,
         description: ClimateDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(
+            coordinator, Platform.SENSOR, description.key, StationType.WEATHER
+        )
         self.entity_description = description
-        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
-        self._attr_device_info = coordinator.station_device_info(StationType.WEATHER)
 
     def _value(self) -> tuple[float | None, dict[str, typing.Any]]:
         today = datetime.now(timezone.utc).date()
@@ -621,17 +603,11 @@ class MeteoSwissClimateSensor(
 
 
 class _FoehnSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
-    _attr_has_entity_name = True
-
-    def __init__(
-        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"sensor.{integration_id}-{self._attr_translation_key}"
-        self._attr_device_info = coordinator.device_info
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator) -> None:
+        super().__init__(coordinator, Platform.SENSOR, self._attr_translation_key)
 
     @property
     def _difference(self) -> float | None:
@@ -689,23 +665,18 @@ class MeteoSwissFoehnOutlookSensor(_FoehnSensor):
 
 
 class MeteoSwissStationFoehnSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """MeteoSwiss's Föhn index measured at the weather station, where it has one."""
 
-    _attr_has_entity_name = True
     _attr_translation_key = "foehn"
     _attr_icon = "mdi:weather-windy-variant"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = list(dict.fromkeys(foehn.STATION_INDEX.values()))
 
-    def __init__(
-        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"sensor.{integration_id}-foehn"
-        self._attr_device_info = coordinator.station_device_info(StationType.WEATHER)
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator) -> None:
+        super().__init__(coordinator, Platform.SENSOR, "foehn", StationType.WEATHER)
 
     @property
     def native_value(self) -> str | None:
@@ -720,7 +691,7 @@ class MeteoSwissStationFoehnSensor(
 
 
 class MeteoSwissWarningSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """The most severe weather warning for the place, now or in coming hours.
@@ -729,7 +700,6 @@ class MeteoSwissWarningSensor(
     them apart in templates.
     """
 
-    _attr_has_entity_name = True
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [NO_WARNING, *LEVELS]
     _attr_icon = "mdi:alert-outline"
@@ -738,17 +708,11 @@ class MeteoSwissWarningSensor(
     _unrecorded_attributes = frozenset({"warnings"})
 
     def __init__(
-        self,
-        integration_id: str,
-        coordinator: MeteoSwissDataUpdateCoordinator,
-        key: str,
-        hours: int,
+        self, coordinator: MeteoSwissDataUpdateCoordinator, key: str, hours: int
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, Platform.SENSOR, key)
         self._hours = hours
         self._attr_translation_key = key
-        self._attr_unique_id = f"sensor.{integration_id}-{key}"
-        self._attr_device_info = coordinator.device_info
 
     def _window(self) -> tuple[datetime, datetime]:
         now = datetime.now(timezone.utc)
@@ -792,29 +756,23 @@ class MeteoSwissWarningSensor(
 
 
 class MeteoSwissPollenSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """The latest hourly concentration of a type of pollen at a pollen station."""
 
-    _attr_has_entity_name = True
     _attr_icon = "mdi:flower-pollen"
     _attr_native_unit_of_measurement = "pollen/m³"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 0
 
-    def __init__(
-        self,
-        integration_id: str,
-        coordinator: MeteoSwissDataUpdateCoordinator,
-        kind: str,
-    ) -> None:
-        super().__init__(coordinator)
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator, kind: str) -> None:
+        super().__init__(
+            coordinator, Platform.SENSOR, f"pollen_{kind}", StationType.POLLEN
+        )
         self._kind = kind
         self._attr_translation_key = f"pollen_{kind}"
-        self._attr_unique_id = f"sensor.{integration_id}-pollen_{kind}"
         self._attr_entity_registry_enabled_default = kind in POLLEN_ON_BY_DEFAULT
-        self._attr_device_info = coordinator.station_device_info(StationType.POLLEN)
 
     @property
     def native_value(self) -> float | None:
@@ -831,7 +789,7 @@ class MeteoSwissPollenSensor(
 
 
 class MeteoSwissSummarySensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """A summary of the forecast, such as the snow expected tonight.
@@ -840,18 +798,14 @@ class MeteoSwissSummarySensor(
     """
 
     entity_description: SummaryDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
-        integration_id: str,
         coordinator: MeteoSwissDataUpdateCoordinator,
         description: SummaryDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, Platform.SENSOR, description.key)
         self.entity_description = description
-        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
-        self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> float | None:
@@ -868,7 +822,7 @@ class MeteoSwissSummarySensor(
 
 
 class MeteoSwissDownloadedSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """What the integration downloaded in the last 24 hours, for all entries.
@@ -877,7 +831,6 @@ class MeteoSwissDownloadedSensor(
     interval.
     """
 
-    _attr_has_entity_name = True
     _attr_translation_key = "downloaded"
     _attr_icon = "mdi:download-network"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -887,12 +840,8 @@ class MeteoSwissDownloadedSensor(
     _attr_suggested_display_precision = 1
     _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(
-        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"sensor.{integration_id}-downloaded"
-        self._attr_device_info = coordinator.device_info
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator) -> None:
+        super().__init__(coordinator, Platform.SENSOR, self._attr_translation_key)
 
     @property
     def native_value(self) -> int:
@@ -910,36 +859,28 @@ class MeteoSwissDownloadedThisMonthSensor(MeteoSwissDownloadedSensor):
     # Statistics then count each month as a new cycle.
     _attr_state_class = SensorStateClass.TOTAL_INCREASING
 
-    def __init__(
-        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
-    ) -> None:
-        super().__init__(integration_id, coordinator)
-        self._attr_unique_id = f"sensor.{integration_id}-downloaded_this_month"
-
     @property
     def native_value(self) -> int:
         return self.coordinator.downloaded_this_month
 
 
 class MeteoSwissStationSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """A measurement only some weather stations make, such as snow depth."""
 
     entity_description: StationDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
-        integration_id: str,
         coordinator: MeteoSwissDataUpdateCoordinator,
         description: StationDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(
+            coordinator, Platform.SENSOR, description.key, StationType.WEATHER
+        )
         self.entity_description = description
-        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
-        self._attr_device_info = coordinator.station_device_info(StationType.WEATHER)
 
     @property
     def _measured(self) -> dict[str, typing.Any]:
@@ -958,11 +899,8 @@ class MeteoSwissStationSensor(
 class MeteoSwissMeasurementTimeSensor(MeteoSwissStationSensor):
     """When the weather station's latest measurement was made."""
 
-    def __init__(
-        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
-    ) -> None:
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator) -> None:
         super().__init__(
-            integration_id,
             coordinator,
             StationDescription(
                 key="measurement_time",
@@ -980,7 +918,7 @@ class MeteoSwissMeasurementTimeSensor(MeteoSwissStationSensor):
 
 
 class MeteoSwissForecastSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """A value of today's forecast, or of the coming hours.
@@ -990,18 +928,14 @@ class MeteoSwissForecastSensor(
     """
 
     entity_description: ForecastDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
-        integration_id: str,
         coordinator: MeteoSwissDataUpdateCoordinator,
         description: ForecastDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, Platform.SENSOR, description.key)
         self.entity_description = description
-        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
-        self._attr_device_info = coordinator.device_info
 
     @property
     def native_value(self) -> float | None:
@@ -1061,26 +995,19 @@ RADAR_SENSORS = (
 )
 
 
-class MeteoSwissRadarSensor(
-    CoordinatorEntity[MeteoSwissRadarCoordinator], SensorEntity
-):
+class MeteoSwissRadarSensor(MeteoSwissEntity[MeteoSwissRadarCoordinator], SensorEntity):
     """Rain or hail now at the place, from the weather radar."""
 
-    _attr_has_entity_name = True
     # A new time every 5 minutes, which the history need not keep.
     _unrecorded_attributes = frozenset({"time"})
 
     def __init__(
         self,
-        integration_id: str,
-        coordinator: MeteoSwissDataUpdateCoordinator,
         radar: MeteoSwissRadarCoordinator,
         description: SensorEntityDescription,
     ) -> None:
-        super().__init__(radar)
+        super().__init__(radar, Platform.SENSOR, description.key)
         self.entity_description = description
-        self._attr_unique_id = f"sensor.{integration_id}-{description.key}"
-        self._attr_device_info = coordinator.device_info
 
     def _reading(self) -> tuple[float | None, datetime] | None:
         return (self.coordinator.data or {}).get(self.entity_description.key)
@@ -1101,7 +1028,7 @@ class MeteoSwissRadarSensor(
 
 
 class MeteoSwissFreezingLevelSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """The forecast height of the 0 °C line for the current hour."""
@@ -1111,16 +1038,11 @@ class MeteoSwissFreezingLevelSensor(
     # A forecast, so without long-term statistics.
     _attr_icon = "mdi:snowflake-thermometer"
     # Shown after the name of the device, e.g. "Bristen Freezing level".
-    _attr_has_entity_name = True
     _attr_name = "Freezing level"
     _attr_suggested_display_precision = 0
 
-    def __init__(
-        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"sensor.{integration_id}-freezing_level"
-        self._attr_device_info = coordinator.device_info
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator) -> None:
+        super().__init__(coordinator, Platform.SENSOR, "freezing_level")
 
     @property
     def native_value(self) -> float | None:
@@ -1136,26 +1058,29 @@ class MeteoSwissFreezingLevelSensor(
 
 
 class MeteoSwissSensor(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SensorEntity,
 ):
     """Represents a sensor from MeteoSwiss."""
 
+    # Named in full, with the station, by its name property.
+    _attr_has_entity_name = False
+
     def __init__(
         self,
-        integration_id: str,
         sensor_type: typing.Any,
         coordinator: MeteoSwissDataUpdateCoordinator,
         station_type: StationType,
     ):
-        super().__init__(coordinator)
-        self._station_type = station_type
-        self._attr_unique_id = "sensor.%s-%s%s" % (
-            integration_id,
-            sensor_type,
-            "-precipitation" if station_type == StationType.PRECIPITATION else "",
+        super().__init__(
+            coordinator,
+            Platform.SENSOR,
+            f"{sensor_type}-precipitation"
+            if station_type == StationType.PRECIPITATION
+            else f"{sensor_type}",
+            station_type,
         )
-        self._attr_device_info = coordinator.station_device_info(station_type)
+        self._station_type = station_type
         self._state = None
         self._type = sensor_type
         self._attr_entity_registry_enabled_default = (

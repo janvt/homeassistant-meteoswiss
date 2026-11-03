@@ -7,8 +7,8 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from custom_components.meteoswiss import MeteoSwissConfigEntry
 from custom_components.meteoswiss.const import CONF_LAT, CONF_LON, CONF_POSTCODE
+from custom_components.meteoswiss.coordinator import MeteoSwissConfigEntry
 
 # Where the user lives: the coordinates of the setup and of the radar, and the
 # postal code.  Station codes and the place's name stay, as they are needed to
