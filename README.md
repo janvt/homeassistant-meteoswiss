@@ -462,7 +462,80 @@ loop's map is a 70 km square centred on the 10 km square the place is in, not
 on the place, so that request, once per start, tells swisstopo only which
 10 km square that is.
 
+## Known limitations
+
+* **Switzerland only.**  Forecasts are for Swiss postal codes and MeteoSwiss's
+  mountains, huts and passes; the stations, pollen and radar are MeteoSwiss's.
+* **Forecasts are per place, not per address.**  A postal code's forecast is
+  for one of its forecast points (the closest to your location), at that
+  point's altitude, and MeteoSwiss updates it once an hour.
+* **Measurements lag.**  A station measures every 10 minutes and publishes a
+  few minutes later; the integration then reads it at its update interval.
+  For rain starting now, the radar is quicker.
+* **Mountains rarely have a station nearby**: without one, their current
+  conditions are the forecast for the current hour.
+* **The radar's amounts are estimates**, often off by a factor of two over a
+  few minutes and less reliable in the mountains.  It shows the present, not
+  where rain is heading.
+* **Weather warnings stop at 3000 m**, as MeteoSwiss's do, and come through
+  MeteoAlarm.
+* **Climate normals are computed** from the station's own history, not
+  MeteoSwiss's official normals, and the days are UTC days.
+* **Pollen are measured, not forecast**, at MeteoSwiss's 15 pollen stations.
+* **Data volume**: about 20 MB a day per place, as MeteoSwiss publishes its
+  forecast only as files for all of Switzerland (see
+  [Download volumes](#download-volumes)).
+* **Station history** imports neither gusts, the wind direction nor wind
+  chill.
+* **One entry per place**, and YAML configuration is only imported once.
+
 ## Troubleshooting
+
+### Common problems
+
+**Setup cannot suggest a postal code or list the places or stations.**
+MeteoSwiss's lists come from `data.geo.admin.ch`: check that Home Assistant
+can reach it, then try again.  For a postal code you can also enter it
+yourself.
+
+**The entry shows *Failed to set up, will retry*, with *Cannot update from
+MeteoSwiss*.**  MeteoSwiss could not be reached when the entry started.  It
+tries again by itself; the message and the log say why it failed.
+
+**A station's sensors are unavailable.**  Its values are older than 90
+minutes, or it stopped publishing.  After an hour without data a repair notice
+appears; choose *Reconfigure* in the entry's menu to pick another station.  A
+single sensor that stays unavailable may be one the station does not measure.
+
+**The forecast is unavailable, with a repair notice that MeteoSwiss no longer
+offers it.**  MeteoSwiss dropped the place: choose *Reconfigure* to pick
+another.
+
+**The snow and lowest temperature sensors are unavailable.**  They need
+*Hourly temperatures*, under *Configure*.
+
+**The radar sensors are unavailable.**  Their latest image is more than
+20 minutes old: MeteoSwiss's images are late, or cannot be downloaded (the log
+says which).  Hail and the rain of the last hour show 0 while it is dry.
+
+**A sensor is missing.**  Some are created turned off, such as the station
+pressure, QNH, dew point, most pollen types and the measurement time: turn them
+on from the device's page, under *entities not shown*.  Sensors that only some
+stations have, such as snow depth, are created for what the station reports
+when the entry is set up; reload the entry if it started reporting since.
+
+**Nothing updates any more.**  The forecast's *Downloads* switch may be off,
+also after a restart; turn it on.
+
+**A repair notice says it uses more data than it should.**  MeteoSwiss changed
+how it publishes its files, and the integration downloads them whole until it
+is updated: update it.
+
+**Importing station history is refused, or imports nothing.**  It needs a
+weather station, the recorder, and the *Downloads* switch on; and it only
+imports for sensors Home Assistant has recorded for at least an hour.
+
+### Reporting a problem
 
 Please report problems in the
 [issues](https://github.com/janvt/homeassistant-meteoswiss/issues), with the
