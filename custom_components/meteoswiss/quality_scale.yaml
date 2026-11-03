@@ -56,16 +56,12 @@ rules:
     comment: A cloud service, with nothing on the network to discover.
   docs-data-update: done
   docs-examples: done
-  docs-known-limitations:
-    status: todo
-    comment: For example that radar amounts are estimates and only Switzerland is covered.
+  docs-known-limitations: done
   docs-supported-devices:
     status: exempt
     comment: A cloud service, without devices of its own.
   docs-supported-functions: done
-  docs-troubleshooting:
-    status: todo
-    comment: The README explains how to report a problem, but not how to solve common ones.
+  docs-troubleshooting: done
   docs-use-cases: done
   dynamic-devices:
     status: exempt
