@@ -1,0 +1,112 @@
+# Where MeteoSwiss stands on the Integration Quality Scale:
+# https://contributors.home-assistant.io/core/quality-scale/rules/
+# Hassfest only checks this file for core integrations, so
+# tests/test_quality_scale.py checks it here.
+rules:
+  # Bronze
+  action-setup: done
+  appropriate-polling: done
+  brands: done
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage:
+    status: todo
+    comment: Tracked in #39.
+  dependency-transparency: done
+  docs-actions: done
+  docs-conditions:
+    status: exempt
+    comment: The integration provides no conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions:
+    status: todo
+    comment: Tracked in #36.
+  docs-triggers:
+    status: exempt
+    comment: The integration provides no triggers.
+  entity-event-setup:
+    status: exempt
+    comment: The entities subscribe to nothing but their coordinators.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry:
+    status: todo
+    comment: Tracked in #35.
+
+  # Silver
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: todo
+    comment: Tracked in #38.
+  parallel-updates:
+    status: todo
+    comment: Tracked in #37.
+  reauthentication-flow:
+    status: exempt
+    comment: MeteoSwiss's open data needs no credentials.
+  test-coverage:
+    status: todo
+    comment: Tracked in #39.
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: A cloud service, with nothing on the network to discover.
+  discovery-update-info:
+    status: exempt
+    comment: A cloud service, with nothing on the network to discover.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations:
+    status: todo
+    comment: For example that radar amounts are estimates and only Switzerland is covered.
+  docs-supported-devices:
+    status: exempt
+    comment: A cloud service, without devices of its own.
+  docs-supported-functions: done
+  docs-troubleshooting:
+    status: todo
+    comment: The README explains how to report a problem, but not how to solve common ones.
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: The devices, a forecast and its stations, are set by the configuration.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations:
+    status: todo
+    comment: Tracked in #40.
+  exception-translations:
+    status: todo
+    comment: Tracked in #40.
+  icon-translations:
+    status: todo
+    comment: Tracked in #41.
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices:
+    status: todo
+    comment: Tracked in #42.
+
+  # Platinum
+  async-dependency:
+    status: done
+    comment: >-
+      MeteoSwiss is read with aiohttp; pyfive only parses the radar images,
+      in the executor.
+  inject-websession: done
+  strict-typing:
+    status: todo
+    comment: Tracked in #43.
