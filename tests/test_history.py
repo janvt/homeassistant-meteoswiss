@@ -3,11 +3,12 @@
 import datetime
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.meteoswiss import history
 from custom_components.meteoswiss.const import DOMAIN
+from custom_components.meteoswiss.ogd import OGDError
 
 from .fakes import NOW, FakeOGD
 from .harness import (
@@ -142,3 +143,119 @@ def test_file_start():
     assert history._file_start(
         "https://x/ber/ogd-smn_ber_h_recent.csv", now
     ) == datetime.datetime(2026, 1, 1, tzinfo=UTC)
+
+
+async def test_nothing_before_home_assistant_recorded_anything(
+    recorder_mock, hass, entry_data
+):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    response = await import_history(hass, entry)
+
+    assert response["imported_hours"] == {}
+    assert FakeOGD.history_calls == []
+
+
+async def test_a_statistic_kept_in_another_kind_of_unit_is_left_alone(
+    recorder_mock, hass, entry_data, frozen_now, monkeypatch, caplog
+):
+    entry = await recorded_entry(hass, entry_data, frozen_now)
+    temperature = entity(hass, entry, "temperature")
+    # As if the file had it in bar, which °C cannot be converted from.
+    monkeypatch.setitem(
+        history.SENSOR_COLUMNS,
+        "temperature",
+        history.SENSOR_COLUMNS["temperature"]._replace(unit="bar"),
+    )
+
+    response = await import_history(hass, entry, since="2026-10-19")
+
+    assert temperature not in response["imported_hours"]
+    assert f"Not importing {temperature}, kept in °C rather than bar" in caplog.text
+    assert response["imported_hours"][entity(hass, entry, "humidity")] == 36
+
+
+async def test_not_for_an_entry_that_is_not_loaded(recorder_mock, hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data)
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await import_history(hass, entry)
+    assert raised.value.translation_key == "entry_not_loaded"
+
+
+async def test_not_without_a_weather_station(recorder_mock, hass, entry_data):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            k: v
+            for k, v in entry_data.items()
+            if k not in ("station", "real_time_name")
+        },
+    )
+    entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await import_history(hass, entry)
+    assert raised.value.translation_key == "no_weather_station"
+
+
+async def test_not_without_the_recorder(
+    recorder_mock, hass, entry_data, frozen_now, monkeypatch
+):
+    entry = await recorded_entry(hass, entry_data, frozen_now)
+    monkeypatch.setattr(
+        hass.config, "components", set(hass.config.components) - {"recorder"}
+    )
+
+    with pytest.raises(ServiceValidationError) as raised:
+        await import_history(hass, entry)
+    assert raised.value.translation_key == "no_recorder"
+
+
+async def test_a_history_file_that_cannot_be_downloaded(
+    recorder_mock, hass, entry_data, frozen_now, monkeypatch
+):
+    entry = await recorded_entry(hass, entry_data, frozen_now)
+
+    async def unavailable(self, url, columns, since):
+        raise OGDError("down")
+
+    monkeypatch.setattr(FakeOGD, "get_station_hours", unavailable)
+
+    with pytest.raises(HomeAssistantError) as raised:
+        await import_history(hass, entry)
+    assert raised.value.translation_key == "history_unavailable"
+    assert raised.value.translation_placeholders == {"error": "down"}
+
+
+async def test_values_are_converted_to_the_unit_a_statistic_is_kept_in(
+    recorder_mock, hass, entry_data, frozen_now, monkeypatch
+):
+    entry = await recorded_entry(hass, entry_data, frozen_now)
+    temperature = entity(hass, entry, "temperature")
+    # As if the file had it in °F, while the statistic is kept in °C.
+    monkeypatch.setitem(
+        history.SENSOR_COLUMNS,
+        "temperature",
+        history.SENSOR_COLUMNS["temperature"]._replace(unit="°F"),
+    )
+
+    await import_history(hass, entry, since="2026-10-19")
+    await async_wait_recording_done(hass)
+
+    first = (await statistics(recorder_mock, hass, temperature))[
+        datetime.datetime(2026, 10, 19, tzinfo=UTC)
+    ]
+    # 5 °F, 4 °F and 6.5 °F.
+    assert first["mean"] == pytest.approx(-15.0)
+    assert first["min"] == pytest.approx(-15.556, abs=0.001)
+    assert first["max"] == pytest.approx(-14.167, abs=0.001)

@@ -813,3 +813,124 @@ async def test_reconfigure_to_another_place_changes_the_unique_id(hass, entry_da
 
     assert result["reason"] == "reconfigure_successful"
     assert entry.unique_id == BRISTEN_PLACE
+
+
+async def test_a_mountain_gone_from_the_list_is_refused(hass, fake_ogd, monkeypatch):
+    result = await start(hass, "mountain")
+    listed = fake_ogd.get_poi_points
+
+    async def without_bristen(self, lat, lon):
+        return [p for p in await listed(self, lat, lon) if p.point_id != 864]
+
+    monkeypatch.setattr(fake_ogd, "get_poi_points", without_bristen)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 10, "hourly_temperature": True},
+    )
+
+    assert result["step_id"] == "mountain"
+    assert result["errors"] == {"point_id": "invalid_point"}
+
+
+async def test_a_mountain_needs_an_update_interval(hass):
+    result = await start(hass, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 0, "hourly_temperature": True},
+    )
+
+    assert result["step_id"] == "mountain"
+    assert result["errors"] == {"update_interval": "update_interval_too_low"}
+
+
+async def test_a_postcode_that_cannot_be_looked_up(hass, fake_ogd, monkeypatch):
+    result = await start(hass)
+
+    async def fail(self, postcode):
+        raise OGDError("down")
+
+    monkeypatch.setattr(fake_ogd, "get_postcode_points", fail)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 5},
+    )
+
+    assert result["step_id"] == "user_two"
+    assert result["errors"] == {"postcode": "cannot_query_postcode"}
+
+
+async def test_without_station_lists_none_is_offered(hass, fake_ogd, monkeypatch):
+    async def fail(self, station_type):
+        raise OGDError("down")
+
+    monkeypatch.setattr(fake_ogd, "get_stations", fail)
+    result = await start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 5},
+    )
+
+    assert defaults(result) == {
+        "station": NO_WEATHER,
+        "real_time_name": "",
+        "precipitation_station": NO_PRECIPITATION,
+        "real_time_precipitation_name": "",
+        "pollen_station": "No pollen station",
+    }
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], defaults(result)
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert "station" not in result["data"]
+
+
+async def test_stations_gone_by_the_time_they_are_chosen(hass, fake_ogd, monkeypatch):
+    result = await start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 5},
+    )
+
+    async def fail(self, station_type):
+        raise OGDError("down")
+
+    monkeypatch.setattr(fake_ogd, "get_stations", fail)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**STATIONS, "pollen_station": "Zürich (PZH)"}
+    )
+
+    assert result["step_id"] == "user_three"
+    assert result["errors"] == {
+        "station": "invalid_station_name",
+        "precipitation_station": "invalid_station_name",
+        "pollen_station": "invalid_station_name",
+    }
+
+
+async def test_a_precipitation_station_needs_a_name(hass):
+    result = await start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 5},
+    )
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**STATIONS, "real_time_precipitation_name": " "}
+    )
+
+    assert result["step_id"] == "user_three"
+    assert result["errors"] == {"real_time_precipitation_name": "empty_name"}
+
+
+async def test_options_without_the_station_list(hass, entry, fake_ogd, monkeypatch):
+    async def fail(self, station_type):
+        raise OGDError("down")
+
+    monkeypatch.setattr(fake_ogd, "get_stations", fail)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    # The configured Föhn stations stay choosable.
+    assert result["step_id"] == "init"
+    for field in ("foehn_south_station", "foehn_north_station"):
+        assert sorted(v for v, _ in options(result, field)) == ["KLO", "LUG"]

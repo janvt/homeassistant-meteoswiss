@@ -12,6 +12,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_component import DATA_INSTANCES
+from homeassistant.setup import async_setup_component
 
 from custom_components.meteoswiss import async_remove_config_entry_device
 from custom_components.meteoswiss.alerts import AlertError
@@ -1332,3 +1333,50 @@ async def test_radar_loop(hass, entry, frozen_now, aioclient_mock):
     assert hass.states.get(loop_id).state == NOW.isoformat()
     await refresh_after(hass, frozen_now, 10)
     assert hass.states.get(loop_id).state == "unavailable"
+
+
+async def test_yaml_configuration_is_imported(hass):
+    assert await async_setup_component(
+        hass, DOMAIN, {DOMAIN: {"name": "Zurich", "postcode": 8005}}
+    )
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    (entry,) = hass.config_entries.async_entries(DOMAIN)
+    assert entry.title == "Zurich"
+    assert entry.state is ConfigEntryState.LOADED
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "deprecated_yaml")
+
+
+async def test_an_entry_without_a_name_is_not_set_up(hass, entry_data):
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            k: v
+            for k, v in entry_data.items()
+            if k not in ("forecast_name", "real_time_name")
+        },
+    )
+    entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+
+    assert entry.state is ConfigEntryState.SETUP_ERROR
+    assert ir.async_get(hass).async_get_issue(
+        DOMAIN, f"{entry.entry_id}_improperly_configured_{DOMAIN}"
+    )
+
+
+async def test_options_reload_the_entry_before_home_assistant_does(
+    hass, entry, monkeypatch
+):
+    # Home Assistant before 2025.8 has no OptionsFlowWithReload.
+    monkeypatch.setattr("custom_components.meteoswiss.RELOADS_ON_OPTIONS_CHANGE", False)
+    await setup(hass, entry)
+    before = entry.runtime_data
+
+    hass.config_entries.async_update_entry(entry, options={"foehn": False})
+    await hass.async_block_till_done(wait_background_tasks=True)
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert entry.runtime_data is not before
+    assert entry.runtime_data.foehn is None

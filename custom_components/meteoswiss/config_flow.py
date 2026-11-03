@@ -507,34 +507,30 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
 
         errors: dict[str, str] = {}
         if user_input is not None:
+            # The lists are read again: a station chosen from the form's may
+            # be gone from them, or they may not be readable now.
             if user_input[CONF_STATION] not in weather_stations:
                 errors[CONF_STATION] = "invalid_station_name"
-            weather_station = weather_stations[user_input[CONF_STATION]]
+            weather_station = weather_stations.get(user_input[CONF_STATION])
             if weather_station:
                 real_time_weather_name = user_input[CONF_REAL_TIME_NAME].strip()
                 if len(real_time_weather_name) < 1:
                     errors[CONF_REAL_TIME_NAME] = "empty_name"
-                # check if the station name is 3 character
-                if not re.match(r"^\w{3}$", weather_station):
-                    errors[CONF_STATION] = "invalid_station_name"
             else:
                 weather_station = None
                 real_time_weather_name = None
 
             if user_input[CONF_PRECIPITATION_STATION] not in precipitation_stations:
                 errors[CONF_PRECIPITATION_STATION] = "invalid_station_name"
-            precipitation_station = precipitation_stations[
+            precipitation_station = precipitation_stations.get(
                 user_input[CONF_PRECIPITATION_STATION]
-            ]
+            )
             if precipitation_station:
                 real_time_precipitation_name = user_input[
                     CONF_REAL_TIME_PRECIPITATION_NAME
                 ].strip()
                 if len(real_time_precipitation_name) < 1:
                     errors[CONF_REAL_TIME_PRECIPITATION_NAME] = "empty_name"
-                # check if the station name is 3 character
-                if not re.match(r"^\w{3}$", precipitation_station):
-                    errors[CONF_PRECIPITATION_STATION] = "invalid_station_name"
             else:
                 precipitation_station = None
                 real_time_precipitation_name = None
