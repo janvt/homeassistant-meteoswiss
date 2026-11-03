@@ -1,0 +1,190 @@
+{
+    "entity": {
+        "sensor": {
+            "10minrain": {
+                "default": "mdi:water"
+            },
+            "10minsun": {
+                "default": "mdi:weather-sunny"
+            },
+            "dew_point": {
+                "default": "mdi:weather-fog"
+            },
+            "diffuse_radiation": {
+                "default": "mdi:weather-partly-cloudy"
+            },
+            "downloaded": {
+                "default": "mdi:download-network"
+            },
+            "downloaded_this_month": {
+                "default": "mdi:download-network"
+            },
+            "foehn": {
+                "default": "mdi:weather-windy-variant"
+            },
+            "foehn_outlook": {
+                "default": "mdi:weather-windy-variant"
+            },
+            "foehn_pressure_difference": {
+                "default": "mdi:arrow-up-down"
+            },
+            "freezing_level": {
+                "default": "mdi:snowflake-thermometer"
+            },
+            "high_vs_normal": {
+                "default": "mdi:thermometer-chevron-up"
+            },
+            "humidity": {
+                "default": "mdi:water-percent"
+            },
+            "longwave_radiation": {
+                "default": "mdi:sun-wireless"
+            },
+            "low_vs_normal": {
+                "default": "mdi:thermometer-chevron-down"
+            },
+            "lowest_freezing_level_48h": {
+                "default": "mdi:snowflake-thermometer"
+            },
+            "max_gust_tomorrow_midday": {
+                "default": "mdi:weather-windy"
+            },
+            "max_temperature_today": {
+                "default": "mdi:thermometer-high"
+            },
+            "min_temperature_today": {
+                "default": "mdi:thermometer-low"
+            },
+            "min_temperature_tonight": {
+                "default": "mdi:thermometer-low"
+            },
+            "month_rain_vs_normal": {
+                "default": "mdi:water-percent"
+            },
+            "month_sunshine_vs_normal": {
+                "default": "mdi:weather-sunny"
+            },
+            "month_vs_normal": {
+                "default": "mdi:calendar-month"
+            },
+            "pollen_alder": {
+                "default": "mdi:flower-pollen"
+            },
+            "pollen_ash": {
+                "default": "mdi:flower-pollen"
+            },
+            "pollen_beech": {
+                "default": "mdi:flower-pollen"
+            },
+            "pollen_birch": {
+                "default": "mdi:flower-pollen"
+            },
+            "pollen_grasses": {
+                "default": "mdi:flower-pollen"
+            },
+            "pollen_hazel": {
+                "default": "mdi:flower-pollen"
+            },
+            "pollen_oak": {
+                "default": "mdi:flower-pollen"
+            },
+            "precipitation_next_hour": {
+                "default": "mdi:weather-rainy"
+            },
+            "precipitation_probability_next_hour": {
+                "default": "mdi:umbrella-outline"
+            },
+            "precipitation_today": {
+                "default": "mdi:weather-rainy"
+            },
+            "pressure": {
+                "default": "mdi:gauge"
+            },
+            "pressure_qff": {
+                "default": "mdi:gauge"
+            },
+            "pressure_qnh": {
+                "default": "mdi:gauge"
+            },
+            "radar_hail_probability": {
+                "default": "mdi:weather-hail"
+            },
+            "radar_hail_size": {
+                "default": "mdi:weather-hail"
+            },
+            "record_high": {
+                "default": "mdi:trophy-outline"
+            },
+            "snow_depth": {
+                "default": "mdi:snowflake"
+            },
+            "snow_next_24h": {
+                "default": "mdi:snowflake"
+            },
+            "snow_next_48h": {
+                "default": "mdi:snowflake"
+            },
+            "snow_tonight": {
+                "default": "mdi:snowflake"
+            },
+            "soil_temperature_10cm": {
+                "default": "mdi:thermometer-lines"
+            },
+            "soil_temperature_20cm": {
+                "default": "mdi:thermometer-lines"
+            },
+            "soil_temperature_5cm": {
+                "default": "mdi:thermometer-lines"
+            },
+            "sun_radiant": {
+                "default": "mdi:weather-sunny"
+            },
+            "sunshine_today": {
+                "default": "mdi:weather-sunny"
+            },
+            "sunshine_tomorrow": {
+                "default": "mdi:weather-sunny"
+            },
+            "sunshine_tomorrow_midday": {
+                "default": "mdi:weather-sunny"
+            },
+            "temperature": {
+                "default": "mdi:thermometer"
+            },
+            "temperature_5cm": {
+                "default": "mdi:thermometer-low"
+            },
+            "weather_warning": {
+                "default": "mdi:alert-outline"
+            },
+            "weather_warning_next_24h": {
+                "default": "mdi:alert-outline"
+            },
+            "wind_chill": {
+                "default": "mdi:snowflake-thermometer"
+            },
+            "wind_direction": {
+                "default": "mdi:compass-rose"
+            },
+            "wind_speed": {
+                "default": "mdi:weather-windy"
+            },
+            "wind_speed_max": {
+                "default": "mdi:weather-windy"
+            }
+        },
+        "switch": {
+            "downloads": {
+                "default": "mdi:download-network",
+                "state": {
+                    "off": "mdi:download-off"
+                }
+            }
+        }
+    },
+    "services": {
+        "import_history": {
+            "service": "mdi:history"
+        }
+    }
+}

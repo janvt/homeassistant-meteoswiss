@@ -49,7 +49,6 @@ from custom_components.meteoswiss.const import (
     CONF_STATION,
     SENSOR_DATA_ID,
     SENSOR_TYPE_CLASS,
-    SENSOR_TYPE_ICON,
     SENSOR_TYPE_NAME,
     SENSOR_TYPE_UNIT,
     SENSOR_TYPES,
@@ -103,7 +102,6 @@ def _soil(depth: int) -> StationDescription:
         key=f"soil_temperature_{depth}cm",
         translation_key=f"soil_temperature_{depth}cm",
         parameter=f"tso{depth:03d}s0",
-        icon="mdi:thermometer-lines",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
@@ -117,7 +115,6 @@ STATION_SENSORS: tuple[StationDescription, ...] = (
         key="snow_depth",
         translation_key="snow_depth",
         parameter="htoauts0",
-        icon="mdi:snowflake",
         device_class=SensorDeviceClass.DISTANCE,
         native_unit_of_measurement=UnitOfLength.CENTIMETERS,
         state_class=SensorStateClass.MEASUREMENT,
@@ -128,7 +125,6 @@ STATION_SENSORS: tuple[StationDescription, ...] = (
         key="temperature_5cm",
         translation_key="temperature_5cm",
         parameter="tre005s0",
-        icon="mdi:thermometer-low",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
@@ -141,7 +137,6 @@ STATION_SENSORS: tuple[StationDescription, ...] = (
         key="wind_chill",
         translation_key="wind_chill",
         parameter="xchills0",
-        icon="mdi:snowflake-thermometer",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
@@ -152,7 +147,6 @@ STATION_SENSORS: tuple[StationDescription, ...] = (
         key="diffuse_radiation",
         translation_key="diffuse_radiation",
         parameter="ods000z0",
-        icon="mdi:weather-partly-cloudy",
         device_class=SensorDeviceClass.IRRADIANCE,
         native_unit_of_measurement=UnitOfIrradiance.WATTS_PER_SQUARE_METER,
         state_class=SensorStateClass.MEASUREMENT,
@@ -163,7 +157,6 @@ STATION_SENSORS: tuple[StationDescription, ...] = (
         key="longwave_radiation",
         translation_key="longwave_radiation",
         parameter="oli000z0",
-        icon="mdi:sun-wireless",
         device_class=SensorDeviceClass.IRRADIANCE,
         native_unit_of_measurement=UnitOfIrradiance.WATTS_PER_SQUARE_METER,
         state_class=SensorStateClass.MEASUREMENT,
@@ -190,7 +183,6 @@ def _snow(description: str, window) -> SummaryDescription:
     return SummaryDescription(
         key=description,
         translation_key=description,
-        icon="mdi:snowflake",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
         suggested_display_precision=1,
@@ -202,7 +194,6 @@ def _sunshine(description: str, window) -> SummaryDescription:
     return SummaryDescription(
         key=description,
         translation_key=description,
-        icon="mdi:weather-sunny",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.HOURS,
         suggested_display_precision=1,
@@ -223,7 +214,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
     SummaryDescription(
         key="max_gust_tomorrow_midday",
         translation_key="max_gust_tomorrow_midday",
-        icon="mdi:weather-windy",
         device_class=SensorDeviceClass.WIND_SPEED,
         native_unit_of_measurement=UnitOfSpeed.KILOMETERS_PER_HOUR,
         suggested_display_precision=0,
@@ -234,7 +224,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
     SummaryDescription(
         key="precipitation_next_hour",
         translation_key="precipitation_next_hour",
-        icon="mdi:weather-rainy",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
         suggested_display_precision=1,
@@ -246,7 +235,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
         # MeteoSwiss's chance of rain in the three hours up to its end.
         key="precipitation_probability_next_hour",
         translation_key="precipitation_probability_next_hour",
-        icon="mdi:umbrella-outline",
         native_unit_of_measurement=PERCENTAGE,
         suggested_display_precision=0,
         value=lambda hourly, now: summaries.precipitation_probability(
@@ -256,7 +244,6 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
     SummaryDescription(
         key="min_temperature_tonight",
         translation_key="min_temperature_tonight",
-        icon="mdi:thermometer-low",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_display_precision=1,
@@ -287,7 +274,6 @@ TODAY_SENSORS: tuple[ForecastDescription, ...] = (
     ForecastDescription(
         key="max_temperature_today",
         translation_key="max_temperature_today",
-        icon="mdi:thermometer-high",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_display_precision=1,
@@ -296,7 +282,6 @@ TODAY_SENSORS: tuple[ForecastDescription, ...] = (
     ForecastDescription(
         key="min_temperature_today",
         translation_key="min_temperature_today",
-        icon="mdi:thermometer-low",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_display_precision=1,
@@ -305,7 +290,6 @@ TODAY_SENSORS: tuple[ForecastDescription, ...] = (
     ForecastDescription(
         key="precipitation_today",
         translation_key="precipitation_today",
-        icon="mdi:weather-rainy",
         device_class=SensorDeviceClass.PRECIPITATION,
         native_unit_of_measurement=UnitOfPrecipitationDepth.MILLIMETERS,
         suggested_display_precision=1,
@@ -315,7 +299,6 @@ TODAY_SENSORS: tuple[ForecastDescription, ...] = (
         # The whole day, the hours already past included.
         key="sunshine_today",
         translation_key="sunshine_today",
-        icon="mdi:weather-sunny",
         device_class=SensorDeviceClass.DURATION,
         native_unit_of_measurement=UnitOfTime.HOURS,
         suggested_display_precision=1,
@@ -336,7 +319,6 @@ def _lowest_freezing_level(forecast: LocalForecast, now: datetime):
 LOWEST_FREEZING_LEVEL = ForecastDescription(
     key="lowest_freezing_level_48h",
     translation_key="lowest_freezing_level_48h",
-    icon="mdi:snowflake-thermometer",
     device_class=SensorDeviceClass.DISTANCE,
     native_unit_of_measurement=UnitOfLength.METERS,
     suggested_display_precision=0,
@@ -514,7 +496,6 @@ CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
     ClimateDescription(
         key="high_vs_normal",
         translation_key="high_vs_normal",
-        icon="mdi:thermometer-chevron-up",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -523,7 +504,6 @@ CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
     ClimateDescription(
         key="low_vs_normal",
         translation_key="low_vs_normal",
-        icon="mdi:thermometer-chevron-down",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -532,7 +512,6 @@ CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
     ClimateDescription(
         key="month_vs_normal",
         translation_key="month_vs_normal",
-        icon="mdi:calendar-month",
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
@@ -541,7 +520,6 @@ CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
     ClimateDescription(
         key="month_rain_vs_normal",
         translation_key="month_rain_vs_normal",
-        icon="mdi:water-percent",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
@@ -550,7 +528,6 @@ CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
     ClimateDescription(
         key="month_sunshine_vs_normal",
         translation_key="month_sunshine_vs_normal",
-        icon="mdi:weather-sunny",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
@@ -560,7 +537,6 @@ CLIMATE_SENSORS: tuple[ClimateDescription, ...] = (
         # No state class: a record, not a measurement.
         key="record_high",
         translation_key="record_high",
-        icon="mdi:trophy-outline",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         suggested_display_precision=1,
@@ -638,7 +614,6 @@ class MeteoSwissFoehnDifferenceSensor(_FoehnSensor):
     """Sea-level pressure south minus north of the Alps: positive for south Föhn."""
 
     _attr_translation_key = "foehn_pressure_difference"
-    _attr_icon = "mdi:arrow-up-down"
     _attr_native_unit_of_measurement = UnitOfPressure.HPA
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 1
@@ -652,7 +627,6 @@ class MeteoSwissFoehnOutlookSensor(_FoehnSensor):
     """Whether the pressure difference makes Föhn likely, and in which direction."""
 
     _attr_translation_key = "foehn_outlook"
-    _attr_icon = "mdi:weather-windy-variant"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = list(foehn.OUTLOOKS)
 
@@ -673,7 +647,6 @@ class MeteoSwissStationFoehnSensor(
     """MeteoSwiss's Föhn index measured at the weather station, where it has one."""
 
     _attr_translation_key = "foehn"
-    _attr_icon = "mdi:weather-windy-variant"
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = list(dict.fromkeys(foehn.STATION_INDEX.values()))
 
@@ -704,7 +677,6 @@ class MeteoSwissWarningSensor(
 
     _attr_device_class = SensorDeviceClass.ENUM
     _attr_options = [NO_WARNING, *LEVELS]
-    _attr_icon = "mdi:alert-outline"
     _attr_attribution = "MeteoSwiss, via MeteoAlarm"
     # The texts of the warnings would be stored with every change of state.
     _unrecorded_attributes = frozenset({"warnings"})
@@ -763,7 +735,6 @@ class MeteoSwissPollenSensor(
 ):
     """The latest hourly concentration of a type of pollen at a pollen station."""
 
-    _attr_icon = "mdi:flower-pollen"
     _attr_native_unit_of_measurement = "pollen/m³"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_suggested_display_precision = 0
@@ -834,7 +805,6 @@ class MeteoSwissDownloadedSensor(
     """
 
     _attr_translation_key = "downloaded"
-    _attr_icon = "mdi:download-network"
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_device_class = SensorDeviceClass.DATA_SIZE
     _attr_native_unit_of_measurement = UnitOfInformation.BYTES
@@ -971,7 +941,6 @@ RADAR_SENSORS = (
     SensorEntityDescription(
         key=HAIL_PROBABILITY,
         translation_key="radar_hail_probability",
-        icon="mdi:weather-hail",
         native_unit_of_measurement=PERCENTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=0,
@@ -979,7 +948,6 @@ RADAR_SENSORS = (
     SensorEntityDescription(
         key=HAIL_SIZE,
         translation_key="radar_hail_size",
-        icon="mdi:weather-hail",
         device_class=SensorDeviceClass.DISTANCE,
         native_unit_of_measurement=UnitOfLength.MILLIMETERS,
         state_class=SensorStateClass.MEASUREMENT,
@@ -1038,7 +1006,6 @@ class MeteoSwissFreezingLevelSensor(
     _attr_device_class = SensorDeviceClass.DISTANCE
     _attr_native_unit_of_measurement = UnitOfLength.METERS
     # A forecast, so without long-term statistics.
-    _attr_icon = "mdi:snowflake-thermometer"
     # Shown after the name of the device, e.g. "Bristen Freezing level".
     _attr_translation_key = "freezing_level"
     _attr_suggested_display_precision = 0
@@ -1091,7 +1058,8 @@ class MeteoSwissSensor(
         self._attr_native_unit_of_measurement = SENSOR_TYPES[self._type][
             SENSOR_TYPE_UNIT
         ]
-        self._attr_icon = SENSOR_TYPES[self._type][SENSOR_TYPE_ICON]
+        # For its icon only: it is named in full by its name property.
+        self._attr_translation_key = sensor_type
         self._attr_device_class = SENSOR_TYPES[self._type][SENSOR_TYPE_CLASS]
         self._attr_state_class = SensorStateClass.MEASUREMENT
         self._data = coordinator.data
