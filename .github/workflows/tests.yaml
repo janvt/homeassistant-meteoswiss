@@ -123,7 +123,27 @@ jobs:
         env:
           PYTHONASYNCIODEBUG: ${{ matrix.debug && '1' || '' }}
           PYTHONDEVMODE: ${{ matrix.debug && '1' || '' }}
-        run: pytest --cov=custom_components.meteoswiss --cov-report=term-missing
+        run: >-
+          pytest --cov=custom_components.meteoswiss --cov-report=term-missing
+          --cov-report=json
+      # The quality scale's test coverage: more than 95% of each module, and
+      # all of the config flow.  On the latest release only: older ones take
+      # other paths for what changed since.
+      - name: Check the coverage of each module
+        if: matrix.homeassistant == 'latest'
+        shell: python
+        run: |
+          import json
+
+          files = json.load(open("coverage.json"))["files"]
+          short = {
+              name: f"{summary['percent_covered']:.1f}%"
+              for name, data in files.items()
+              if (summary := data["summary"])["percent_covered"]
+              < (100 if name.endswith("config_flow.py") else 95.01)
+          }
+          print("\n".join(f"{name}: {share}" for name, share in short.items()))
+          assert not short, "Not covered enough for the quality scale"
       # One issue for each job: opened when it fails, commented on while it
       # keeps failing, and closed when it passes again.
       - name: Report the result

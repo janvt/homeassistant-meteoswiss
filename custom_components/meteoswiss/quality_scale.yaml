@@ -9,9 +9,7 @@ rules:
   brands: done
   common-modules: done
   config-flow: done
-  config-flow-test-coverage:
-    status: todo
-    comment: Tracked in #39.
+  config-flow-test-coverage: done
   dependency-transparency: done
   docs-actions: done
   docs-conditions:
@@ -45,9 +43,7 @@ rules:
   reauthentication-flow:
     status: exempt
     comment: MeteoSwiss's open data needs no credentials.
-  test-coverage:
-    status: todo
-    comment: Tracked in #39.
+  test-coverage: done
 
   # Gold
   devices: done
