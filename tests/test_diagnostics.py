@@ -1,21 +1,25 @@
 """The diagnostics download of an entry."""
 
+import contextlib
 from http import HTTPStatus
 
-# Imported before the time is frozen: the download imports it, and with the
-# time frozen it fails on Home Assistant 2024.12.
-import aiohasupervisor  # noqa: F401
 import pytest
 from homeassistant.setup import async_setup_component
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.ogd import MeteoSwissOGD
 
 from .fakes import FakeOGD, FakeSession
+from .harness import MockConfigEntry
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
+
+# Imported before the time is frozen: the download imports it, and with the
+# time frozen it fails on Home Assistant 2024.12. The test harness of newer
+# versions does not install it.
+with contextlib.suppress(ImportError):
+    import aiohasupervisor  # noqa: F401
 
 
 async def get_diagnostics_for_config_entry(hass, hass_client, entry):

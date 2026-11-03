@@ -4,11 +4,11 @@ import logging
 from unittest.mock import PropertyMock, patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
 
 from .fakes import NOW, FakeMeteoAlarm, FakeOGD, FakeRadar
+from .harness import MockConfigEntry
 
 
 @pytest.fixture(autouse=True)

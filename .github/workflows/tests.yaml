@@ -27,8 +27,62 @@ jobs:
         with:
           args: format --check
 
+  # The Home Assistant versions to test, which change without a push.
+  versions:
+    name: Versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+    steps:
+      - id: matrix
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REPORT: ${{ contains(fromJSON('["schedule", "workflow_dispatch"]'), github.event_name) }}
+        run: |
+          pypi=$(curl -sf https://pypi.org/pypi/homeassistant/json)
+          latest=$(jq -r .info.version <<<"$pypi")
+          # The newest beta, unless its release is out.
+          beta=$(jq -r '[.releases | to_entries[] | select(.key | test("b[0-9]+$"))
+            | select(.value | length > 0)] | max_by(.value[0].upload_time).key' <<<"$pypi")
+          if jq -e --arg release "${beta%b*}" '.releases | has($release)' <<<"$pypi" >/dev/null; then
+            beta=
+          fi
+          echo "Latest: $latest, beta: ${beta:-none}"
+
+          # The test harness pins the Home Assistant version it matches, and
+          # Home Assistant moves to new Python versions quickly. Before 2026.11
+          # the harness is pytest-homeassistant-custom-component, with "pins";
+          # from 2026.11 it is Home Assistant's pytest-home-assistant, of the
+          # "version".
+          matrix='[]'
+          add() { matrix=$(jq -c ". + [$1]" <<<"$matrix"); }
+          # The minimum in hacs.json, with the pycares of its time: its harness
+          # takes the thread of newer ones for one a test left running.
+          add '{"homeassistant": "2024.12.0", "python": "3.12",
+            "pins": "pytest-homeassistant-custom-component==0.13.190 pycares==4.5.0"}'
+          if [ "$(printf '%s\n' 2026.11.0 "$latest" | sort -V | head -1)" = 2026.11.0 ]; then
+            add "{\"homeassistant\": \"latest\", \"python\": \"3.14\", \"version\": \"$latest\"}"
+          else
+            add '{"homeassistant": "latest", "python": "3.14", "pins": ""}'
+          fi
+          # With asyncio and Python warning about more.
+          if [ -n "$beta" ]; then
+            add "{\"homeassistant\": \"beta\", \"python\": \"3.14\", \"version\": \"$beta\", \"debug\": true}"
+          elif [ "$REPORT" = true ]; then
+            # Its failures are the release's now, if they are still there.
+            number=$(gh issue list --state open --search 'in:title "Tests fail on Home Assistant beta"' \
+              --json number,title --jq 'map(select(.title == "Tests fail on Home Assistant beta"))[0].number // empty')
+            if [ -n "$number" ]; then
+              gh issue close "$number" --comment "There is no beta now; the latest release is $latest."
+            fi
+          fi
+          jq . <<<"$matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
   test:
     name: Tests (Home Assistant ${{ matrix.homeassistant }})
+    needs: versions
     runs-on: ubuntu-latest
     # A beta breaking something does not block a change, but shows what the
     # next release will.
@@ -36,23 +90,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The test harness pins the Home Assistant version it matches, and
-        # Home Assistant moves to new Python versions quickly.
-        include:
-          # The minimum in hacs.json, with the pycares of its time: its harness
-          # takes the thread of newer ones for one a test left running.
-          - homeassistant: "2024.12.0"
-            pins: "pytest-homeassistant-custom-component==0.13.190 pycares==4.5.0"
-            python: "3.12"
-          - homeassistant: latest
-            pins: ""
-            python: "3.14"
-          # The harness of the newest beta, or of the latest release when
-          # there is no beta, with asyncio and Python warning about more.
-          - homeassistant: beta
-            pins: ""
-            python: "3.14"
-            debug: true
+        include: ${{ fromJSON(needs.versions.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -61,10 +99,18 @@ jobs:
           cache: pip
           cache-dependency-path: requirements_test.txt
       - name: Install dependencies
+        if: ${{ !matrix.version }}
         run: pip install -r requirements_test.txt ${{ matrix.pins }}
-      - name: Install the beta
-        if: matrix.homeassistant == 'beta'
-        run: pip install --pre --upgrade pytest-homeassistant-custom-component
+      # Not with pytest-homeassistant-custom-component, whose fixtures it
+      # replaces. It is not on PyPI yet, but in Home Assistant's repository.
+      - name: Install dependencies with pytest-home-assistant
+        if: ${{ matrix.version }}
+        env:
+          VERSION: ${{ matrix.version }}
+        run: |
+          grep -v pytest-homeassistant-custom-component requirements_test.txt > "$RUNNER_TEMP/requirements.txt"
+          pip install -r "$RUNNER_TEMP/requirements.txt" pytest-cov "homeassistant==$VERSION" \
+            "pytest-home-assistant @ git+https://github.com/home-assistant/core@$VERSION#subdirectory=packages/pytest-home-assistant"
       - name: Show the Home Assistant version
         id: version
         run: |

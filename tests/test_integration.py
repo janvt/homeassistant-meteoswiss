@@ -11,10 +11,6 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_component import DATA_INSTANCES
-from pytest_homeassistant_custom_component.common import (
-    MockConfigEntry,
-    async_fire_time_changed,
-)
 
 from custom_components.meteoswiss import (
     DATA_ALERTS,
@@ -36,6 +32,10 @@ from .fakes import (
     FakeMeteoAlarm,
     FakeRadar,
     make_warning,
+)
+from .harness import (
+    MockConfigEntry,
+    async_fire_time_changed,
 )
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
