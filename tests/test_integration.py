@@ -15,14 +15,14 @@ from homeassistant.helpers.entity_component import DATA_INSTANCES
 
 from custom_components.meteoswiss import async_remove_config_entry_device
 from custom_components.meteoswiss.alerts import AlertError
-from custom_components.meteoswiss.const import DOMAIN
+from custom_components.meteoswiss.const import DOMAIN, place_unique_id
 from custom_components.meteoswiss.coordinator import (
     DATA_ALERTS,
     DATA_CLIENT,
     DATA_DOWNLOADS,
     DATA_RADAR,
 )
-from custom_components.meteoswiss.ogd import OGDError
+from custom_components.meteoswiss.ogd import POINT_TYPE_POSTCODE, OGDError
 from custom_components.meteoswiss.radar import Image
 from custom_components.meteoswiss.radar_loop import MAP_URL
 from custom_components.meteoswiss.usage import REQUEST_OVERHEAD
@@ -635,6 +635,29 @@ async def test_only_a_device_no_longer_used_can_be_deleted(hass, entry):
     assert await async_remove_config_entry_device(hass, entry, stale)
     for device in devices:
         assert not await async_remove_config_entry_device(hass, entry, device)
+
+
+async def test_an_entry_without_a_unique_id_gets_its_place(hass, entry):
+    assert entry.unique_id is None
+
+    await setup(hass, entry)
+
+    assert entry.unique_id == place_unique_id(800500, POINT_TYPE_POSTCODE)
+
+
+async def test_a_second_entry_for_a_place_keeps_working_without(
+    hass, entry, entry_data
+):
+    await setup(hass, entry)
+    # Set up before there could be only one entry per place.
+    second = MockConfigEntry(domain=DOMAIN, data=entry_data, title="Zurich again")
+    second.add_to_hass(hass)
+
+    await setup(hass, second)
+
+    assert second.state is ConfigEntryState.LOADED
+    assert second.unique_id is None
+    assert entry.unique_id == place_unique_id(800500, POINT_TYPE_POSTCODE)
 
 
 async def test_each_entry_has_its_own_device(hass, entry):

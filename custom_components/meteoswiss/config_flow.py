@@ -53,6 +53,7 @@ from custom_components.meteoswiss.const import (
     STATION_URL,
     USER_AGENT,
     OptionsFlowBase,
+    place_unique_id,
 )
 from custom_components.meteoswiss.issues import (
     async_delete_issues,
@@ -124,6 +125,18 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
     def _previously(self, key: str, default: Any) -> Any:
         """A setting of the entry being reconfigured, as the default."""
         return (self._previous or {}).get(key, default)
+
+    async def _async_set_place(self) -> None:
+        """Make the place the entry's unique ID, aborting if it is set up."""
+        unique_id = place_unique_id(self._point_id, self._point_type)
+        if (
+            self._previous is not None
+            and self._get_reconfigure_entry().unique_id == unique_id
+        ):
+            # Reconfiguring the stations of the same place.
+            return
+        await self.async_set_unique_id(unique_id)
+        self._abort_if_unique_id_configured()
 
     def _previous_place(self, point_type: int) -> bool:
         """Whether the entry being reconfigured is for this kind of place."""
@@ -221,6 +234,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 )
                 self._update_interval = int(user_input[CONF_UPDATE_INTERVAL])
                 self._hourly_temperature = bool(user_input[CONF_HOURLY_TEMPERATURE])
+                await self._async_set_place()
                 return await self.async_step_user_three()
 
         user_input = user_input or {}
@@ -382,6 +396,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             self._postcode,
             self._forecast_name,
         )
+        await self._async_set_place()
         return await self.async_step_user_three()
 
     async def _get_all_weather_stations_and_closest_one(
@@ -656,6 +671,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             async_delete_issues(self.hass, entry.data)
             return self.async_update_reload_and_abort(
                 entry,
+                unique_id=place_unique_id(self._point_id, self._point_type),
                 title=title,
                 data=data,
                 # The setting is now in the data.

@@ -38,6 +38,7 @@ from custom_components.meteoswiss.const import (
     FOEHN_DEFAULTS,
     RELOADS_ON_OPTIONS_CHANGE,
     USER_AGENT,
+    place_unique_id,
 )
 from custom_components.meteoswiss.coordinator import (
     DATA_ALERTS,
@@ -57,7 +58,7 @@ from custom_components.meteoswiss.issues import (
     async_delete_issues,
     freezing_level_setting,
 )
-from custom_components.meteoswiss.ogd import POINT_TYPE_POSTCODE, MeteoSwissOGD
+from custom_components.meteoswiss.ogd import POINT_TYPE_POSTCODE, MeteoSwissOGD, Point
 from custom_components.meteoswiss.pause import Pauses
 from custom_components.meteoswiss.radar import Radar
 from custom_components.meteoswiss.usage import MonthToDate
@@ -164,6 +165,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
     )
     await coordinator.async_config_entry_first_refresh()
     point = coordinator.data["point"]
+    # Before the update listener, which would reload the entry for it.
+    _async_set_unique_id(hass, entry, point)
     if entry.options.get(CONF_RADAR, DEFAULT_RADAR) and point is not None:
         if DATA_RADAR not in hass.data:
             hass.data[DATA_RADAR] = Radar(async_get_clientsession(hass), USER_AGENT)
@@ -212,6 +215,22 @@ async def async_remove_config_entry_device(
     return coordinator is None or not device.identifiers & (
         coordinator.device_identifiers
     )
+
+
+@callback
+def _async_set_unique_id(
+    hass: HomeAssistant, entry: MeteoSwissConfigEntry, point: Point | None
+) -> None:
+    """Give an entry set up without a unique ID its place as one.
+
+    Unless another entry has it: a second entry for the same place, set up
+    before there could not be one, keeps working without.
+    """
+    if entry.unique_id is not None or point is None:
+        return
+    unique_id = place_unique_id(point.point_id, point.point_type)
+    if hass.config_entries.async_entry_for_domain_unique_id(DOMAIN, unique_id) is None:
+        hass.config_entries.async_update_entry(entry, unique_id=unique_id)
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:

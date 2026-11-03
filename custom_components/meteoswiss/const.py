@@ -347,3 +347,11 @@ SENSOR_TYPES: dict[str, SensorTypedef] = {
     # by pilots so altimeters show height above sea level.
     "pressure_qnh": _pressure_qnh_sensor,
 }
+
+
+def place_unique_id(point_id: int, point_type: int) -> str:
+    """The unique ID of an entry: its forecast point, so one entry per place.
+
+    With the type, as point IDs are only unique within a type.
+    """
+    return f"{point_type}-{point_id}"
