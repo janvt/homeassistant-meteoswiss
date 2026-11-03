@@ -2,6 +2,7 @@
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
 [![Tests](https://github.com/janvt/homeassistant-meteoswiss/actions/workflows/tests.yaml/badge.svg)](https://github.com/janvt/homeassistant-meteoswiss/actions/workflows/tests.yaml)
+[![Quality scale: Platinum](https://img.shields.io/badge/quality%20scale-platinum-B4C4D4.svg)](custom_components/meteoswiss/quality_scale.yaml)
 
 Forecasts, measurements, warnings, pollen, Föhn and climate normals for
 Switzerland in Home Assistant, from MeteoSwiss's official
