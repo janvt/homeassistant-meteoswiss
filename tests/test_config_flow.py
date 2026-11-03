@@ -4,8 +4,12 @@ import pytest
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import issue_registry as ir
 
-from custom_components.meteoswiss.const import DOMAIN
-from custom_components.meteoswiss.ogd import OGDError
+from custom_components.meteoswiss.const import DOMAIN, place_unique_id
+from custom_components.meteoswiss.ogd import (
+    POINT_TYPE_POI,
+    POINT_TYPE_POSTCODE,
+    OGDError,
+)
 
 from .harness import MockConfigEntry
 
@@ -704,3 +708,108 @@ async def test_the_freezing_level_setting(hass, entry_data, data, options, shown
     result = await hass.config_entries.options.async_init(entry.entry_id)
 
     assert defaults(result)["freezing_level"] is shown
+
+
+ZURICH_PLACE = place_unique_id(800500, POINT_TYPE_POSTCODE)
+BRISTEN_PLACE = place_unique_id(864, POINT_TYPE_POI)
+
+
+async def test_a_new_entry_is_its_place(hass):
+    result = await start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"postcode": "8005", "forecast_name": "Zurich", "update_interval": 10},
+    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], STATIONS)
+
+    assert result["result"].unique_id == ZURICH_PLACE
+
+
+async def test_a_postcode_is_set_up_only_once(hass, entry_data):
+    MockConfigEntry(domain=DOMAIN, data=entry_data, unique_id=ZURICH_PLACE).add_to_hass(
+        hass
+    )
+
+    result = await start(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"postcode": "8005", "forecast_name": "Elsewhere", "update_interval": 10},
+    )
+
+    # Before choosing the stations.
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_a_mountain_is_set_up_only_once(hass):
+    MockConfigEntry(
+        domain=DOMAIN,
+        data={"point_type": 3, "point_id": 864, "forecast_name": "Bristen"},
+        unique_id=BRISTEN_PLACE,
+    ).add_to_hass(hass)
+
+    result = await start(hass, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 10, "hourly_temperature": True},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+
+async def test_reconfigure_keeps_the_place_with_other_stations(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, unique_id=ZURICH_PLACE)
+    entry.add_to_hass(hass)
+
+    result = await reconfigure(hass, entry)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], defaults(result)
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {**STATIONS, "precipitation_station": NO_PRECIPITATION}
+    )
+    await settle(hass, entry)
+
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.unique_id == ZURICH_PLACE
+    assert "precipitation_station" not in entry.data
+
+
+async def test_reconfigure_to_a_place_set_up_already(hass, entry_data):
+    MockConfigEntry(
+        domain=DOMAIN,
+        data={"point_type": 3, "point_id": 864, "forecast_name": "Bristen"},
+        unique_id=BRISTEN_PLACE,
+    ).add_to_hass(hass)
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, unique_id=ZURICH_PLACE)
+    entry.add_to_hass(hass)
+
+    result = await reconfigure(hass, entry, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 10, "hourly_temperature": True},
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.unique_id == ZURICH_PLACE
+    assert entry.data == entry_data
+
+
+async def test_reconfigure_to_another_place_changes_the_unique_id(hass, entry_data):
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, unique_id=ZURICH_PLACE)
+    entry.add_to_hass(hass)
+
+    result = await reconfigure(hass, entry, "mountain")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"point_id": "864", "update_interval": 10, "hourly_temperature": True},
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], defaults(result)
+    )
+    await settle(hass, entry)
+
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.unique_id == BRISTEN_PLACE
