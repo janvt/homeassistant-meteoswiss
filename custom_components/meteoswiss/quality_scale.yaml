@@ -83,6 +83,4 @@ rules:
       MeteoSwiss is read with aiohttp; pyfive only parses the radar images,
       in the executor.
   inject-websession: done
-  strict-typing:
-    status: todo
-    comment: Tracked in #43.
+  strict-typing: done

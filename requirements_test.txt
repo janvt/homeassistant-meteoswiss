@@ -1,5 +1,7 @@
 pytest-homeassistant-custom-component
 ruff
+# Strict typing, with mypy.ini.
+mypy
 pyfive==1.1.2
 # To write radar files for the tests.
 h5py

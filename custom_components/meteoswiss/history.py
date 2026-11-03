@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import datetime
 import logging
+from collections.abc import Callable
 from functools import partial
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple, cast
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntryState
@@ -25,6 +26,7 @@ from homeassistant.core import (
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import entity_registry as er
+from homeassistant.util.json import JsonValueType
 
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
@@ -104,8 +106,12 @@ async def async_import_history(
 ) -> dict[str, int]:
     """Import the weather station's hours from `since` on; the number of
     hours imported by statistic ID."""
-    # Not at the top: the recorder is only needed for this.
-    from homeassistant.components.recorder import get_instance
+    # Not at the top: the recorder is only needed for this.  Newer versions
+    # have get_instance in homeassistant.helpers.recorder; this works on all.
+    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
+        get_instance,
+    )
+    from homeassistant.components.recorder.models import StatisticData
     from homeassistant.components.recorder.statistics import (
         STATISTIC_UNIT_TO_UNIT_CONVERTER,
         async_import_statistics,
@@ -113,6 +119,8 @@ async def async_import_history(
         statistics_during_period,
     )
 
+    if not (station := coordinator.weather_station):
+        return {}
     entry_id = coordinator.config_entry.entry_id
     registry = er.async_get(hass)
     entity_ids = {
@@ -153,7 +161,7 @@ async def async_import_history(
                 else start
             )
     # Converts from the files' unit to the one a statistic is kept in.
-    convert = {}
+    convert: dict[str, Callable[[float], float] | None] = {}
     for key, statistic_id in list(keys.items()):
         unit = SENSOR_COLUMNS[key].unit
         kept = metadata[statistic_id][1]["unit_of_measurement"]
@@ -176,7 +184,7 @@ async def async_import_history(
     client = coordinator.client
     now = datetime.datetime.now(datetime.UTC)
     # A file at a time, so that only one is in memory.
-    for url in client.station_history_urls(coordinator.weather_station, since, now):
+    for url in client.station_history_urls(station, since, now):
         if end is not None and _file_start(url, now) >= end:
             continue
         hours = await client.get_station_hours(url, columns, since)
@@ -184,19 +192,19 @@ async def async_import_history(
             source = SENSOR_COLUMNS[key]
             before = first.get(statistic_id)
             to_unit = convert[key]
-            statistics = []
-            for start, row in hours:
-                if before is not None and start >= before:
+            statistics: list[StatisticData] = []
+            for hour, row in hours:
+                if before is not None and hour >= before:
                     continue
-                values = {}
+                values: dict[str, float] = {}
                 for name in ("mean", "min", "max"):
                     column = getattr(source, name)
                     value = row.get(column) if column else None
                     if value is not None:
                         value /= source.divisor
-                        values[name] = to_unit(value) if to_unit else value
+                        values[name] = to_unit(value) if to_unit is not None else value
                 if "mean" in values:
-                    statistics.append({"start": start, **values})
+                    statistics.append(cast(StatisticData, {"start": hour, **values}))
             if statistics:
                 async_import_statistics(hass, metadata[statistic_id][1], statistics)
                 imported[statistic_id] += len(statistics)
@@ -244,7 +252,8 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 translation_key="history_unavailable",
                 translation_placeholders={"error": str(exc)},
             ) from exc
-        return {"since": since.date().isoformat(), "imported_hours": imported}
+        hours: dict[str, JsonValueType] = dict(imported)
+        return {"since": since.date().isoformat(), "imported_hours": hours}
 
     hass.services.async_register(
         DOMAIN,

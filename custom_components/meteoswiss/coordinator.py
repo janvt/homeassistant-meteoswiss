@@ -4,7 +4,7 @@ import asyncio
 import datetime
 import logging
 import time
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict, cast, override
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
@@ -125,11 +125,12 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
     """Class to manage fetching MeteoSwiss data API."""
 
     data: MeteoSwissClientResult
+    config_entry: MeteoSwissConfigEntry
 
     def __init__(
         self,
         hass: HomeAssistant,
-        config_entry: ConfigEntry,
+        config_entry: MeteoSwissConfigEntry,
         update_interval: datetime.timedelta,
         postcode: int | None,
         point_id: int | None,
@@ -458,11 +459,12 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
     async def _async_get_today(self) -> dict[str, float | None]:
         """The weather station's highest and lowest temperature today."""
-        if not self.climate_normals:
+        # Normals are only on with a weather station.
+        if not self.climate_normals or not (station := self.weather_station):
             return {}
-        source = f"Today's temperatures at station {self.weather_station}"
+        source = f"Today's temperatures at station {station}"
         try:
-            today = await self.client.get_station_today(self.weather_station)
+            today = await self.client.get_station_today(station)
         except OGDError as exc:
             self._outages.failed(source, exc)
             return {}
@@ -485,10 +487,12 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             )
 
     async def _async_refresh_climate(self, now: datetime.datetime) -> None:
-        source = f"Climate history of station {self.weather_station}"
+        if not (station := self.weather_station):
+            return
+        source = f"Climate history of station {station}"
         try:
             async with asyncio.timeout(FORECAST_TIMEOUT):
-                self._climate = await self.client.get_climate(self.weather_station)
+                self._climate = await self.client.get_climate(station)
             self._climate_checked = now
         except (OGDError, TimeoutError) as exc:
             self._outages.failed(source, str(exc) or "timed out")
@@ -562,8 +566,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
     def _paused_data(self) -> MeteoSwissClientResult:
         """The last data, or none if paused since it was set up."""
-        if self.data is not None:
-            return self.data
+        # None until the first refresh, which its type does not tell.
+        if (data := cast(MeteoSwissClientResult | None, self.data)) is not None:
+            return data
         return self._with_entry_attributes(
             {
                 "forecast": None,
@@ -577,6 +582,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             }
         )
 
+    @override
     async def _async_update_data(self) -> MeteoSwissClientResult:
         """Update data from MeteoSwiss open data."""
         if self.paused:
@@ -632,7 +638,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 _LOGGER.exception("Unexpected error updating %s", self.forecast_name)
             raise _update_failed(repr(exc)) from exc
 
-        data = {
+        data: dict[str, Any] = {
             # Read only now: a refresh in the background may have finished.
             "forecast": self._forecast,
             "condition_by_station": condition_by_station,
@@ -694,9 +700,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 self.first_error[CONF_POSTCODE] = time.time()
 
             m = MAX_CONTINUOUS_ERROR_TIME
-            last_error: float = time.time() - cast(
-                float, self.first_error[CONF_POSTCODE]
-            )
+            last_error = time.time() - cast(float, self.first_error[CONF_POSTCODE])
             if not self.error_raised[CONF_POSTCODE] and last_error > m:
                 self._async_create_no_forecast_issue()
         else:
@@ -728,10 +732,12 @@ type RadarReadings = dict[str, tuple[float | None, datetime.datetime] | None]
 class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
     """The radar's readings at an entry's place, apart from its other data."""
 
+    config_entry: MeteoSwissConfigEntry
+
     def __init__(
         self,
         hass: HomeAssistant,
-        entry: ConfigEntry,
+        entry: MeteoSwissConfigEntry,
         radar: Radar,
         name: str,
         location: tuple[float, float],
@@ -749,6 +755,7 @@ class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
         # Set by the entry's coordinator; see its async_set_paused.
         self.paused = False
 
+    @override
     async def _async_update_data(self) -> RadarReadings:
         if self.paused:
             return self.data or {}

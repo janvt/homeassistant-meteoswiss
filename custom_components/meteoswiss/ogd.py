@@ -16,6 +16,7 @@ import logging
 import math
 import time
 import zoneinfo
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, TypedDict
@@ -234,7 +235,7 @@ class HourlyForecast(TypedDict):
     wind_speed: float | None
     wind_bearing: float | None
     wind_gust: float | None  # strongest gust of the hour, km/h
-    cloud_coverage: float | None  # %, all layers together
+    cloud_coverage: int | None  # %, all layers together
     freezing_level: float | None  # metres above sea level
     sunshine: float | None  # minutes
 
@@ -299,7 +300,9 @@ def _ordered_by_point(head: bytes) -> bool:
 # The orders of the files that are ordered by point, as sort keys of
 # (point_id, point_type_id).  Some files are sorted by number; others by type,
 # then by point ID as text (1, 10, 10101, ..., 2).
-POINT_ORDERS = (
+# The key a row sorts by, from its point ID and type.
+type PointOrder = Callable[[int, int], tuple[int, int | str]]
+POINT_ORDERS: tuple[PointOrder, ...] = (
     lambda point_id, point_type: (point_id, point_type),
     lambda point_id, point_type: (point_type, str(point_id)),
 )
@@ -514,17 +517,18 @@ def _station_time(timestamp: str | None) -> datetime.datetime | None:
         return None
 
 
-def _cloud_coverage(*layers: float | None) -> float | None:
+def _cloud_coverage(*layers: float | None) -> int | None:
     """The share of the sky covered by any layer, in %.
 
     MeteoSwiss forecasts low, medium and high cloud separately, and no total,
     so the layers are assumed to overlap at random.
     """
-    if any(layer is None for layer in layers):
+    present = [layer for layer in layers if layer is not None]
+    if len(present) < len(layers):
         return None
     clear = 1.0
-    for layer in layers:
-        clear *= 1 - min(max(layer, 0.0), 1.0)  # type: ignore[arg-type]
+    for layer in present:
+        clear *= 1 - min(max(layer, 0.0), 1.0)
     return round((1 - clear) * 100)
 
 
@@ -756,6 +760,8 @@ class MeteoSwissOGD:
             raise UnknownPointError(
                 f"No forecast point {point_id} of type {point_type}"
             )
+        if postcode is None:
+            raise UnknownPostcodeError("No postal code for the forecast point")
         points = await self.get_postcode_points(postcode)
         if point_id is not None:
             points = [p for p in points if p.point_id == point_id] or points
@@ -1239,7 +1245,12 @@ class MeteoSwissOGD:
         """Bytes downloaded from MeteoSwiss in the last USAGE_PERIOD."""
         return self.usage.downloaded
 
-    async def _learn_blocks(self, url: str, budget: _Budget):
+    async def _learn_blocks(
+        self, url: str, budget: _Budget
+    ) -> (
+        tuple[_Blocks, dict[tuple[int, int], dict[str, tuple[int, str]]], int, bool]
+        | None
+    ):
         """Read the first block of a file for the order of the points.
 
         Returns the layout, the rows read, the file's size and whether that was
@@ -1467,7 +1478,7 @@ class MeteoSwissOGD:
         return (await self._streamed_point_values(url, [prefix]))[prefix]
 
     async def _ranged_point_values(
-        self, url: str, total: int, point: Point, prefix: str, order
+        self, url: str, total: int, point: Point, prefix: str, order: PointOrder
     ) -> tuple[dict[str, str], bool]:
         """Binary search a file ordered by point, in the given order.
 

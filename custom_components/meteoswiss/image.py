@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+from typing import override
 
 from homeassistant.components.image import ImageEntity
 from homeassistant.const import Platform
@@ -52,6 +53,7 @@ class MeteoSwissRadarLoop(
         ImageEntity.__init__(self, hass)
 
     @property
+    @override
     def available(self) -> bool:
         """Only while there is a recent frame to show, as for the sensors."""
         updated = self.coordinator.loop.updated
@@ -62,8 +64,10 @@ class MeteoSwissRadarLoop(
         )
 
     @property
+    @override
     def image_last_updated(self) -> datetime.datetime | None:
         return self.coordinator.loop.updated
 
+    @override
     async def async_image(self) -> bytes | None:
         return await self.coordinator.loop.gif()

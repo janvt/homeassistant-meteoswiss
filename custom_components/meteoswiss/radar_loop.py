@@ -238,7 +238,7 @@ def _colours(rate: np.ndarray) -> PILImage.Image:
     return PILImage.fromarray(rgba, "RGBA")
 
 
-def _legend(font: ImageFont.ImageFont) -> PILImage.Image:
+def _legend(font: ImageFont.ImageFont | ImageFont.FreeTypeFont) -> PILImage.Image:
     from PIL import Image as PILImage  # noqa: PLC0415
     from PIL import ImageDraw  # noqa: PLC0415
 

@@ -110,8 +110,10 @@ def parse_feed(xml: bytes) -> list[_Entry]:
         if entry.findtext(f"{CAP}message_type") == "Cancel":
             continue
         try:
-            onset = datetime.datetime.fromisoformat(entry.findtext(f"{CAP}onset"))
-            expires = datetime.datetime.fromisoformat(entry.findtext(f"{CAP}expires"))
+            onset = datetime.datetime.fromisoformat(entry.findtext(f"{CAP}onset") or "")
+            expires = datetime.datetime.fromisoformat(
+                entry.findtext(f"{CAP}expires") or ""
+            )
             polygons = [
                 _polygon(p.text or "") for p in entry.iter(f"{CAP}polygon") if p.text
             ]

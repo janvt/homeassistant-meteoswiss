@@ -556,10 +556,12 @@ logger:
 pip install -r requirements_test.txt
 pytest
 ruff check
+mypy
 ```
 
 The tests run against in-memory copies of MeteoSwiss's files, so they need no
-network.  CI runs them, ruff, hassfest and the HACS checks on every push.
+network.  mypy checks the types with Home Assistant core's strict settings.  CI
+runs them, ruff, mypy, hassfest and the HACS checks on every push.
 
 ## Credits
 

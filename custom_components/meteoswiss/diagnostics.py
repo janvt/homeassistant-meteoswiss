@@ -50,8 +50,9 @@ async def async_get_config_entry_diagnostics(
             },
             "stations": data["condition_by_station"],
             "pollen": data["pollen"],
-            "warnings": data["warnings"]
-            and [
+            "warnings": None
+            if data["warnings"] is None
+            else [
                 {
                     "type": w["type"],
                     "level": w["level"],

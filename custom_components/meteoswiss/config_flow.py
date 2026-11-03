@@ -1,11 +1,14 @@
 """Config flow to configure the Meteo-Swiss integration."""
 
+from __future__ import annotations
+
 import logging
 import re
-from typing import Any
+from typing import Any, override
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
 from homeassistant.helpers import issue_registry as ir
@@ -92,31 +95,35 @@ def mountain_label(point: Point, lat: float, lon: float) -> str:
     return f"{point.name}{height}, {distance:.0f} km"
 
 
-class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:ignore
+class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
     CONNECTION_CLASS = config_entries.CONN_CLASS_LOCAL_POLL
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Init FlowHandler."""
         super().__init__()
-        self._lat = None
-        self._lon = None
-        self._postcode = None
-        self._point_id = None
+        # Each set by its step, before the steps after it read it.
+        self._lat = 0.0
+        self._lon = 0.0
+        self._postcode: int | None = None
+        self._point_id: int | None = None
         self._point_type = POINT_TYPE_POSTCODE
-        self._forecast_name = None
-        self._update_interval = None
+        self._forecast_name = ""
+        self._update_interval = DEFAULT_UPDATE_INTERVAL
         self._hourly_temperature = DEFAULT_HOURLY_TEMPERATURE
         # The settings of the entry being reconfigured, if any.
         self._previous: dict[str, Any] | None = None
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry):
+    @override
+    def async_get_options_flow(config_entry: ConfigEntry) -> MeteoSwissOptionsFlow:
         """Options that can be changed after setup."""
         return MeteoSwissOptionsFlow()
 
-    async def async_step_reconfigure(self, user_input=None):
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Change the place or stations of an entry, keeping its entities."""
         entry = self._get_reconfigure_entry()
         self._previous = {**entry.data, **entry.options}
@@ -128,6 +135,8 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
 
     async def _async_set_place(self) -> None:
         """Make the place the entry's unique ID, aborting if it is set up."""
+        # Chosen in the step before.
+        assert self._point_id is not None
         unique_id = place_unique_id(self._point_id, self._point_type)
         if (
             self._previous is not None
@@ -145,7 +154,10 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             and self._previous.get(CONF_POINT_TYPE, POINT_TYPE_POSTCODE) == point_type
         )
 
-    async def async_step_user(self, user_input=None):
+    @override
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle a flow initiated by the user.
 
         In this step, we collect the latitude and longitude.
@@ -158,7 +170,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             self._postcode,
         )
 
-        def data_schema(lat, lon):
+        def data_schema(lat: float, lon: float) -> vol.Schema:
             return vol.Schema(
                 {
                     vol.Required(
@@ -200,13 +212,17 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         )
         return await self.async_step_location()
 
-    async def async_step_location(self, user_input=None):
+    async def async_step_location(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Choose between the forecast of a postal code and of a mountain."""
         return self.async_show_menu(
             step_id="location", menu_options=["user_two", "mountain"]
         )
 
-    async def async_step_mountain(self, user_input=None):
+    async def async_step_mountain(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Choose a mountain, hut or pass, closest first."""
         ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
         errors = {}
@@ -225,7 +241,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
                 errors[CONF_POINT_ID] = "invalid_point"
             if user_input[CONF_UPDATE_INTERVAL] < 1:
                 errors[CONF_UPDATE_INTERVAL] = "update_interval_too_low"
-            if not errors:
+            if point is not None and not errors:
                 self._point_type = POINT_TYPE_POI
                 self._point_id = point.point_id
                 self._postcode = None
@@ -287,7 +303,9 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             step_id="mountain", data_schema=schema, errors=errors
         )
 
-    async def async_step_user_two(self, user_input=None):
+    async def async_step_user_two(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the second step of setup.
 
         In this step we collect the postal code, the name of the forecast,
@@ -301,7 +319,9 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             self._postcode,
         )
 
-        def data_schema(postcode, name, interval, hourly_temperature):
+        def data_schema(
+            postcode: str, name: str, interval: int, hourly_temperature: bool
+        ) -> vol.Schema:
             return vol.Schema(
                 {
                     vol.Required(
@@ -400,22 +420,24 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         return await self.async_step_user_three()
 
     async def _get_all_weather_stations_and_closest_one(
-        self, ogd, lat, lon
-    ) -> tuple[str, str, str]:
+        self, ogd: MeteoSwissOGD, lat: float, lon: float
+    ) -> tuple[str, str, dict[str, str]]:
         return await self._get_all_stations_and_closest_one(
             ogd, lat, lon, station_type=StationType.WEATHER
         )
 
     async def _get_all_precipitation_stations_and_closest_one(
-        self, ogd, lat, lon
-    ) -> tuple[str, str, str]:
+        self, ogd: MeteoSwissOGD, lat: float, lon: float
+    ) -> tuple[str, str, dict[str, str]]:
         return await self._get_all_stations_and_closest_one(
             ogd, lat, lon, station_type=StationType.PRECIPITATION
         )
 
     async def _get_all_stations_and_closest_one(
-        self, ogd, lat, lon, station_type
-    ) -> tuple[str, str, str]:
+        self, ogd: MeteoSwissOGD, lat: float, lon: float, station_type: StationType
+    ) -> tuple[str, str, dict[str, str]]:
+        """The closest station's abbreviation and name, and all stations by
+        their label, the first being none."""
         try:
             stations = await ogd.get_stations(station_type)
         except OGDError:
@@ -432,7 +454,9 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         all_stations.update({"%s (%s)" % (s.name, s.abbr): s.abbr for s in stations})
         return default_station, default_station_name, all_stations
 
-    async def async_step_user_three(self, user_input=None):
+    async def async_step_user_three(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the step of setup."""
         _LOGGER.debug(
             "step user three: continuing with lat %s lon %s post %s",
@@ -442,15 +466,15 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
         )
 
         def data_schema(
-            name,
-            weather_station,
-            weather_stations,
-            precipitation_name,
-            precipitation_station,
-            precipitation_stations,
-            pollen_station,
-            pollen_stations,
-        ):
+            name: str | None,
+            weather_station: str,
+            weather_stations: dict[str, str],
+            precipitation_name: str | None,
+            precipitation_station: str,
+            precipitation_stations: dict[str, str],
+            pollen_station: str,
+            pollen_stations: dict[str, str],
+        ) -> vol.Schema:
             return vol.Schema(
                 {
                     vol.Required(
@@ -478,6 +502,11 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
 
         ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
 
+        # None for a mountain, which rarely has a station nearby.
+        default_weather_station: str | None
+        default_weather_station_name: str | None
+        default_precipitation_station: str | None
+        default_precipitation_station_name: str | None
         (
             default_weather_station,
             default_weather_station_name,
@@ -665,6 +694,7 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             entry = self._get_reconfigure_entry()
             # The notices about the previous place or stations no longer apply.
             async_delete_issues(self.hass, entry.data)
+            assert self._point_id is not None  # chosen with the place
             return self.async_update_reload_and_abort(
                 entry,
                 unique_id=place_unique_id(self._point_id, self._point_type),
@@ -682,7 +712,9 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
             data=data,
         )
 
-    async def async_step_import(self, import_config: dict[str, Any]):
+    async def async_step_import(
+        self, import_config: dict[str, Any]
+    ) -> ConfigFlowResult:
         """Import a config entry."""
         ir.async_create_issue(
             self.hass,
@@ -726,7 +758,9 @@ class MeteoSwissFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):  # type:i
 class MeteoSwissOptionsFlow(OptionsFlowBase):
     """Change the options of a MeteoSwiss entry."""
 
-    async def async_step_init(self, user_input=None):
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         entry = self.config_entry
         current = {
             CONF_HOURLY_TEMPERATURE: entry.data.get(
@@ -762,7 +796,7 @@ class MeteoSwissOptionsFlow(OptionsFlowBase):
                 return self.async_create_entry(data=user_input)
             current.update(user_input)
 
-        def required(key):
+        def required(key: str) -> vol.Required:
             return vol.Required(key, default=current[key])
 
         options = [
