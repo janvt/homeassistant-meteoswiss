@@ -46,6 +46,7 @@ from custom_components.meteoswiss.const import (
     DEFAULT_UPDATE_INTERVAL,
     DOMAIN,
     FOEHN_DEFAULTS,
+    RELOADS_ON_OPTIONS_CHANGE,
     STATION_URL,
     USER_AGENT,
 )
@@ -213,7 +214,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         # Not first_refresh: the rest of the entry works without the radar.
         await coordinator.radar.async_refresh()
 
-    entry.async_on_unload(entry.add_update_listener(update_listener))
+    if not RELOADS_ON_OPTIONS_CHANGE:
+        entry.async_on_unload(entry.add_update_listener(update_listener))
 
     entry.runtime_data = coordinator
 
@@ -239,7 +241,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 async def update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Update listener."""
+    """Reload on an options change, for Home Assistant before 2025.8."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 

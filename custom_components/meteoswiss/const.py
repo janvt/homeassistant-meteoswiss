@@ -5,6 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import TypedDict
 
+from homeassistant import config_entries
 from homeassistant.components.sensor import SensorDeviceClass
 from homeassistant.const import (
     DEGREE,
@@ -69,6 +70,13 @@ STATION_URL = (
     "https://www.meteoswiss.admin.ch/services-and-publications/applications/"
     "measurement-values.html"
 )
+
+# Home Assistant 2025.8 reloads an entry after its options flow itself, and
+# warns about an update listener doing it.
+OptionsFlowBase = getattr(
+    config_entries, "OptionsFlowWithReload", config_entries.OptionsFlow
+)
+RELOADS_ON_OPTIONS_CHANGE = hasattr(config_entries, "OptionsFlowWithReload")
 
 
 class Condition(StrEnum):
