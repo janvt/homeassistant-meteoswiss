@@ -303,6 +303,9 @@
             },
             "measurement_time": {
                 "name": "Heure de la mesure"
+            },
+            "freezing_level": {
+                "name": "Isotherme zéro"
             }
         },
         "image": {
@@ -347,6 +350,12 @@
         },
         "history_unavailable": {
             "message": "L'historique de la station n'a pas pu être téléchargé : {error}"
+        },
+        "update_failed": {
+            "message": "Impossible de mettre à jour depuis MeteoSuisse : {error}"
+        },
+        "unknown_place": {
+            "message": "MeteoSuisse ne propose pas de prévision pour {name} ; reconfigurez l'entrée pour choisir un autre lieu."
         }
     }
 }

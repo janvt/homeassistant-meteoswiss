@@ -303,6 +303,9 @@
             },
             "measurement_time": {
                 "name": "Measurement time"
+            },
+            "freezing_level": {
+                "name": "Freezing level"
             }
         },
         "image": {
@@ -347,6 +350,12 @@
         },
         "history_unavailable": {
             "message": "The station history could not be downloaded: {error}"
+        },
+        "update_failed": {
+            "message": "Cannot update from MeteoSwiss: {error}"
+        },
+        "unknown_place": {
+            "message": "MeteoSwiss does not offer a forecast for {name}; reconfigure the entry to choose another place."
         }
     }
 }

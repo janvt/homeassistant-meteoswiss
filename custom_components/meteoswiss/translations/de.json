@@ -303,6 +303,9 @@
             },
             "measurement_time": {
                 "name": "Messzeitpunkt"
+            },
+            "freezing_level": {
+                "name": "Nullgradgrenze"
             }
         },
         "image": {
@@ -347,6 +350,12 @@
         },
         "history_unavailable": {
             "message": "Der Stationsverlauf konnte nicht heruntergeladen werden: {error}"
+        },
+        "update_failed": {
+            "message": "Aktualisierung von MeteoSwiss fehlgeschlagen: {error}"
+        },
+        "unknown_place": {
+            "message": "MeteoSwiss bietet für {name} keine Prognose an; konfiguriere den Eintrag neu, um einen anderen Ort zu wählen."
         }
     }
 }

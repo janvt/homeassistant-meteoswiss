@@ -81,12 +81,8 @@ rules:
   entity-category: done
   entity-device-class: done
   entity-disabled-by-default: done
-  entity-translations:
-    status: todo
-    comment: Tracked in #40.
-  exception-translations:
-    status: todo
-    comment: Tracked in #40.
+  entity-translations: done
+  exception-translations: done
   icon-translations:
     status: todo
     comment: Tracked in #41.

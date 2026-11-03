@@ -303,6 +303,9 @@
             },
             "measurement_time": {
                 "name": "Måletidspunkt"
+            },
+            "freezing_level": {
+                "name": "Nullgradsgrense"
             }
         },
         "image": {
@@ -347,6 +350,12 @@
         },
         "history_unavailable": {
             "message": "Stasjonshistorikken kunne ikke lastes ned: {error}"
+        },
+        "update_failed": {
+            "message": "Kan ikke oppdatere fra MeteoSwiss: {error}"
+        },
+        "unknown_place": {
+            "message": "MeteoSwiss tilbyr ikke varsel for {name}; rekonfigurer oppføringen for å velge et annet sted."
         }
     }
 }
