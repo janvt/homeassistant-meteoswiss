@@ -3,6 +3,9 @@ name: Tests
 on:
   push:
   pull_request:
+  # For a new Home Assistant beta when nothing is pushed.
+  schedule:
+    - cron: "0 5 * * *"
 
 jobs:
   lint:
@@ -18,18 +21,47 @@ jobs:
           args: format --check
 
   test:
-    name: Tests
+    name: Tests (Home Assistant ${{ matrix.homeassistant }})
     runs-on: ubuntu-latest
+    # A beta breaking something does not block a change, but shows what the
+    # next release will.
+    continue-on-error: ${{ matrix.homeassistant == 'beta' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # The test harness pins the Home Assistant version it matches, and
+        # Home Assistant moves to new Python versions quickly.
+        include:
+          # The minimum in hacs.json, with the pycares of its time: its harness
+          # takes the thread of newer ones for one a test left running.
+          - homeassistant: "2024.12.0"
+            pins: "pytest-homeassistant-custom-component==0.13.190 pycares==4.5.0"
+            python: "3.12"
+          - homeassistant: latest
+            pins: ""
+            python: "3.14"
+          # The harness of the newest beta, or of the latest release when
+          # there is no beta, with asyncio and Python warning about more.
+          - homeassistant: beta
+            pins: ""
+            python: "3.14"
+            debug: true
     steps:
       - uses: actions/checkout@v4
-      # Home Assistant moves to new Python versions quickly; the test harness
-      # pins the Home Assistant version it matches.
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: ${{ matrix.python }}
           cache: pip
           cache-dependency-path: requirements_test.txt
       - name: Install dependencies
-        run: pip install -r requirements_test.txt
+        run: pip install -r requirements_test.txt ${{ matrix.pins }}
+      - name: Install the beta
+        if: matrix.homeassistant == 'beta'
+        run: pip install --pre --upgrade pytest-homeassistant-custom-component
+      - name: Show the Home Assistant version
+        run: pip show homeassistant | head -2
       - name: Run tests
+        env:
+          PYTHONASYNCIODEBUG: ${{ matrix.debug && '1' || '' }}
+          PYTHONDEVMODE: ${{ matrix.debug && '1' || '' }}
         run: pytest --cov=custom_components.meteoswiss --cov-report=term-missing
