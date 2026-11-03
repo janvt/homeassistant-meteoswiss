@@ -75,6 +75,8 @@ from custom_components.meteoswiss.radar import (
 )
 
 _LOGGER = logging.getLogger(__name__)
+# Updated by the coordinators, so without limit.
+PARALLEL_UPDATES = 0
 
 # Precipitation stations only measure rain.
 PRECIPITATION_SENSOR_TYPES = ("10minrain",)

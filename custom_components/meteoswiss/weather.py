@@ -47,6 +47,8 @@ from custom_components.meteoswiss.entity import MeteoSwissEntity
 from custom_components.meteoswiss.ogd import HourlyForecast, current_hour
 
 _LOGGER = logging.getLogger(__name__)
+# Updated by the coordinator, so without limit.
+PARALLEL_UPDATES = 0
 
 
 async def async_setup_entry(
