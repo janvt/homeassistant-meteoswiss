@@ -55,6 +55,16 @@ repository if needed, so you can skip step 1:
    when *Show beta versions* is turned on for the repository.
 3. Restart Home Assistant.
 
+### Marketplace (Home Assistant 2026.11 and newer)
+
+From Home Assistant 2026.11 the Marketplace replaces HACS.  It takes over what
+HACS installed, this integration included, and it stays a custom repository
+there.  Browsing and installing from the Marketplace's catalog work without
+GitHub, but adding a custom repository and getting its updates need the
+Marketplace connected to GitHub: choose *Reconfigure* on the Marketplace's entry
+under *Settings* → *Devices & services* and enter the code it shows on GitHub.
+Without the connection, new versions of this integration are not offered.
+
 ### Manually
 
 Copy `custom_components/meteoswiss` from the
@@ -62,7 +72,7 @@ Copy `custom_components/meteoswiss` from the
 the `custom_components` folder of your Home Assistant configuration, and restart
 Home Assistant.
 
-Either way, it needs Home Assistant 2024.11 or newer.
+Either way, it needs Home Assistant 2024.12 or newer.
 
 ### Coming from Rudd-O's or websylv's version
 
