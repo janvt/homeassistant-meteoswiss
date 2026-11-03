@@ -379,6 +379,20 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         )
 
     @property
+    def device_identifiers(self) -> set[tuple[str, str]]:
+        """The identifiers of the entry's devices: its forecast and stations."""
+        devices = [self.device_info] + [
+            self.station_device_info(station_type)
+            for station_type, station in (
+                (StationType.WEATHER, self.weather_station),
+                (StationType.PRECIPITATION, self.precipitation_station),
+                (StationType.POLLEN, self.pollen_station),
+            )
+            if station
+        ]
+        return {i for device in devices for i in device["identifiers"]}
+
+    @property
     def is_mountain(self) -> bool:
         return self.point_type == POINT_TYPE_POI
 
