@@ -83,6 +83,15 @@ RADAR_HOME_DISTANCE_KM = 10
 type MeteoSwissConfigEntry = ConfigEntry[MeteoSwissDataUpdateCoordinator]
 
 
+def _update_failed(error: str) -> UpdateFailed:
+    """An update that failed, with a message the user's language can show."""
+    return UpdateFailed(
+        translation_domain=DOMAIN,
+        translation_key="update_failed",
+        translation_placeholders={"error": error},
+    )
+
+
 class MeteoSwissClientResult(TypedDict):
     forecast: LocalForecast | None
     # Latest measurements of each configured station, by station: by
@@ -609,15 +618,19 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         except UnknownPointError as exc:
             # This will not fix itself, so tell the user straight away.
             self._async_create_no_forecast_issue()
-            raise UpdateFailed(exc) from exc
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="unknown_place",
+                translation_placeholders={"name": self.forecast_name},
+            ) from exc
         except (OGDError, AlertError, TimeoutError) as exc:
             # Logged by the coordinator, once until an update works again.
-            raise UpdateFailed(str(exc) or "timed out") from exc
+            raise _update_failed(str(exc) or "timed out") from exc
         except Exception as exc:
             # Unexpected, so with its traceback, but also only once.
             if self.last_update_success:
                 _LOGGER.exception("Unexpected error updating %s", self.forecast_name)
-            raise UpdateFailed(repr(exc)) from exc
+            raise _update_failed(repr(exc)) from exc
 
         data = {
             # Read only now: a refresh in the background may have finished.

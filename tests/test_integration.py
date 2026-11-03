@@ -245,6 +245,8 @@ async def test_setup_is_retried_without_any_forecast(hass, entry, fake_ogd):
     assert not await hass.config_entries.async_setup(entry.entry_id)
 
     assert entry.state is ConfigEntryState.SETUP_RETRY
+    # Shown on the entry, in the user's language.
+    assert entry.reason == "Cannot update from MeteoSwiss: down"
 
 
 async def test_station_failure_only_affects_the_sensors(hass, entry, fake_ogd):

@@ -69,3 +69,22 @@ def test_menu_options_have_texts():
     for step_id, options in menus:
         names = set(re.findall(r'"(\w+)"', options))
         assert names == set(EN["config"]["step"][step_id]["menu_options"])
+
+
+def exception_keys_raised() -> set[str]:
+    """The translation keys of the errors raised with a translation domain."""
+    keys = set()
+    for module in COMPONENT.glob("*.py"):
+        for node in ast.walk(ast.parse(module.read_text())):
+            if isinstance(node, ast.Call):
+                kwargs = {k.arg: k.value for k in node.keywords}
+                key = kwargs.get("translation_key")
+                if "translation_domain" in kwargs and isinstance(key, ast.Constant):
+                    keys.add(key.value)
+    return keys
+
+
+def test_errors_have_texts():
+    raised = exception_keys_raised()
+    assert {"update_failed", "unknown_place"} <= raised  # the parsing found them
+    assert raised <= set(EN["exceptions"])

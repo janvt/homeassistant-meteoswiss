@@ -1038,7 +1038,7 @@ class MeteoSwissFreezingLevelSensor(
     # A forecast, so without long-term statistics.
     _attr_icon = "mdi:snowflake-thermometer"
     # Shown after the name of the device, e.g. "Bristen Freezing level".
-    _attr_name = "Freezing level"
+    _attr_translation_key = "freezing_level"
     _attr_suggested_display_precision = 0
 
     def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator) -> None:

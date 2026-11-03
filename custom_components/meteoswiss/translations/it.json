@@ -303,6 +303,9 @@
             },
             "measurement_time": {
                 "name": "Ora della misura"
+            },
+            "freezing_level": {
+                "name": "Limite dello zero termico"
             }
         },
         "image": {
@@ -347,6 +350,12 @@
         },
         "history_unavailable": {
             "message": "Non è stato possibile scaricare la cronologia della stazione: {error}"
+        },
+        "update_failed": {
+            "message": "Impossibile aggiornare da MeteoSvizzera: {error}"
+        },
+        "unknown_place": {
+            "message": "MeteoSvizzera non offre previsioni per {name}; riconfigurare la voce per scegliere un altro luogo."
         }
     }
 }

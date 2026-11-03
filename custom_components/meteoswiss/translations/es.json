@@ -303,6 +303,9 @@
             },
             "measurement_time": {
                 "name": "Hora de la medición"
+            },
+            "freezing_level": {
+                "name": "Nivel de congelación"
             }
         },
         "image": {
@@ -347,6 +350,12 @@
         },
         "history_unavailable": {
             "message": "No se pudo descargar el historial de la estación: {error}"
+        },
+        "update_failed": {
+            "message": "No se pudo actualizar desde MeteoSuiza: {error}"
+        },
+        "unknown_place": {
+            "message": "MeteoSuiza no ofrece la previsión para {name}; reconfigure la entrada para elegir otro lugar."
         }
     }
 }
