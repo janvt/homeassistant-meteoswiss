@@ -30,7 +30,9 @@ from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
 
 if TYPE_CHECKING:
-    from custom_components.meteoswiss import MeteoSwissDataUpdateCoordinator
+    from custom_components.meteoswiss.coordinator import (
+        MeteoSwissDataUpdateCoordinator,
+    )
 
 _LOGGER = logging.getLogger(__name__)
 

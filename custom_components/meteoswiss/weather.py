@@ -21,19 +21,14 @@ from homeassistant.components.weather import (
     WeatherEntityFeature,
 )
 from homeassistant.const import (
+    Platform,
     UnitOfPressure,
     UnitOfSpeed,
     UnitOfTemperature,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.meteoswiss import (
-    MeteoSwissClientResult,
-    MeteoSwissConfigEntry,
-    MeteoSwissDataUpdateCoordinator,
-)
 from custom_components.meteoswiss.const import (
     CODE_TO_CONDITION_MAP,
     CONF_POSTCODE,
@@ -43,6 +38,12 @@ from custom_components.meteoswiss.const import (
     CONF_STATION,
     STATION_URL,
 )
+from custom_components.meteoswiss.coordinator import (
+    MeteoSwissClientResult,
+    MeteoSwissConfigEntry,
+    MeteoSwissDataUpdateCoordinator,
+)
+from custom_components.meteoswiss.entity import MeteoSwissEntity
 from custom_components.meteoswiss.ogd import HourlyForecast, current_hour
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up weather entity."""
     c = entry.runtime_data
-    async_add_entities([MeteoSwissWeather(entry.entry_id, c)], True)
+    async_add_entities([MeteoSwissWeather(c)], True)
 
 
 def condition_name_to_first_value(
@@ -96,10 +97,9 @@ def condition_name_to_first_value(
 
 
 class MeteoSwissWeather(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     WeatherEntity,
 ):
-    _attr_has_entity_name = True
     _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_native_pressure_unit = UnitOfPressure.HPA
     _attr_native_wind_speed_unit = UnitOfSpeed.KILOMETERS_PER_HOUR
@@ -107,16 +107,10 @@ class MeteoSwissWeather(
         WeatherEntityFeature.FORECAST_DAILY | WeatherEntityFeature.FORECAST_HOURLY
     )
 
-    def __init__(
-        self,
-        integration_id: str,
-        coordinator: MeteoSwissDataUpdateCoordinator,
-    ):
-        super().__init__(coordinator)
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator):
+        super().__init__(coordinator, Platform.WEATHER)
         # Symbols not in CODE_TO_CONDITION_MAP, logged once each.
         self._unknown_symbols: set[int] = set()
-        self._attr_unique_id = "weather.%s" % integration_id
-        self._attr_device_info = coordinator.device_info
         self._attr_postcode = coordinator.data[CONF_POSTCODE]
         self._attr_station = coordinator.data[CONF_STATION]
         self._attr_weather_station = self._attr_station

@@ -5,15 +5,15 @@ from __future__ import annotations
 from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import EntityCategory
+from homeassistant.const import EntityCategory, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from custom_components.meteoswiss import (
+from custom_components.meteoswiss.coordinator import (
     MeteoSwissConfigEntry,
     MeteoSwissDataUpdateCoordinator,
 )
+from custom_components.meteoswiss.entity import MeteoSwissEntity
 
 
 async def async_setup_entry(
@@ -21,11 +21,11 @@ async def async_setup_entry(
     entry: MeteoSwissConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    async_add_entities([MeteoSwissDownloadsSwitch(entry.entry_id, entry.runtime_data)])
+    async_add_entities([MeteoSwissDownloadsSwitch(entry.runtime_data)])
 
 
 class MeteoSwissDownloadsSwitch(
-    CoordinatorEntity[MeteoSwissDataUpdateCoordinator],
+    MeteoSwissEntity[MeteoSwissDataUpdateCoordinator],
     SwitchEntity,
 ):
     """On while the entry downloads; off pauses it, e.g. from an automation
@@ -36,16 +36,11 @@ class MeteoSwissDownloadsSwitch(
     restarts.
     """
 
-    _attr_has_entity_name = True
     _attr_translation_key = "downloads"
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(
-        self, integration_id: str, coordinator: MeteoSwissDataUpdateCoordinator
-    ) -> None:
-        super().__init__(coordinator)
-        self._attr_unique_id = f"switch.{integration_id}-downloads"
-        self._attr_device_info = coordinator.device_info
+    def __init__(self, coordinator: MeteoSwissDataUpdateCoordinator) -> None:
+        super().__init__(coordinator, Platform.SWITCH, "downloads")
 
     @property
     def is_on(self) -> bool:
