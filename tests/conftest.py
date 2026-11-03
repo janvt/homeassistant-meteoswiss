@@ -1,18 +1,33 @@
 """Shared fixtures."""
 
+import logging
 from unittest.mock import PropertyMock, patch
 
 import pytest
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
 
 from .fakes import NOW, FakeMeteoAlarm, FakeOGD, FakeRadar
+from .harness import MockConfigEntry
 
 
 @pytest.fixture(autouse=True)
 def _enable_custom_integrations(enable_custom_integrations):
     """Let Home Assistant load custom_components/meteoswiss."""
+
+
+@pytest.fixture(autouse=True)
+def _no_deprecated_usage(caplog):
+    """Fail on what Home Assistant reports as deprecated, which it only logs
+    for custom integrations until the version that breaks it."""
+    yield
+    reports = [
+        record.getMessage()
+        for record in caplog.get_records("call")
+        if record.name == "homeassistant.helpers.frame"
+        and record.levelno >= logging.WARNING
+    ]
+    assert not reports
 
 
 @pytest.fixture

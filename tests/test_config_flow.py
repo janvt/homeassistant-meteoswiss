@@ -3,10 +3,11 @@
 import pytest
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import issue_registry as ir
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
 from custom_components.meteoswiss.ogd import OGDError
+
+from .harness import MockConfigEntry
 
 pytestmark = pytest.mark.usefixtures("fake_ogd")
 

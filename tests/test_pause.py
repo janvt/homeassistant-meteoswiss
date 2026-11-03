@@ -2,11 +2,11 @@
 
 import pytest
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.meteoswiss.const import DOMAIN
 
 from .fakes import FakeMeteoAlarm, FakeOGD, FakeRadar
+from .harness import MockConfigEntry
 from .test_integration import entity_id, refresh_after, setup, weather_id
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")

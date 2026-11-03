@@ -5,16 +5,16 @@ import datetime
 import pytest
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.components.recorder.common import (
-    async_wait_recording_done,
-    do_adhoc_statistics,
-)
 
 from custom_components.meteoswiss import history
 from custom_components.meteoswiss.const import DOMAIN
 
 from .fakes import NOW, FakeOGD
+from .harness import (
+    MockConfigEntry,
+    async_wait_recording_done,
+    do_adhoc_statistics,
+)
 
 pytestmark = pytest.mark.usefixtures("fake_ogd", "frozen_now")
 
