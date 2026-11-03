@@ -46,10 +46,6 @@ class MeteoSwissDownloadsSwitch(
     def is_on(self) -> bool:
         return not self.coordinator.paused
 
-    @property
-    def icon(self) -> str:
-        return "mdi:download-network" if self.is_on else "mdi:download-off"
-
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.async_set_paused(False)
 

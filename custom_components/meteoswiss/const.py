@@ -193,7 +193,6 @@ CODE_TO_CONDITION_MAP = {
 
 SENSOR_TYPE_NAME = "name"
 SENSOR_TYPE_UNIT = "unit"
-SENSOR_TYPE_ICON = "icon"
 SENSOR_TYPE_CLASS = "device_class"
 SENSOR_DATA_ID = "msDataId"
 
@@ -237,7 +236,6 @@ tdetows0     °C             Taupunkt Turm
 class SensorTypedef(TypedDict):
     name: str
     unit: StrEnum | str
-    icon: str
     device_class: SensorDeviceClass | None
     msDataId: str
 
@@ -245,84 +243,72 @@ class SensorTypedef(TypedDict):
 _temp_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "temperature",
     SENSOR_TYPE_UNIT: UnitOfTemperature.CELSIUS,
-    SENSOR_TYPE_ICON: "mdi:thermometer",
     SENSOR_TYPE_CLASS: SensorDeviceClass.TEMPERATURE,
     SENSOR_DATA_ID: "tre200s0",
 }
 _rain_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "10 minute rain",
     SENSOR_TYPE_UNIT: "mm",
-    SENSOR_TYPE_ICON: "mdi:water",
     SENSOR_TYPE_CLASS: SensorDeviceClass.PRECIPITATION,
     SENSOR_DATA_ID: "rre150z0",
 }
 _sun_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "10 minute sun",
     SENSOR_TYPE_UNIT: UnitOfTime.MINUTES,
-    SENSOR_TYPE_ICON: "mdi:weather-sunny",
     SENSOR_TYPE_CLASS: None,
     SENSOR_DATA_ID: "sre000z0",
 }
 _radiance_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "sun irradiation",
     SENSOR_TYPE_UNIT: UnitOfIrradiance.WATTS_PER_SQUARE_METER,
-    SENSOR_TYPE_ICON: "mdi:weather-sunny",
     SENSOR_TYPE_CLASS: SensorDeviceClass.IRRADIANCE,
     SENSOR_DATA_ID: "gre000z0",
 }
 _humidity_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "humidity",
     SENSOR_TYPE_UNIT: PERCENTAGE,
-    SENSOR_TYPE_ICON: "mdi:water-percent",
     SENSOR_TYPE_CLASS: SensorDeviceClass.HUMIDITY,
     SENSOR_DATA_ID: "ure200s0",
 }
 _dew_point_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "dew point",
     SENSOR_TYPE_UNIT: UnitOfTemperature.CELSIUS,
-    SENSOR_TYPE_ICON: "mdi:weather-fog",
     SENSOR_TYPE_CLASS: None,
     SENSOR_DATA_ID: "tde200s0",
 }
 _wind_direction_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "wind direction",
     SENSOR_TYPE_UNIT: DEGREE,
-    SENSOR_TYPE_ICON: "mdi:compass-rose",
     SENSOR_TYPE_CLASS: None,
     SENSOR_DATA_ID: "dkl010z0",
 }
 _wind_speed_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "wind speed",
     SENSOR_TYPE_UNIT: UnitOfSpeed.KILOMETERS_PER_HOUR,
-    SENSOR_TYPE_ICON: "mdi:weather-windy",
     SENSOR_TYPE_CLASS: None,
     SENSOR_DATA_ID: "fu3010z0",
 }
 _wind_speed_max_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "wind speed max",
     SENSOR_TYPE_UNIT: UnitOfSpeed.KILOMETERS_PER_HOUR,
-    SENSOR_TYPE_ICON: "mdi:weather-windy",
     SENSOR_TYPE_CLASS: None,
     SENSOR_DATA_ID: "fu3010z1",
 }
 _pressure_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "pressure",
     SENSOR_TYPE_UNIT: UnitOfPressure.HPA,
-    SENSOR_TYPE_ICON: "mdi:gauge",
     SENSOR_TYPE_CLASS: SensorDeviceClass.ATMOSPHERIC_PRESSURE,
     SENSOR_DATA_ID: "prestas0",
 }
 _pressure_qff_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "pressure QFF",
     SENSOR_TYPE_UNIT: UnitOfPressure.HPA,
-    SENSOR_TYPE_ICON: "mdi:gauge",
     SENSOR_TYPE_CLASS: SensorDeviceClass.ATMOSPHERIC_PRESSURE,
     SENSOR_DATA_ID: "pp0qffs0",
 }
 _pressure_qnh_sensor: SensorTypedef = {
     SENSOR_TYPE_NAME: "pressure QNH",
     SENSOR_TYPE_UNIT: UnitOfPressure.HPA,
-    SENSOR_TYPE_ICON: "mdi:gauge",
     SENSOR_TYPE_CLASS: SensorDeviceClass.ATMOSPHERIC_PRESSURE,
     SENSOR_DATA_ID: "pp0qnhs0",
 }

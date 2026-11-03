@@ -88,3 +88,35 @@ def test_errors_have_texts():
     raised = exception_keys_raised()
     assert {"update_failed", "unknown_place"} <= raised  # the parsing found them
     assert raised <= set(EN["exceptions"])
+
+
+ICONS = json.loads((COMPONENT / "icons.json").read_text())
+
+
+def test_icons_come_from_icons_json():
+    """None set in code, where they could not depend on the state."""
+    for module in COMPONENT.glob("*.py"):
+        for node in ast.walk(ast.parse(module.read_text())):
+            assert not (isinstance(node, ast.keyword) and node.arg == "icon"), module
+            assert not (isinstance(node, ast.Name) and node.id == "_attr_icon"), module
+            assert not (isinstance(node, ast.FunctionDef) and node.name == "icon"), (
+                module
+            )
+
+
+def test_icons_are_material_design_icons():
+    def icons(value):
+        if isinstance(value, dict):
+            for v in value.values():
+                yield from icons(v)
+        else:
+            yield value
+
+    assert all(icon.startswith("mdi:") for icon in icons(ICONS))
+
+
+def test_every_action_has_an_icon():
+    import yaml
+
+    actions = yaml.safe_load((COMPONENT / "services.yaml").read_text())
+    assert set(ICONS["services"]) == set(actions)
