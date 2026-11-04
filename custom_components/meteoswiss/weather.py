@@ -75,13 +75,9 @@ def condition_name_to_first_value(
         _LOGGER.debug("Current condition is empty for all stations: %s", condition)
         return None
     for n, row in enumerate(condition):
-        try:
-            value = row[name]
-        except Exception:
-            _LOGGER.exception(
-                "Current condition %s (%s) has no value for %s", n, row, name
-            )
-            continue
+        # A precipitation station's row only holds its rainfall, so a missing
+        # key is as ordinary as an empty value.
+        value = row.get(name)
         if value is None or value == "-":
             _LOGGER.debug(
                 "Value %s of current condition %s (%s) is %s, so not available",

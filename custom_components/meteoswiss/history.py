@@ -108,9 +108,7 @@ async def async_import_history(
     hours imported by statistic ID."""
     # Not at the top: the recorder is only needed for this.  Newer versions
     # have get_instance in homeassistant.helpers.recorder; this works on all.
-    from homeassistant.components.recorder import (  # type: ignore[attr-defined]
-        get_instance,
-    )
+    from homeassistant.components.recorder import get_instance
     from homeassistant.components.recorder.models import StatisticData
     from homeassistant.components.recorder.statistics import (
         STATISTIC_UNIT_TO_UNIT_CONVERTER,
