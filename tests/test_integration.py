@@ -27,6 +27,7 @@ from custom_components.meteoswiss.ogd import POINT_TYPE_POSTCODE, OGDError
 from custom_components.meteoswiss.radar import Image
 from custom_components.meteoswiss.radar_loop import MAP_URL
 from custom_components.meteoswiss.usage import REQUEST_OVERHEAD
+from custom_components.meteoswiss.weather import condition_name_to_first_value
 
 from .fakes import (
     FOEHN_PRESSURES,
@@ -267,6 +268,32 @@ def logged(caplog, level, text):
         for r in caplog.records
         if r.levelno == level and r.getMessage().startswith(text)
     ]
+
+
+async def test_a_value_no_station_has_is_empty_and_not_an_error(
+    hass, entry, frozen_now, caplog, monkeypatch
+):
+    # Andermatt measures no sea-level pressure, and the precipitation station
+    # next in line only has its rainfall.
+    monkeypatch.delitem(STATION_MEASUREMENTS, "pp0qffs0")
+
+    await setup(hass, entry)
+
+    state = hass.states.get(weather_id(hass, entry))
+    assert "pressure" not in state.attributes
+    assert state.attributes["temperature"] == 13.4
+    assert not [
+        r
+        for r in caplog.records
+        if r.levelno >= logging.WARNING and r.name.startswith("custom_components")
+    ]
+
+
+def test_a_value_that_is_no_number_is_logged_and_skipped(caplog):
+    rows = [{"pp0qffs0": "broken"}, {"pp0qffs0": 1012.3}]
+
+    assert condition_name_to_first_value(rows, "pp0qffs0") == 1012.3
+    assert logged(caplog, logging.ERROR, "Error converting broken to float")
 
 
 async def test_a_station_outage_is_logged_once_and_so_is_its_end(
