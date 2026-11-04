@@ -55,7 +55,7 @@ jobs:
           # The test harness pins the Home Assistant version it matches, and
           # Home Assistant moves to new Python versions quickly. Before 2026.11
           # the harness is pytest-homeassistant-custom-component, with "pins";
-          # from 2026.11 it is Home Assistant's pytest-home-assistant, of the
+          # from 2026.11 it is Home Assistant's pytest-homeassistant, of the
           # "version".
           matrix='[]'
           add() { matrix=$(jq -c ". + [$1]" <<<"$matrix"); }
@@ -105,14 +105,14 @@ jobs:
         run: pip install -r requirements_test.txt ${{ matrix.pins }}
       # Not with pytest-homeassistant-custom-component, whose fixtures it
       # replaces. It is not on PyPI yet, but in Home Assistant's repository.
-      - name: Install dependencies with pytest-home-assistant
+      - name: Install dependencies with pytest-homeassistant
         if: ${{ matrix.version }}
         env:
           VERSION: ${{ matrix.version }}
         run: |
           grep -v pytest-homeassistant-custom-component requirements_test.txt > "$RUNNER_TEMP/requirements.txt"
           pip install -r "$RUNNER_TEMP/requirements.txt" pytest-cov "homeassistant==$VERSION" \
-            "pytest-home-assistant @ git+https://github.com/home-assistant/core@$VERSION#subdirectory=packages/pytest-home-assistant"
+            "pytest-homeassistant @ git+https://github.com/home-assistant/core@$VERSION#subdirectory=packages/pytest-homeassistant"
       - name: Show the Home Assistant version
         id: version
         run: |
