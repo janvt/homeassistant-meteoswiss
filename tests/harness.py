@@ -1,4 +1,4 @@
-"""The helpers of the test harness: pytest-home-assistant from Home Assistant
+"""The helpers of the test harness: pytest-homeassistant from Home Assistant
 2026.11 on, pytest-homeassistant-custom-component before it."""
 
 try:
