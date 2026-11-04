@@ -39,8 +39,9 @@ INTERVAL = datetime.timedelta(minutes=5)
 # not make the sensors unavailable.
 MAX_AGE = datetime.timedelta(minutes=20)
 # File names end in letters telling which radars contributed: usually the same
-# for days at a time, so the last that worked is tried first, then these.
-VARIANTS = ("rl", "vl", "pl")
+# for days at a time, so the last that worked is tried first, then these (all
+# seen in the first days of November 2026; tl and jl are newest).
+VARIANTS = ("rl", "vl", "pl", "tl", "jl")
 # An image this late is looked up in the day's list of files (up to 280 kB),
 # at most this often for each collection.  The list lags the files by 4 to 6
 # minutes, so the latest image it lists gives the variant; it is read again

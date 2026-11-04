@@ -206,8 +206,9 @@ def item(day="20261021", collection=radar.PRECIPITATION):
     return radar.ITEM_URL.format(collection=collection, day=day)
 
 
-async def test_pl_is_tried_without_the_list():
-    meteo, session = client({url(RAIN_RATE, SLOT, "pl"): image({ZURICH: 3.0})})
+@pytest.mark.parametrize("variant", ["pl", "tl", "jl"])
+async def test_variants_seen_are_tried_without_the_list(variant):
+    meteo, session = client({url(RAIN_RATE, SLOT, variant): image({ZURICH: 3.0})})
 
     readings = await meteo.get(*ZURICH, NOW)
 

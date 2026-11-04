@@ -217,6 +217,27 @@ RAIN_GAUGES = (
 )
 
 
+# MeteoSwiss's hail images can come hours after the rain's: up to 10 hours late
+# on the night of 3 November 2026, all published that morning.
+HAIL_MAX_DELAY = datetime.timedelta(days=1)
+
+
+async def latest_listed(
+    meteo: radar.Radar, product: radar.Product, slot: datetime.datetime
+) -> datetime.datetime | None:
+    """The time of the latest image listed, up to slot and HAIL_MAX_DELAY before."""
+    listed: set[str] = set()
+    for day in (slot, slot - datetime.timedelta(days=1)):
+        url = radar.ITEM_URL.format(collection=product.collection, day=f"{day:%Y%m%d}")
+        listed.update(await meteo._assets(url, slot) or {})
+    for steps in range(HAIL_MAX_DELAY // radar.INTERVAL + 1):
+        candidate = slot - steps * radar.INTERVAL
+        stamp = radar._stamp(product, candidate)
+        if any(n.startswith(stamp) and n.endswith(product.suffix) for n in listed):
+            return candidate
+    return None
+
+
 async def test_radar_images(http, counting):
     meteo = radar.Radar(counting, USER_AGENT)  # type: ignore[arg-type]
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -233,10 +254,11 @@ async def test_radar_images(http, counting):
     for exchange in counting.log:
         if exchange.status == 200:
             assert exchange.bytes < 300 * KB
-    # Hail images, published alongside.
-    slot = image.time
+    # Hail images, the latest published.
     for key in (radar.HAIL_PROBABILITY, radar.HAIL_SIZE):
         product = radar.PRODUCTS[key]
+        slot = await latest_listed(meteo, product, image.time)
+        assert slot is not None, f"no {key} image in {HAIL_MAX_DELAY}"
         body = await meteo._image(product, slot, slot + radar.LOOKUP_AFTER)
         assert body is not None, f"no {key} image for {slot}"
         assert radar.Image.parse(body, slot, product.scale).values.shape == (640, 710)
