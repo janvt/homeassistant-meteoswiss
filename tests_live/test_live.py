@@ -250,10 +250,11 @@ async def test_radar_images(http, counting):
     # Images are downloaded whole: the share is 100%.
     sent = counting.transferred
     record("radar", "latest images", counting.requests, sent, sent)
-    # Each image is small: nothing to gain from reading part of it.
+    # Each image is small: nothing to gain from reading part of it.  CombiPrecip
+    # is the largest, about 625 kB on a wet day.
     for exchange in counting.log:
         if exchange.status == 200:
-            assert exchange.bytes < 300 * KB
+            assert exchange.bytes < 700 * KB
     # Hail images, the latest published.
     for key in (radar.HAIL_PROBABILITY, radar.HAIL_SIZE):
         product = radar.PRODUCTS[key]
