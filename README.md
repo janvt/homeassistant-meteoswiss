@@ -595,7 +595,7 @@ pip install -r requirements_test.txt
 pytest
 ruff check
 mypy
-node --test tests/
+node --test tests/*.test.mjs
 ```
 
 The tests run against in-memory copies of MeteoSwiss's files, so they need no

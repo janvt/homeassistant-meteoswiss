@@ -1,4 +1,4 @@
-// The dashboard strategy, with Node's test runner: node --test tests/
+// The dashboard strategy, with Node's test runner: node --test tests/*.test.mjs
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { test } from "node:test";

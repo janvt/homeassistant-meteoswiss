@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - run: node --test tests/
+      - run: node --test tests/*.test.mjs
 
   # The Home Assistant versions to test, which change without a push.
   versions:
