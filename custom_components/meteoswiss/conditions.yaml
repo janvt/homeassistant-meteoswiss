@@ -1,0 +1,71 @@
+.behavior: &behavior
+  required: true
+  default: any
+  selector:
+    automation_behavior:
+      mode: condition
+
+.for: &for
+  required: true
+  default: "00:00:00"
+  selector:
+    duration:
+
+is_warning:
+  target:
+    entity:
+      - integration: meteoswiss
+        domain: sensor
+        device_class: enum
+  fields:
+    behavior: *behavior
+    for: *for
+    level:
+      required: true
+      default: orange
+      selector:
+        select:
+          translation_key: warning_level
+          options:
+            - yellow
+            - orange
+            - red
+    types:
+      required: false
+      default: []
+      selector:
+        select:
+          translation_key: warning_type
+          multiple: true
+          options:
+            - wind
+            - snow-ice
+            - thunderstorm
+            - fog
+            - high-temperature
+            - low-temperature
+            - forest-fire
+            - avalanches
+            - rain
+            - flooding
+            - rain-flood
+
+is_raining:
+  target:
+    entity:
+      - integration: meteoswiss
+        domain: sensor
+        device_class: precipitation_intensity
+  fields:
+    behavior: *behavior
+    for: *for
+    rate:
+      required: true
+      default: 0.1
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: any
+          mode: box
+          unit_of_measurement: mm/h

@@ -357,5 +357,176 @@
         "unknown_place": {
             "message": "MeteoSwiss does not offer a forecast for {name}; reconfigure the entry to choose another place."
         }
+    },
+    "triggers": {
+        "warning_reached": {
+            "name": "Weather warning reached",
+            "description": "Triggers when a MeteoSwiss weather warning of a level or above comes into force at the place, or is announced for the next 24 hours.",
+            "fields": {
+                "behavior": {
+                    "name": "Trigger when"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "level": {
+                    "name": "Level",
+                    "description": "The warning's level, or a more severe one."
+                },
+                "types": {
+                    "name": "Types",
+                    "description": "Only warnings of these types; none for warnings of any type."
+                }
+            }
+        },
+        "rain_started": {
+            "name": "Rain started",
+            "description": "Triggers when the radar's rain rate at the place rises to the rate set.",
+            "fields": {
+                "behavior": {
+                    "name": "Trigger when"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "rate": {
+                    "name": "Rain rate",
+                    "description": "The rain rate from which it counts as raining."
+                }
+            }
+        },
+        "rain_stopped": {
+            "name": "Rain stopped",
+            "description": "Triggers when the radar's rain rate at the place falls below the rate set.",
+            "fields": {
+                "behavior": {
+                    "name": "Trigger when"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "rate": {
+                    "name": "Rain rate",
+                    "description": "The rain rate from which it counts as raining."
+                }
+            }
+        },
+        "hail_expected": {
+            "name": "Hail expected",
+            "description": "Triggers when the radar's probability of hail at the place rises to the probability set.",
+            "fields": {
+                "behavior": {
+                    "name": "Trigger when"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "probability": {
+                    "name": "Probability",
+                    "description": "The probability of hail, in %."
+                }
+            }
+        },
+        "foehn_expected": {
+            "name": "Föhn expected",
+            "description": "Triggers when the Föhn outlook from the pressure difference across the Alps reaches the outlook set.",
+            "fields": {
+                "behavior": {
+                    "name": "Trigger when"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "outlook": {
+                    "name": "Outlook",
+                    "description": "The Föhn expected, or a stronger one."
+                }
+            }
+        },
+        "pollen_crossed_threshold": {
+            "name": "Pollen crossed threshold",
+            "description": "Triggers when the concentration of a type of pollen crosses a threshold.",
+            "fields": {
+                "behavior": {
+                    "name": "Trigger when"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "threshold": {
+                    "name": "Threshold"
+                }
+            }
+        }
+    },
+    "conditions": {
+        "is_warning": {
+            "name": "Weather warning in force",
+            "description": "Tests if a MeteoSwiss weather warning of a level or above is in force at the place, or is announced for the next 24 hours.",
+            "fields": {
+                "behavior": {
+                    "name": "Condition passes if"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "level": {
+                    "name": "Level",
+                    "description": "The warning's level, or a more severe one."
+                },
+                "types": {
+                    "name": "Types",
+                    "description": "Only warnings of these types; none for warnings of any type."
+                }
+            }
+        },
+        "is_raining": {
+            "name": "Raining",
+            "description": "Tests if the radar's rain rate at the place is at the rate set or above.",
+            "fields": {
+                "behavior": {
+                    "name": "Condition passes if"
+                },
+                "for": {
+                    "name": "For at least"
+                },
+                "rate": {
+                    "name": "Rain rate",
+                    "description": "The rain rate from which it counts as raining."
+                }
+            }
+        }
+    },
+    "selector": {
+        "warning_level": {
+            "options": {
+                "yellow": "Yellow",
+                "orange": "Orange",
+                "red": "Red"
+            }
+        },
+        "warning_type": {
+            "options": {
+                "wind": "Wind",
+                "snow-ice": "Snow or ice",
+                "thunderstorm": "Thunderstorm",
+                "fog": "Fog",
+                "high-temperature": "Heat",
+                "low-temperature": "Frost",
+                "forest-fire": "Forest fire",
+                "avalanches": "Avalanches",
+                "rain": "Rain",
+                "flooding": "Flooding",
+                "rain-flood": "Rain and flooding"
+            }
+        },
+        "foehn_outlook": {
+            "options": {
+                "south": "South Föhn likely",
+                "strong_south": "Strong south Föhn",
+                "north": "North Föhn likely",
+                "strong_north": "Strong north Föhn"
+            }
+        }
     }
 }

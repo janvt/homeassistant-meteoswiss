@@ -357,5 +357,176 @@
         "unknown_place": {
             "message": "MeteoSwiss bietet für {name} keine Prognose an; konfiguriere den Eintrag neu, um einen anderen Ort zu wählen."
         }
+    },
+    "triggers": {
+        "warning_reached": {
+            "name": "Wetterwarnung erreicht",
+            "description": "Löst aus, wenn eine Wetterwarnung von MeteoSchweiz der Stufe oder höher am Ort in Kraft tritt oder für die nächsten 24 Stunden angekündigt wird.",
+            "fields": {
+                "behavior": {
+                    "name": "Auslösen, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "level": {
+                    "name": "Stufe",
+                    "description": "Die Stufe der Warnung oder eine höhere."
+                },
+                "types": {
+                    "name": "Arten",
+                    "description": "Nur Warnungen dieser Arten; keine für Warnungen jeder Art."
+                }
+            }
+        },
+        "rain_started": {
+            "name": "Regen hat begonnen",
+            "description": "Löst aus, wenn die Regenintensität des Radars am Ort auf den eingestellten Wert steigt.",
+            "fields": {
+                "behavior": {
+                    "name": "Auslösen, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "rate": {
+                    "name": "Regenintensität",
+                    "description": "Die Regenintensität, ab der es als Regen gilt."
+                }
+            }
+        },
+        "rain_stopped": {
+            "name": "Regen hat aufgehört",
+            "description": "Löst aus, wenn die Regenintensität des Radars am Ort unter den eingestellten Wert fällt.",
+            "fields": {
+                "behavior": {
+                    "name": "Auslösen, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "rate": {
+                    "name": "Regenintensität",
+                    "description": "Die Regenintensität, ab der es als Regen gilt."
+                }
+            }
+        },
+        "hail_expected": {
+            "name": "Hagel erwartet",
+            "description": "Löst aus, wenn die Hagelwahrscheinlichkeit des Radars am Ort auf den eingestellten Wert steigt.",
+            "fields": {
+                "behavior": {
+                    "name": "Auslösen, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "probability": {
+                    "name": "Wahrscheinlichkeit",
+                    "description": "Die Hagelwahrscheinlichkeit in %."
+                }
+            }
+        },
+        "foehn_expected": {
+            "name": "Föhn erwartet",
+            "description": "Löst aus, wenn die Föhnaussicht aus der Druckdifferenz über die Alpen die eingestellte Aussicht erreicht.",
+            "fields": {
+                "behavior": {
+                    "name": "Auslösen, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "outlook": {
+                    "name": "Aussicht",
+                    "description": "Der erwartete Föhn oder ein stärkerer."
+                }
+            }
+        },
+        "pollen_crossed_threshold": {
+            "name": "Pollen haben Schwellenwert überschritten",
+            "description": "Löst aus, wenn die Konzentration einer Pollenart einen Schwellenwert überschreitet.",
+            "fields": {
+                "behavior": {
+                    "name": "Auslösen, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "threshold": {
+                    "name": "Schwellenwert"
+                }
+            }
+        }
+    },
+    "conditions": {
+        "is_warning": {
+            "name": "Wetterwarnung in Kraft",
+            "description": "Prüft, ob eine Wetterwarnung von MeteoSchweiz der Stufe oder höher am Ort in Kraft ist oder für die nächsten 24 Stunden angekündigt ist.",
+            "fields": {
+                "behavior": {
+                    "name": "Bedingung erfüllt, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "level": {
+                    "name": "Stufe",
+                    "description": "Die Stufe der Warnung oder eine höhere."
+                },
+                "types": {
+                    "name": "Arten",
+                    "description": "Nur Warnungen dieser Arten; keine für Warnungen jeder Art."
+                }
+            }
+        },
+        "is_raining": {
+            "name": "Es regnet",
+            "description": "Prüft, ob die Regenintensität des Radars am Ort den eingestellten Wert erreicht.",
+            "fields": {
+                "behavior": {
+                    "name": "Bedingung erfüllt, wenn"
+                },
+                "for": {
+                    "name": "Für mindestens"
+                },
+                "rate": {
+                    "name": "Regenintensität",
+                    "description": "Die Regenintensität, ab der es als Regen gilt."
+                }
+            }
+        }
+    },
+    "selector": {
+        "warning_level": {
+            "options": {
+                "yellow": "Gelb",
+                "orange": "Orange",
+                "red": "Rot"
+            }
+        },
+        "warning_type": {
+            "options": {
+                "wind": "Wind",
+                "snow-ice": "Schnee oder Glätte",
+                "thunderstorm": "Gewitter",
+                "fog": "Nebel",
+                "high-temperature": "Hitze",
+                "low-temperature": "Frost",
+                "forest-fire": "Waldbrand",
+                "avalanches": "Lawinen",
+                "rain": "Regen",
+                "flooding": "Hochwasser",
+                "rain-flood": "Regen und Hochwasser"
+            }
+        },
+        "foehn_outlook": {
+            "options": {
+                "south": "Südföhn wahrscheinlich",
+                "strong_south": "Starker Südföhn",
+                "north": "Nordföhn wahrscheinlich",
+                "strong_north": "Starker Nordföhn"
+            }
+        }
     }
 }

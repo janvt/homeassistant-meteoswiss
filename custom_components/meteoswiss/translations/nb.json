@@ -357,5 +357,176 @@
         "unknown_place": {
             "message": "MeteoSwiss tilbyr ikke varsel for {name}; rekonfigurer oppføringen for å velge et annet sted."
         }
+    },
+    "triggers": {
+        "warning_reached": {
+            "name": "Farevarsel nådd",
+            "description": "Utløses når et farevarsel fra MeteoSwiss på nivået eller høyere trer i kraft på stedet, eller varsles for de neste 24 timene.",
+            "fields": {
+                "behavior": {
+                    "name": "Utløs når"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "level": {
+                    "name": "Nivå",
+                    "description": "Farevarselets nivå, eller et høyere."
+                },
+                "types": {
+                    "name": "Typer",
+                    "description": "Bare farevarsler av disse typene; ingen for farevarsler av alle typer."
+                }
+            }
+        },
+        "rain_started": {
+            "name": "Regnet har startet",
+            "description": "Utløses når radarens regnintensitet på stedet stiger til verdien som er satt.",
+            "fields": {
+                "behavior": {
+                    "name": "Utløs når"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "rate": {
+                    "name": "Regnintensitet",
+                    "description": "Nedbørintensiteten der det regnes som regn."
+                }
+            }
+        },
+        "rain_stopped": {
+            "name": "Regnet har stoppet",
+            "description": "Utløses når radarens regnintensitet på stedet faller under verdien som er satt.",
+            "fields": {
+                "behavior": {
+                    "name": "Utløs når"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "rate": {
+                    "name": "Regnintensitet",
+                    "description": "Nedbørintensiteten der det regnes som regn."
+                }
+            }
+        },
+        "hail_expected": {
+            "name": "Hagl ventes",
+            "description": "Utløses når radarens sannsynlighet for hagl på stedet stiger til verdien som er satt.",
+            "fields": {
+                "behavior": {
+                    "name": "Utløs når"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "probability": {
+                    "name": "Sannsynlighet",
+                    "description": "Sannsynligheten for hagl, i %."
+                }
+            }
+        },
+        "foehn_expected": {
+            "name": "Føhn ventes",
+            "description": "Utløses når føhnutsikten fra trykkforskjellen over Alpene når utsikten som er satt.",
+            "fields": {
+                "behavior": {
+                    "name": "Utløs når"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "outlook": {
+                    "name": "Utsikt",
+                    "description": "Føhnen som ventes, eller en sterkere."
+                }
+            }
+        },
+        "pollen_crossed_threshold": {
+            "name": "Pollen krysset terskel",
+            "description": "Utløses når konsentrasjonen av en type pollen krysser en terskel.",
+            "fields": {
+                "behavior": {
+                    "name": "Utløs når"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "threshold": {
+                    "name": "Terskel"
+                }
+            }
+        }
+    },
+    "conditions": {
+        "is_warning": {
+            "name": "Farevarsel i kraft",
+            "description": "Tester om et farevarsel fra MeteoSwiss på nivået eller høyere er i kraft på stedet, eller varslet for de neste 24 timene.",
+            "fields": {
+                "behavior": {
+                    "name": "Betingelsen er oppfylt hvis"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "level": {
+                    "name": "Nivå",
+                    "description": "Farevarselets nivå, eller et høyere."
+                },
+                "types": {
+                    "name": "Typer",
+                    "description": "Bare farevarsler av disse typene; ingen for farevarsler av alle typer."
+                }
+            }
+        },
+        "is_raining": {
+            "name": "Det regner",
+            "description": "Tester om radarens regnintensitet på stedet er på verdien som er satt eller over.",
+            "fields": {
+                "behavior": {
+                    "name": "Betingelsen er oppfylt hvis"
+                },
+                "for": {
+                    "name": "I minst"
+                },
+                "rate": {
+                    "name": "Regnintensitet",
+                    "description": "Nedbørintensiteten der det regnes som regn."
+                }
+            }
+        }
+    },
+    "selector": {
+        "warning_level": {
+            "options": {
+                "yellow": "Gult",
+                "orange": "Oransje",
+                "red": "Rødt"
+            }
+        },
+        "warning_type": {
+            "options": {
+                "wind": "Vind",
+                "snow-ice": "Snø eller is",
+                "thunderstorm": "Torden",
+                "fog": "Tåke",
+                "high-temperature": "Hete",
+                "low-temperature": "Frost",
+                "forest-fire": "Skogbrann",
+                "avalanches": "Snøskred",
+                "rain": "Regn",
+                "flooding": "Flom",
+                "rain-flood": "Regn og flom"
+            }
+        },
+        "foehn_outlook": {
+            "options": {
+                "south": "Sørføhn sannsynlig",
+                "strong_south": "Sterk sørføhn",
+                "north": "Nordføhn sannsynlig",
+                "strong_north": "Sterk nordføhn"
+            }
+        }
     }
 }

@@ -186,5 +186,33 @@
         "import_history": {
             "service": "mdi:history"
         }
+    },
+    "triggers": {
+        "warning_reached": {
+            "trigger": "mdi:alert"
+        },
+        "rain_started": {
+            "trigger": "mdi:weather-pouring"
+        },
+        "rain_stopped": {
+            "trigger": "mdi:weather-partly-cloudy"
+        },
+        "hail_expected": {
+            "trigger": "mdi:weather-hail"
+        },
+        "foehn_expected": {
+            "trigger": "mdi:weather-windy"
+        },
+        "pollen_crossed_threshold": {
+            "trigger": "mdi:flower-pollen"
+        }
+    },
+    "conditions": {
+        "is_warning": {
+            "condition": "mdi:alert"
+        },
+        "is_raining": {
+            "condition": "mdi:weather-rainy"
+        }
     }
 }
