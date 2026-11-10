@@ -3,3 +3,5 @@ __pycache__
 .coverage
 coverage.json
 .mypy_cache
+# Written by Home Assistant when a test sets up automations.
+tests/testing_config/

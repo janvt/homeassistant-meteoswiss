@@ -34,6 +34,8 @@ and is now maintained on its own: see [Credits](#credits).
   normals, and the record for the date.
 * **Freezing level** forecast.
 * **Radar** (optional): rain and hail right now at the place, every 5 minutes.
+* **Triggers and conditions** of its own in the automation editor, such as a
+  warning reaching orange, rain starting or Föhn expected.
 * **Dashboard**: a ready-made dashboard of each place's forecast, warnings,
   radar, pollen and stations, which follows the entities you have.
 * Guided setup that suggests the postal code and stations closest to your Home
@@ -319,14 +321,8 @@ summit):
 The radar knows within a minute or two that rain has started at your place,
 where the nearest precipitation station is typically 5 km away and reports
 10-minute totals 10 minutes later.  That makes it the sensor for automations
-like closing windows or retracting an awning:
-
-```yaml
-trigger:
-  - platform: numeric_state
-    entity_id: sensor.zurich_radar_rain_rate
-    above: 0.5
-```
+like closing windows or retracting an awning, with the trigger *Rain
+started* (see [Automations](#automations)).
 
 Its amounts are estimates, often off by a factor of two over a few minutes,
 and less reliable in the mountains: for how much it rained, use the
@@ -336,6 +332,54 @@ and the rain of the last hour until it has been dry there for an hour.  Each
 image of the rain of the last hour is 30 to 60 kB on a dry day in Switzerland
 and up to about 625 kB on a wet one: while it rains at the place that is up to
 7.5 MB an hour.
+
+## Automations
+
+From Home Assistant 2026.11, the automation editor lists triggers and
+conditions of MeteoSwiss with the others.  Each targets the integration's
+sensors: pick a sensor, or a device or an area, which is narrowed to the
+sensors the trigger is about.  Like Home Assistant's own, a trigger fires when
+the state reaches what it waits for, once, not on every update while it stays
+there, nor when a sensor comes back after being unavailable; *For at least*
+waits for it to last.
+
+| Trigger | Fires when |
+|---|---|
+| *Weather warning reached* | a warning of the level (default orange) or above comes into force, or, on *Weather warning next 24 hours*, is announced; optionally only warnings of some types, such as wind or thunderstorm |
+| *Rain started* | the radar's rain rate at the place rises to the rate (default 0.1 mm/h) |
+| *Rain stopped* | the radar's rain rate falls below the rate; with *For at least*, once it has been dry that long |
+| *Hail expected* | the radar's probability of hail rises to the probability (default 50%) |
+| *Föhn expected* | the Föhn outlook reaches south Föhn likely or strong south Föhn, or the same in the north |
+| *Pollen crossed threshold* | a pollen concentration crosses a threshold, a number or another entity |
+
+| Condition | Passes while |
+|---|---|
+| *Weather warning in force* | a warning of the level or above is in force (or announced), optionally of some types |
+| *Raining* | the radar's rain rate at the place is at the rate or above |
+
+The radar's triggers and condition need *Radar* turned on, and the Föhn
+trigger the Föhn outlook.  In YAML:
+
+```yaml
+triggers:
+  - trigger: meteoswiss.rain_started
+    target:
+      entity_id: sensor.zurich_radar_rain_rate
+    options:
+      rate: 0.5
+conditions:
+  - condition: meteoswiss.is_warning
+    target:
+      entity_id: sensor.zurich_weather_warning_next_24_hours
+    options:
+      level: yellow
+      types: [wind, thunderstorm]
+```
+
+The types are MeteoAlarm's: `wind`, `snow-ice`, `thunderstorm`, `fog`,
+`high-temperature`, `low-temperature`, `forest-fire`, `avalanches`, `rain`,
+`flooding` and `rain-flood`.  Before 2026.11, use the sensors in Home
+Assistant's state and numeric state triggers.
 
 ## Dashboard
 

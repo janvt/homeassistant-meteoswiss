@@ -357,5 +357,176 @@
         "unknown_place": {
             "message": "MeteoSuiza no ofrece la previsión para {name}; reconfigure la entrada para elegir otro lugar."
         }
+    },
+    "triggers": {
+        "warning_reached": {
+            "name": "Aviso meteorológico alcanzado",
+            "description": "Se activa cuando un aviso meteorológico de MeteoSwiss del nivel o superior entra en vigor en el lugar, o se anuncia para las próximas 24 horas.",
+            "fields": {
+                "behavior": {
+                    "name": "Activar cuando"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "level": {
+                    "name": "Nivel",
+                    "description": "El nivel del aviso, o uno más alto."
+                },
+                "types": {
+                    "name": "Tipos",
+                    "description": "Solo avisos de estos tipos; ninguno para avisos de cualquier tipo."
+                }
+            }
+        },
+        "rain_started": {
+            "name": "Ha empezado a llover",
+            "description": "Se activa cuando la intensidad de lluvia del radar en el lugar sube al valor elegido.",
+            "fields": {
+                "behavior": {
+                    "name": "Activar cuando"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "rate": {
+                    "name": "Intensidad de lluvia",
+                    "description": "La intensidad de lluvia a partir de la cual cuenta como lluvia."
+                }
+            }
+        },
+        "rain_stopped": {
+            "name": "Ha dejado de llover",
+            "description": "Se activa cuando la intensidad de lluvia del radar en el lugar baja del valor elegido.",
+            "fields": {
+                "behavior": {
+                    "name": "Activar cuando"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "rate": {
+                    "name": "Intensidad de lluvia",
+                    "description": "La intensidad de lluvia a partir de la cual cuenta como lluvia."
+                }
+            }
+        },
+        "hail_expected": {
+            "name": "Granizo esperado",
+            "description": "Se activa cuando la probabilidad de granizo del radar en el lugar sube al valor elegido.",
+            "fields": {
+                "behavior": {
+                    "name": "Activar cuando"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "probability": {
+                    "name": "Probabilidad",
+                    "description": "La probabilidad de granizo, en %."
+                }
+            }
+        },
+        "foehn_expected": {
+            "name": "Foehn esperado",
+            "description": "Se activa cuando la tendencia del foehn por la diferencia de presión a través de los Alpes alcanza la elegida.",
+            "fields": {
+                "behavior": {
+                    "name": "Activar cuando"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "outlook": {
+                    "name": "Tendencia",
+                    "description": "El foehn esperado, o uno más fuerte."
+                }
+            }
+        },
+        "pollen_crossed_threshold": {
+            "name": "Polen superó un umbral",
+            "description": "Se activa cuando la concentración de un tipo de polen cruza un umbral.",
+            "fields": {
+                "behavior": {
+                    "name": "Activar cuando"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "threshold": {
+                    "name": "Umbral"
+                }
+            }
+        }
+    },
+    "conditions": {
+        "is_warning": {
+            "name": "Aviso meteorológico en vigor",
+            "description": "Comprueba si un aviso meteorológico de MeteoSwiss del nivel o superior está en vigor en el lugar, o anunciado para las próximas 24 horas.",
+            "fields": {
+                "behavior": {
+                    "name": "La condición se cumple si"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "level": {
+                    "name": "Nivel",
+                    "description": "El nivel del aviso, o uno más alto."
+                },
+                "types": {
+                    "name": "Tipos",
+                    "description": "Solo avisos de estos tipos; ninguno para avisos de cualquier tipo."
+                }
+            }
+        },
+        "is_raining": {
+            "name": "Está lloviendo",
+            "description": "Comprueba si la intensidad de lluvia del radar en el lugar alcanza el valor elegido.",
+            "fields": {
+                "behavior": {
+                    "name": "La condición se cumple si"
+                },
+                "for": {
+                    "name": "Durante al menos"
+                },
+                "rate": {
+                    "name": "Intensidad de lluvia",
+                    "description": "La intensidad de lluvia a partir de la cual cuenta como lluvia."
+                }
+            }
+        }
+    },
+    "selector": {
+        "warning_level": {
+            "options": {
+                "yellow": "Amarillo",
+                "orange": "Naranja",
+                "red": "Rojo"
+            }
+        },
+        "warning_type": {
+            "options": {
+                "wind": "Viento",
+                "snow-ice": "Nieve o hielo",
+                "thunderstorm": "Tormenta",
+                "fog": "Niebla",
+                "high-temperature": "Calor",
+                "low-temperature": "Helada",
+                "forest-fire": "Incendio forestal",
+                "avalanches": "Aludes",
+                "rain": "Lluvia",
+                "flooding": "Inundación",
+                "rain-flood": "Lluvia e inundación"
+            }
+        },
+        "foehn_outlook": {
+            "options": {
+                "south": "Foehn del sur probable",
+                "strong_south": "Foehn del sur fuerte",
+                "north": "Foehn del norte probable",
+                "strong_north": "Foehn del norte fuerte"
+            }
+        }
     }
 }

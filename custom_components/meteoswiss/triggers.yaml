@@ -1,0 +1,152 @@
+.behavior: &behavior
+  required: true
+  default: each
+  selector:
+    automation_behavior:
+      mode: trigger
+
+.for: &for
+  required: true
+  default: "00:00:00"
+  selector:
+    duration:
+
+.level: &level
+  required: true
+  default: orange
+  selector:
+    select:
+      translation_key: warning_level
+      options:
+        - yellow
+        - orange
+        - red
+
+.types: &types
+  required: false
+  default: []
+  selector:
+    select:
+      translation_key: warning_type
+      multiple: true
+      options:
+        - wind
+        - snow-ice
+        - thunderstorm
+        - fog
+        - high-temperature
+        - low-temperature
+        - forest-fire
+        - avalanches
+        - rain
+        - flooding
+        - rain-flood
+
+.rate: &rate
+  required: true
+  default: 0.1
+  selector:
+    number:
+      min: 0
+      max: 100
+      step: any
+      mode: box
+      unit_of_measurement: mm/h
+
+.enum_sensors: &enum_sensors
+  entity:
+    - integration: meteoswiss
+      domain: sensor
+      device_class: enum
+
+.rain_rate_sensors: &rain_rate_sensors
+  entity:
+    - integration: meteoswiss
+      domain: sensor
+      device_class: precipitation_intensity
+
+warning_reached:
+  target: *enum_sensors
+  fields:
+    behavior: *behavior
+    for: *for
+    level: *level
+    types: *types
+
+rain_started:
+  target: *rain_rate_sensors
+  fields:
+    behavior: *behavior
+    for: *for
+    rate: *rate
+
+rain_stopped:
+  target: *rain_rate_sensors
+  fields:
+    behavior: *behavior
+    for: *for
+    rate: *rate
+
+hail_expected:
+  target:
+    entity:
+      - integration: meteoswiss
+        domain: sensor
+        unit_of_measurement: "%"
+  fields:
+    behavior: *behavior
+    for: *for
+    probability:
+      required: true
+      default: 50
+      selector:
+        number:
+          min: 1
+          max: 100
+          step: 1
+          mode: slider
+          unit_of_measurement: "%"
+
+foehn_expected:
+  target: *enum_sensors
+  fields:
+    behavior: *behavior
+    for: *for
+    outlook:
+      required: true
+      default: south
+      selector:
+        select:
+          translation_key: foehn_outlook
+          options:
+            - south
+            - strong_south
+            - north
+            - strong_north
+
+pollen_crossed_threshold:
+  target:
+    entity:
+      - integration: meteoswiss
+        domain: sensor
+        unit_of_measurement: pollen/m³
+  fields:
+    behavior: *behavior
+    for: *for
+    threshold:
+      required: true
+      selector:
+        numeric_threshold:
+          mode: crossed
+          entity:
+            - domain: input_number
+              unit_of_measurement: pollen/m³
+            - domain: number
+              unit_of_measurement: pollen/m³
+            - domain: sensor
+              unit_of_measurement: pollen/m³
+          number:
+            min: 0
+            step: any
+            mode: box
+            unit_of_measurement: pollen/m³
