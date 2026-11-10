@@ -1291,6 +1291,28 @@ async def test_no_radar_unless_turned_on(hass, entry):
     )
 
 
+@pytest.mark.parametrize("radar", [True, False])
+async def test_another_integration_s_data_is_left_alone(hass, entry_data, radar):
+    # What the meteoswiss_radar integration keeps, under its own domain, and
+    # anything else that starts with ours.
+    others = {
+        f"{DOMAIN}_{key}": True
+        for key in ("radar", "client", "alerts", "downloads", "month", "pauses")
+    }
+    hass.data.update(others)
+    entry = MockConfigEntry(domain=DOMAIN, data=entry_data, options={"radar": radar})
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    assert entry.state is ConfigEntryState.LOADED
+    assert (entry.runtime_data.radar is not None) is radar
+    sensor = entity_id(hass, "sensor", f"sensor.{entry.entry_id}-downloaded")
+    assert hass.states.get(sensor).state not in ("unavailable", "unknown")
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    for key, value in others.items():
+        assert hass.data[key] is value
+
+
 async def test_radar_sensors(hass, entry, frozen_now):
     hass.config_entries.async_update_entry(entry, options={"radar": True})
     FakeRadar.readings = {
