@@ -553,8 +553,10 @@ another.
 *Hourly temperatures*, under *Configure*.
 
 **The radar sensors are unavailable.**  Their latest image is more than
-20 minutes old: MeteoSwiss's images are late, or cannot be downloaded (the log
-says which).  Hail and the rain of the last hour show 0 while it is dry.
+20 minutes old: MeteoSwiss has stopped publishing them, or they cannot be
+downloaded.  The log says which, once, with the time of the last image, and
+again when they are back.  Hail and the rain of the last hour show 0 while it
+is dry.
 
 **A sensor is missing.**  Some are created turned off, such as the station
 pressure, QNH, dew point, most pollen types and the measurement time: turn them
