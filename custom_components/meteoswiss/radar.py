@@ -389,7 +389,10 @@ class Radar:
                 except RadarError as exc:
                     self._outages.failed(f"Radar {key}", exc)
                 else:
-                    self._outages.worked(f"Radar {key}")
+                    if key == RAIN_RATE and (stopped := self._stopped(now)):
+                        self._outages.failed(f"Radar {key}", stopped)
+                    else:
+                        self._outages.worked(f"Radar {key}")
                 if key == RAIN_RATE:
                     self._note_rain(lat, lon)
         values: dict[str, tuple[float | None, datetime.datetime] | None] = {}
@@ -409,6 +412,21 @@ class Radar:
             else:
                 values[key] = (image.value(lat, lon), image.time)
         return values
+
+    def _stopped(self, now: datetime.datetime) -> str | None:
+        """Why the rain rate is unavailable while MeteoSwiss can be reached.
+
+        Its images come every 5 minutes, so one older than MAX_AGE, when the
+        sensors become unavailable, means MeteoSwiss has stopped publishing
+        them.  The others are not checked: hail images are often late, and
+        the rain of the last hour only comes while it rains.
+        """
+        none = "MeteoSwiss has published no rain image"
+        if (rain := self._images.get(RAIN_RATE)) is None:
+            return f"{none} in the last {MAX_AGE.seconds // 60} minutes"
+        if now - rain.time > MAX_AGE:
+            return f"{none} since {rain.time:%H:%M} UTC"
+        return None
 
     def _note_rain(self, lat: float, lon: float) -> None:
         """Keep since when the latest rain images are dry at a place."""

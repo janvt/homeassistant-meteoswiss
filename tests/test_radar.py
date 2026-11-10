@@ -183,6 +183,42 @@ async def test_a_reading_too_old_is_none():
     assert readings[HAIL_PROBABILITY] is None
 
 
+def warnings(caplog):
+    return [r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+
+
+async def test_images_that_stop_coming_are_logged_once(caplog):
+    files = {url(RAIN_RATE): image({ZURICH: 1.0})}
+    meteo, _ = client(files)
+    await meteo.get(*ZURICH, NOW)
+    # Not while the latest image is a reading.
+    await meteo.get(*ZURICH, SLOT + radar.MAX_AGE)
+    assert not warnings(caplog)
+
+    later = NOW + radar.MAX_AGE + radar.INTERVAL
+    await meteo.get(*ZURICH, later)
+    await meteo.get(*ZURICH, later + radar.INTERVAL)
+    assert warnings(caplog) == [
+        "Radar rain_rate is unavailable: MeteoSwiss has published no rain image"
+        " since 12:30 UTC"
+    ]
+
+    # Back with the next image.
+    slot = radar.latest_slot(later + radar.INTERVAL * 2)
+    files[url(RAIN_RATE, slot)] = image()
+    await meteo.get(*ZURICH, slot + datetime.timedelta(minutes=1))
+    assert "Radar rain_rate is available again" in caplog.text
+
+
+async def test_no_image_at_all_is_logged(caplog):
+    meteo, _ = client({})
+    await meteo.get(*ZURICH, NOW)
+    assert warnings(caplog) == [
+        "Radar rain_rate is unavailable: MeteoSwiss has published no rain image"
+        " in the last 20 minutes"
+    ]
+
+
 async def test_the_variant_that_worked_is_tried_first():
     later = SLOT + radar.INTERVAL
     files = {
