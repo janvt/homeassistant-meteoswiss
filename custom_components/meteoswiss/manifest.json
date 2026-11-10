@@ -2,6 +2,8 @@
     "domain": "meteoswiss",
     "name": "MeteoSwiss",
     "after_dependencies": [
+        "frontend",
+        "http",
         "recorder"
     ],
     "codeowners": [

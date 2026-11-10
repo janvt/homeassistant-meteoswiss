@@ -52,6 +52,7 @@ from custom_components.meteoswiss.coordinator import (
     MeteoSwissRadarCoordinator,
     radar_location,
 )
+from custom_components.meteoswiss.dashboard import async_setup_dashboard
 from custom_components.meteoswiss.downloads import SharedDownloads
 from custom_components.meteoswiss.history import async_setup_services
 from custom_components.meteoswiss.issues import (
@@ -71,6 +72,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:
     """Setup via old entry in configuration.yaml."""
     _LOGGER.debug("Async setup: meteoswiss")
     async_setup_services(hass)
+    await async_setup_dashboard(hass)
 
     conf = config.get(DOMAIN)
     if conf is None:

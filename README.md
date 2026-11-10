@@ -34,6 +34,8 @@ and is now maintained on its own: see [Credits](#credits).
   normals, and the record for the date.
 * **Freezing level** forecast.
 * **Radar** (optional): rain and hail right now at the place, every 5 minutes.
+* **Dashboard**: a ready-made dashboard of each place's forecast, warnings,
+  radar, pollen and stations, which follows the entities you have.
 * Guided setup that suggests the postal code and stations closest to your Home
   Assistant location.  Stations, place and options can be changed later without
   losing entities or history.
@@ -335,6 +337,41 @@ image of the rain of the last hour is 30 to 60 kB on a dry day in Switzerland
 and up to about 625 kB on a wet one: while it rains at the place that is up to
 7.5 MB an hour.
 
+## Dashboard
+
+The integration brings a dashboard that builds itself from its entities.  In
+**Settings → Dashboards**, choose **Add dashboard** and then **MeteoSwiss**.
+It has a view for each place, with:
+
+* the daily and hourly forecast,
+* the warnings, today and tomorrow,
+* the radar, Föhn, pollen and climate normals, when the place has them,
+* a section for each of its stations, and
+* the downloads and their volume.
+
+A section is only shown when its entities are there, so turning the radar on or
+choosing a pollen station adds it the next time the dashboard is opened.  The
+names and the area of the devices and entities are yours to change, and the
+dashboard follows.  Hidden entities are left out.
+
+To show only some places, or in another order, edit the dashboard in YAML
+(**⋮ → Raw configuration editor**) and give the names of their devices:
+
+```yaml
+strategy:
+  type: custom:meteoswiss
+  places:
+    - Zürich
+    - Arosa
+```
+
+To change the cards themselves, take control of the dashboard
+(**⋮ → Take control**): it is then a copy you edit as you like, and no longer
+follows the entities.
+
+The dashboard needs Home Assistant's frontend, which `default_config` sets up.
+After an update of the integration, reload the browser once to load it.
+
 ## Station history
 
 The action *MeteoSwiss: Import station history* (`meteoswiss.import_history`)
@@ -558,11 +595,12 @@ pip install -r requirements_test.txt
 pytest
 ruff check
 mypy
+node --test tests/
 ```
 
 The tests run against in-memory copies of MeteoSwiss's files, so they need no
 network.  mypy checks the types with Home Assistant core's strict settings.  CI
-runs them, ruff, mypy, hassfest and the HACS checks on every push.
+runs them, ruff, mypy, the dashboard's tests with Node, hassfest and the HACS checks on every push.
 
 ## Credits
 

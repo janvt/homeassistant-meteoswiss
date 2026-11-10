@@ -29,6 +29,14 @@ jobs:
         with:
           args: format --check
 
+  # The dashboard strategy, which the frontend runs.
+  strategy:
+    name: Dashboard strategy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: node --test tests/
+
   # The Home Assistant versions to test, which change without a push.
   versions:
     name: Versions
