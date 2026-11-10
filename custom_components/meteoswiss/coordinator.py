@@ -67,13 +67,14 @@ FORECAST_TIMEOUT = 300
 UPDATE_TIMEOUT = 60
 # The client keeps a station's history for longer; this is how often to ask.
 CLIMATE_CHECK_INTERVAL = datetime.timedelta(hours=1)
-# Shared by all entries.
-DATA_CLIENT: HassKey[MeteoSwissOGD] = HassKey(f"{DOMAIN}_client")
-DATA_ALERTS: HassKey[MeteoAlarm] = HassKey(f"{DOMAIN}_alerts")
-DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}_downloads")
-DATA_RADAR: HassKey[Radar] = HassKey(f"{DOMAIN}_radar")
-DATA_MONTH: HassKey[MonthToDate] = HassKey(f"{DOMAIN}_month")
-DATA_PAUSES: HassKey[Pauses] = HassKey(f"{DOMAIN}_pauses")
+# Shared by all entries. A dot, which no integration's domain can have, keeps
+# these apart from another integration's own data: "meteoswiss_radar" is one.
+DATA_CLIENT: HassKey[MeteoSwissOGD] = HassKey(f"{DOMAIN}.client")
+DATA_ALERTS: HassKey[MeteoAlarm] = HassKey(f"{DOMAIN}.alerts")
+DATA_DOWNLOADS: HassKey[SharedDownloads] = HassKey(f"{DOMAIN}.downloads")
+DATA_RADAR: HassKey[Radar] = HassKey(f"{DOMAIN}.radar")
+DATA_MONTH: HassKey[MonthToDate] = HassKey(f"{DOMAIN}.month")
+DATA_PAUSES: HassKey[Pauses] = HassKey(f"{DOMAIN}.pauses")
 # Radar images come every 5 minutes, a minute or so after their interval.
 RADAR_UPDATE_INTERVAL = datetime.timedelta(minutes=1)
 # A place this close to the home is taken to be the home's: the radar is then
