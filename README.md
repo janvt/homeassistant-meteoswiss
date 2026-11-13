@@ -330,8 +330,8 @@ precipitation station, or the rain of the last hour, which is checked against
 the gauges.  Hail is only looked at while it rains at or next to the place,
 and the rain of the last hour until it has been dry there for an hour.  Each
 image of the rain of the last hour is 30 to 60 kB on a dry day in Switzerland
-and up to about 625 kB on a wet one: while it rains at the place that is up to
-7.5 MB an hour.
+and up to about 830 kB on a wet one: while it rains at the place that is up to
+10 MB an hour.
 
 ## Automations
 
