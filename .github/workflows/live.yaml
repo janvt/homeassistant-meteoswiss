@@ -44,6 +44,10 @@ jobs:
         run: pip install -r requirements_test.txt
       # The Home Assistant test plugins block the network.
       - name: Run the live tests
+        env:
+          # For Home Assistant's quality scale on GitHub: with a token, its
+          # limit is per repository rather than per shared runner IP.
+          GITHUB_TOKEN: ${{ github.token }}
         run: pytest -p no:homeassistant -p no:socket tests_live -v
       # Scheduled runs report to an issue, assigned to the owner so that it
       # notifies them: opened (or commented on) when the checks fail, closed
