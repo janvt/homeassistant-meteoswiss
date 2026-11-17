@@ -9,7 +9,11 @@ than going unnoticed.
 
 from __future__ import annotations
 
+import asyncio
+import os
 import re
+
+import aiohttp
 
 from tests.test_quality_scale import TIERS
 
@@ -19,12 +23,27 @@ HASSFEST = (
 )
 # Rule("action-setup", ScaledQualityScaleTiers.BRONZE), possibly over lines.
 RULE = re.compile(r'Rule\(\s*"([a-z0-9-]+)",\s*ScaledQualityScaleTiers\.([A-Z]+)\b')
+# GitHub limits downloads without a token by IP address, which the runners
+# share: on 16 November 2026 it answered 429.  The workflow's token raises the
+# limit, and a 429 is retried after the wait GitHub asks for.
+ATTEMPTS = 4
+
+
+async def fetch_hassfest(http: aiohttp.ClientSession) -> str:
+    token = os.environ.get("GITHUB_TOKEN")
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    for attempt in range(ATTEMPTS):
+        async with http.get(HASSFEST, headers=headers) as response:
+            if response.status != 429 or attempt == ATTEMPTS - 1:
+                response.raise_for_status()
+                return await response.text()
+            wait = response.headers.get("Retry-After", "")
+        await asyncio.sleep(min(int(wait) if wait.isdigit() else 10 * 2**attempt, 60))
+    raise AssertionError("unreachable")
 
 
 async def test_the_rules_are_home_assistants_latest(http):
-    async with http.get(HASSFEST) as response:
-        response.raise_for_status()
-        source = await response.text()
+    source = await fetch_hassfest(http)
     latest = {rule: tier.lower() for rule, tier in RULE.findall(source)}
     # Rather than every rule seeming removed if hassfest is written otherwise.
     assert len(latest) > 40, f"Cannot read the rules from {HASSFEST}"
