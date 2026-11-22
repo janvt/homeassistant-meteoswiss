@@ -263,10 +263,12 @@ valley, which often stays grey while the peaks get sun.
 
 ##### Several places
 
-A summit gets the snow and the wind, while the sun can be better a little
-lower, or at a pass nearby.  Each place's sensors carry their values, so a
-template binary sensor can combine them: here the snow and the wind on Gross
-Windgällen, and the sun of the sunniest of three places.
+Each sensor judges one place.  To change its limits, use *Configure*; a
+template is only needed to combine places.  A summit gets the snow and the
+wind, while the sun can be better a little lower, or at a pass nearby.  The
+sensors carry their values as attributes, so a template binary sensor can
+combine them: here the snow and the wind on Gross Windgällen, and the sun of
+the sunniest of three places.
 
 ```yaml
 template:
@@ -286,8 +288,9 @@ template:
              and state_attr(peak, 'max_gust') | float(99) < 40 }}
 ```
 
-Change the numbers for other limits; for tomorrow, read the
-`bluebird_tomorrow` sensors instead.  The same template works as a
+The template reads the values, not the sensors' states, so it has its own
+limits: the numbers in it, not those under *Configure*.  For tomorrow, read
+the `bluebird_tomorrow` sensors instead.  The same template works as a
 *Template → Binary sensor* helper in the UI.  Its defaults keep it off while
 the summit's values are unknown: no snow and a strong wind.
 
