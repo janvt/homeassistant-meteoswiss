@@ -275,7 +275,7 @@ template:
   - binary_sensor:
       - name: Ptarmigan Uri
         unique_id: ptarmigan_uri
-        icon: mdi:bird
+        icon: mdi:turkey
         state: >
           {% set peak = 'binary_sensor.gross_windgallen_ptarmigan' %}
           {% set places = ['binary_sensor.gross_windgallen_ptarmigan',

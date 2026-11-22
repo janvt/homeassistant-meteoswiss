@@ -2,13 +2,10 @@
     "entity": {
         "binary_sensor": {
             "bluebird_tomorrow": {
-                "default": "mdi:weather-sunny",
-                "state": {
-                    "on": "mdi:weather-sunny-alert"
-                }
+                "default": "mdi:bird"
             },
             "ptarmigan": {
-                "default": "mdi:bird"
+                "default": "mdi:turkey"
             }
         },
         "sensor": {
