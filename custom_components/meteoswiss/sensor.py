@@ -227,6 +227,22 @@ SUMMARIES: tuple[SummaryDescription, ...] = (
             hourly, summaries.tomorrow(now, *summaries.MIDDAY)
         ),
     ),
+    # For a look two days ahead: the snow before that morning, and its midday.
+    _snow("snow_until_day_after_tomorrow", summaries.until_day_after_tomorrow),
+    _sunshine(
+        "sunshine_day_after_tomorrow_midday",
+        lambda now: summaries.day_after_tomorrow(now, *summaries.MIDDAY),
+    ),
+    SummaryDescription(
+        key="max_gust_day_after_tomorrow_midday",
+        translation_key="max_gust_day_after_tomorrow_midday",
+        device_class=SensorDeviceClass.WIND_SPEED,
+        native_unit_of_measurement=UnitOfSpeed.KILOMETERS_PER_HOUR,
+        suggested_display_precision=0,
+        value=lambda hourly, now: summaries.max_gust(
+            hourly, summaries.day_after_tomorrow(now, *summaries.MIDDAY)
+        ),
+    ),
     SummaryDescription(
         key="precipitation_next_hour",
         translation_key="precipitation_next_hour",

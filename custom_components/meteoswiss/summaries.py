@@ -64,19 +64,44 @@ def today(now: datetime.datetime) -> Window:
     )
 
 
-def tomorrow(
+def days_ahead(
     now: datetime.datetime,
+    days: int,
     start: datetime.time = datetime.time(0),
     end: datetime.time | None = None,
 ) -> Window:
-    """Tomorrow, or part of it (end None meaning midnight)."""
-    day = now.astimezone(LOCAL_TIME_ZONE).date() + datetime.timedelta(days=1)
+    """A day some days from today, or part of it (end None meaning midnight)."""
+    day = now.astimezone(LOCAL_TIME_ZONE).date() + datetime.timedelta(days=days)
     return (
         _local(day, start),
         _local(day + datetime.timedelta(days=1), datetime.time(0))
         if end is None
         else _local(day, end),
     )
+
+
+def tomorrow(
+    now: datetime.datetime,
+    start: datetime.time = datetime.time(0),
+    end: datetime.time | None = None,
+) -> Window:
+    """Tomorrow, or part of it (end None meaning midnight)."""
+    return days_ahead(now, 1, start, end)
+
+
+def day_after_tomorrow(
+    now: datetime.datetime,
+    start: datetime.time = datetime.time(0),
+    end: datetime.time | None = None,
+) -> Window:
+    """The day after tomorrow, or part of it (end None meaning midnight)."""
+    return days_ahead(now, 2, start, end)
+
+
+def until_day_after_tomorrow(now: datetime.datetime) -> Window:
+    """From today's midnight to 08:00 the day after tomorrow: the snow that
+    has fallen and will fall before that morning."""
+    return today(now)[0], day_after_tomorrow(now, NIGHT[1])[0]
 
 
 def coming_hours(now: datetime.datetime, hours: int) -> Window:

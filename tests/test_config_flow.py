@@ -1,7 +1,7 @@
 """The config flow, with the OGD client faked."""
 
 import pytest
-from homeassistant.data_entry_flow import FlowResultType
+from homeassistant.data_entry_flow import FlowResultType, section
 from homeassistant.helpers import issue_registry as ir
 
 from custom_components.meteoswiss.const import DOMAIN, place_unique_id
@@ -21,7 +21,14 @@ NO_PRECIPITATION = "No real-time precipitation station"
 
 
 def defaults(result):
-    return {str(key): key.default() for key in result["data_schema"].schema}
+    """The form's defaults; a section's are a dict under its name."""
+    out = {}
+    for key, value in result["data_schema"].schema.items():
+        if isinstance(value, section):
+            out[str(key)] = {str(k): k.default() for k in value.schema.schema}
+        else:
+            out[str(key)] = key.default()
+    return out
 
 
 async def start(hass, step="user_two"):
@@ -651,6 +658,14 @@ async def test_foehn_options_have_sane_defaults(hass, entry):
         "foehn_north_station": "KLO",
         "foehn_threshold": 4.0,
         "foehn_strong_threshold": 8.0,
+        "bluebird_days": {
+            "bluebird_snow": 20.0,
+            "bluebird_sunshine": 4.5,
+            "bluebird_gust": 40.0,
+            "ptarmigan_snow": 15.0,
+            "ptarmigan_sunshine": 2.0,
+            "ptarmigan_gust": 40.0,
+        },
     }
 
 
@@ -686,6 +701,37 @@ async def test_foehn_options_are_saved(hass, entry):
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert entry.options["foehn_north_station"] == "SMA"
     assert entry.options["foehn_threshold"] == 5.0
+
+
+async def test_bluebird_limits_are_saved_flat(hass, entry):
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    form = defaults(result)
+    form["bluebird_days"]["ptarmigan_snow"] = 10.0
+    result = await hass.config_entries.options.async_configure(result["flow_id"], form)
+    await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert "bluebird_days" not in entry.options
+    assert entry.options["ptarmigan_snow"] == 10.0
+    assert entry.options["bluebird_snow"] == 20.0
+
+    # Shown again with the saved value.
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    assert defaults(result)["bluebird_days"]["ptarmigan_snow"] == 10.0
+
+
+async def test_bluebird_limits_stay_without_the_section(hass, entry_data):
+    entry = MockConfigEntry(
+        domain=DOMAIN, data=entry_data, options={"bluebird_sunshine": 3.0}
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+    form = {k: v for k, v in defaults(result).items() if k != "bluebird_days"}
+    await hass.config_entries.options.async_configure(result["flow_id"], form)
+    await hass.async_block_till_done()
+
+    assert entry.options["bluebird_sunshine"] == 3.0
+    assert entry.options["ptarmigan_gust"] == 40.0
 
 
 @pytest.mark.parametrize(

@@ -129,6 +129,28 @@
                     "freezing_level": "Un sensore per l'altitudine prevista dello zero termico. MeteoSvizzera lo pubblica in un file per tutta la Svizzera (33 MB), di cui vengono lette solo le righe di questa località: circa 0,5 MB ogni tre ore, 4 MB al giorno.",
                     "climate_normals": "Sensori che confrontano oggi e questo mese alla stazione meteo con le sue norme 1991–2020, calcolate dalla serie di misure della stazione, e il record per la data. La serie (circa 1,4 MB) viene scaricata all'avvio di Home Assistant e poi solo controllata una volta alla settimana; i giorni di quest'anno ogni sei ore.",
                     "radar": "Sensori di pioggia e grandine in questo momento in questa località, dal radar meteorologico di MeteoSvizzera, ogni 5 minuti: più rapidi e vicini della stazione pluviometrica, ad esempio per chiudere le finestre. Inoltre la pioggia dell'ultima ora, il radar corretto con i pluviometri, e un'immagine animata degli ultimi 20 minuti di pioggia intorno alla località. Scarica da 15 a 35 MB al giorno, per tutte le località insieme, e fino a 150 MB in più in una giornata di pioggia continua."
+                },
+                "sections": {
+                    "bluebird_days": {
+                        "name": "Giorni bluebird",
+                        "description": "Soglie dei sensori Bluebird domani e Pernice bianca: neve fresca, poi sole tra le 9 e le 15 e poco vento. La neve è in mm d'acqua; 1 mm è molto approssimativamente 1 cm di polvere.",
+                        "data": {
+                            "bluebird_snow": "Bluebird domani: neve stanotte",
+                            "bluebird_sunshine": "Bluebird domani: sole",
+                            "bluebird_gust": "Bluebird domani: raffiche sotto",
+                            "ptarmigan_snow": "Pernice bianca: neve",
+                            "ptarmigan_sunshine": "Pernice bianca: sole",
+                            "ptarmigan_gust": "Pernice bianca: raffiche sotto"
+                        },
+                        "data_description": {
+                            "bluebird_snow": "Almeno questa neve dalle 18 alle 8.",
+                            "bluebird_sunshine": "Almeno queste ore di sole domani tra le 9 e le 15.",
+                            "bluebird_gust": "La raffica più forte domani tra le 9 e le 15 deve restare sotto.",
+                            "ptarmigan_snow": "Almeno questa neve dalla mezzanotte di oggi alle 8 di dopodomani.",
+                            "ptarmigan_sunshine": "Almeno queste ore di sole dopodomani tra le 9 e le 15.",
+                            "ptarmigan_gust": "La raffica più forte dopodomani tra le 9 e le 15 deve restare sotto."
+                        }
+                    }
                 }
             }
         },
@@ -138,6 +160,14 @@
         }
     },
     "entity": {
+        "binary_sensor": {
+            "bluebird_tomorrow": {
+                "name": "Bluebird domani"
+            },
+            "ptarmigan": {
+                "name": "Pernice bianca"
+            }
+        },
         "sensor": {
             "snow_tonight": {
                 "name": "Neve stanotte"
@@ -156,6 +186,15 @@
             },
             "max_gust_tomorrow_midday": {
                 "name": "Raffica più forte domani 9–15"
+            },
+            "snow_until_day_after_tomorrow": {
+                "name": "Neve fino a dopodomani"
+            },
+            "sunshine_day_after_tomorrow_midday": {
+                "name": "Sole dopodomani 9–15"
+            },
+            "max_gust_day_after_tomorrow_midday": {
+                "name": "Raffica più forte dopodomani 9–15"
             },
             "precipitation_next_hour": {
                 "name": "Precipitazioni prossima ora"

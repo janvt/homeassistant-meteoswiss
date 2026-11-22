@@ -39,6 +39,12 @@ CONF_FOEHN_SOUTH = "foehn_south_station"
 CONF_FOEHN_NORTH = "foehn_north_station"
 CONF_FOEHN_THRESHOLD = "foehn_threshold"
 CONF_FOEHN_STRONG_THRESHOLD = "foehn_strong_threshold"
+CONF_BLUEBIRD_SNOW = "bluebird_snow"
+CONF_BLUEBIRD_SUNSHINE = "bluebird_sunshine"
+CONF_BLUEBIRD_GUST = "bluebird_gust"
+CONF_PTARMIGAN_SNOW = "ptarmigan_snow"
+CONF_PTARMIGAN_SUNSHINE = "ptarmigan_sunshine"
+CONF_PTARMIGAN_GUST = "ptarmigan_gust"
 CONF_LAT = "latitude"
 CONF_LON = "longitude"
 
@@ -62,6 +68,21 @@ FOEHN_DEFAULTS = {
     CONF_FOEHN_THRESHOLD: DEFAULT_FOEHN_THRESHOLD,
     CONF_FOEHN_STRONG_THRESHOLD: DEFAULT_FOEHN_STRONG_THRESHOLD,
 }
+
+# Bluebird days: at least this much snow (mm of water, roughly cm of powder),
+# at least this many hours of sun between 9 and 15, and gusts below this
+# (km/h).  Bluebird tomorrow counts tonight's snow; Ptarmigan, looser, the
+# snow from today's midnight to the morning of the day after tomorrow.
+BLUEBIRD_DEFAULTS: dict[str, float] = {
+    CONF_BLUEBIRD_SNOW: 20.0,
+    CONF_BLUEBIRD_SUNSHINE: 4.5,
+    CONF_BLUEBIRD_GUST: 40.0,
+    CONF_PTARMIGAN_SNOW: 15.0,
+    CONF_PTARMIGAN_SUNSHINE: 2.0,
+    CONF_PTARMIGAN_GUST: 40.0,
+}
+# The options form shows them in a collapsed section of this name.
+BLUEBIRD_SECTION = "bluebird_days"
 
 USER_AGENT = "MeteoSwiss Home Assistant integration"
 

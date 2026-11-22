@@ -129,6 +129,28 @@
                     "freezing_level": "Ein Sensor für die prognostizierte Höhe der Nullgradgrenze. MeteoSchweiz veröffentlicht sie in einer Datei für die ganze Schweiz (33 MB), aus der nur die Zeilen dieses Orts gelesen werden: etwa 0,5 MB alle drei Stunden, 4 MB pro Tag.",
                     "climate_normals": "Sensoren, die heute und diesen Monat an der Wetterstation mit ihren Normwerten 1991–2020 vergleichen, berechnet aus der eigenen Messreihe der Station, sowie der Rekord für das Datum. Die Messreihe (etwa 1,4 MB) wird beim Start von Home Assistant heruntergeladen und danach nur einmal pro Woche auf Änderungen geprüft, die Tage dieses Jahres alle sechs Stunden.",
                     "radar": "Sensoren für Regen und Hagel jetzt an diesem Ort, vom Wetterradar von MeteoSchweiz, alle 5 Minuten: schneller und näher als die Niederschlagsstation, etwa um Fenster zu schliessen. Dazu der Regen der letzten Stunde, das Radar an die Regenmesser angeglichen, und ein animiertes Bild der letzten 20 Minuten Regen rund um den Ort. Lädt 15 bis 35 MB pro Tag herunter, für alle Orte zusammen, an einem Tag mit Dauerregen bis zu 150 MB mehr."
+                },
+                "sections": {
+                    "bluebird_days": {
+                        "name": "Bluebird-Tage",
+                        "description": "Grenzen der Sensoren Bluebird morgen und Schneehuhn: Neuschnee, dann Sonne zwischen 9 und 15 Uhr und wenig Wind. Schnee in mm Wasser; 1 mm ist sehr grob 1 cm Pulver.",
+                        "data": {
+                            "bluebird_snow": "Bluebird morgen: Schnee heute Nacht",
+                            "bluebird_sunshine": "Bluebird morgen: Sonne",
+                            "bluebird_gust": "Bluebird morgen: Böen unter",
+                            "ptarmigan_snow": "Schneehuhn: Schnee",
+                            "ptarmigan_sunshine": "Schneehuhn: Sonne",
+                            "ptarmigan_gust": "Schneehuhn: Böen unter"
+                        },
+                        "data_description": {
+                            "bluebird_snow": "Mindestens so viel Schnee von 18 bis 8 Uhr.",
+                            "bluebird_sunshine": "Mindestens so viele Stunden Sonne morgen zwischen 9 und 15 Uhr.",
+                            "bluebird_gust": "Die stärkste Böe morgen zwischen 9 und 15 Uhr muss darunter bleiben.",
+                            "ptarmigan_snow": "Mindestens so viel Schnee von heute Mitternacht bis übermorgen 8 Uhr.",
+                            "ptarmigan_sunshine": "Mindestens so viele Stunden Sonne übermorgen zwischen 9 und 15 Uhr.",
+                            "ptarmigan_gust": "Die stärkste Böe übermorgen zwischen 9 und 15 Uhr muss darunter bleiben."
+                        }
+                    }
                 }
             }
         },
@@ -138,6 +160,14 @@
         }
     },
     "entity": {
+        "binary_sensor": {
+            "bluebird_tomorrow": {
+                "name": "Bluebird morgen"
+            },
+            "ptarmigan": {
+                "name": "Schneehuhn"
+            }
+        },
         "sensor": {
             "snow_tonight": {
                 "name": "Schnee heute Nacht"
@@ -156,6 +186,15 @@
             },
             "max_gust_tomorrow_midday": {
                 "name": "Stärkste Böe morgen 9–15 Uhr"
+            },
+            "snow_until_day_after_tomorrow": {
+                "name": "Schnee bis übermorgen"
+            },
+            "sunshine_day_after_tomorrow_midday": {
+                "name": "Sonnenschein übermorgen 9–15 Uhr"
+            },
+            "max_gust_day_after_tomorrow_midday": {
+                "name": "Stärkste Böe übermorgen 9–15 Uhr"
             },
             "precipitation_next_hour": {
                 "name": "Niederschlag nächste Stunde"

@@ -52,6 +52,9 @@ SUMMARY_NAMES = (
     "sunshine_tomorrow_9_15",
     "sunshine_tomorrow",
     "strongest_gust_tomorrow_9_15",
+    "snow_until_the_day_after_tomorrow",
+    "sunshine_day_after_tomorrow_9_15",
+    "strongest_gust_day_after_tomorrow_9_15",
     "precipitation_next_hour",
     "chance_of_rain_next_hour",
     "lowest_temperature_tonight",
@@ -730,6 +733,9 @@ async def test_forecast_summaries(hass, entry):
         "sunshine_tomorrow_midday",
         "sunshine_tomorrow",
         "max_gust_tomorrow_midday",
+        "snow_until_day_after_tomorrow",
+        "sunshine_day_after_tomorrow_midday",
+        "max_gust_day_after_tomorrow_midday",
         "min_temperature_tonight",
     ):
         assert summary(hass, entry, key).state == "unavailable", key
@@ -753,8 +759,60 @@ async def test_forecast_summaries_over_whole_windows(hass, entry, fake_ogd):
     assert value("sunshine_tomorrow_midday") == "3.0"
     # Tomorrow 09-15 local is 07-13 UTC on the 21st: i = 22 to 27.
     assert value("max_gust_tomorrow_midday") == "47.0"
+    assert value("sunshine_day_after_tomorrow_midday") == "3.0"
+    # The day after tomorrow 09-15 local is 07-13 UTC on the 22nd: i = 46 to 51.
+    assert value("max_gust_day_after_tomorrow_midday") == "71.0"
+    # The fake starts at 09:00 UTC, after today's midnight: not the whole window.
+    assert value("snow_until_day_after_tomorrow") == "unavailable"
     # Tonight from 18:00 local (16:00 UTC, i = 7) on.
     assert value("min_temperature_tonight") == "17.0"
+
+
+def bluebird(hass, entry, key):
+    return hass.states.get(
+        entity_id(hass, "binary_sensor", f"binary_sensor.{entry.entry_id}-{key}")
+    )
+
+
+async def test_bluebird_days(hass, entry, fake_ogd):
+    fake_ogd.hours = 80
+    await setup(hass, entry)
+
+    tomorrow = bluebird(hass, entry, "bluebird_tomorrow")
+    assert tomorrow.state == "off"  # too warm for snow
+    assert tomorrow.attributes["friendly_name"] == "Zurich Bluebird tomorrow"
+    assert tomorrow.attributes["snow"] == 0.0
+    assert tomorrow.attributes["sunshine"] == 3.0
+    assert tomorrow.attributes["max_gust"] == 47.0
+    # The fake starts at 09:00 UTC, after today's midnight: its snow is unknown.
+    assert bluebird(hass, entry, "ptarmigan").state == "unavailable"
+
+    # Cold, snowing 2 mm an hour, sunny and calm (the fake has both at once).
+    coordinator = entry.runtime_data
+    for hour in coordinator.data["forecast"]["hourly"]:
+        hour.update(temperature=-5.0, precipitation=2.0, wind_gust=30.0, sunshine=60.0)
+    coordinator.async_update_listeners()
+    await hass.async_block_till_done()
+
+    tomorrow = bluebird(hass, entry, "bluebird_tomorrow")
+    assert tomorrow.state == "on"
+    # 18:00-08:00 local is 16:00-06:00 UTC: 14 hours of 2 mm.
+    assert tomorrow.attributes["snow"] == 28.0
+
+
+async def test_bluebird_limits_from_the_options(hass, entry_data, fake_ogd):
+    """The fake's warm tomorrow has no snow, 3 h of sun and gusts to 47 km/h:
+    a bluebird day with limits that low."""
+    fake_ogd.hours = 80
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data=entry_data,
+        options={"bluebird_snow": 0.0, "bluebird_sunshine": 3.0, "bluebird_gust": 50.0},
+    )
+    entry.add_to_hass(hass)
+    await setup(hass, entry)
+
+    assert bluebird(hass, entry, "bluebird_tomorrow").state == "on"
 
 
 async def test_summaries_needing_hourly_temperatures(hass, entry_data, fake_ogd):
