@@ -1,5 +1,16 @@
 {
     "entity": {
+        "binary_sensor": {
+            "bluebird_tomorrow": {
+                "default": "mdi:weather-sunny",
+                "state": {
+                    "on": "mdi:weather-sunny-alert"
+                }
+            },
+            "ptarmigan": {
+                "default": "mdi:bird"
+            }
+        },
         "sensor": {
             "10minrain": {
                 "default": "mdi:water"
@@ -45,6 +56,9 @@
             },
             "lowest_freezing_level_48h": {
                 "default": "mdi:snowflake-thermometer"
+            },
+            "max_gust_day_after_tomorrow_midday": {
+                "default": "mdi:weather-windy"
             },
             "max_gust_tomorrow_midday": {
                 "default": "mdi:weather-windy"
@@ -124,6 +138,9 @@
             "snow_next_48h": {
                 "default": "mdi:snowflake"
             },
+            "snow_until_day_after_tomorrow": {
+                "default": "mdi:snowflake"
+            },
             "snow_tonight": {
                 "default": "mdi:snowflake"
             },
@@ -140,6 +157,9 @@
                 "default": "mdi:weather-sunny"
             },
             "sunshine_today": {
+                "default": "mdi:weather-sunny"
+            },
+            "sunshine_day_after_tomorrow_midday": {
                 "default": "mdi:weather-sunny"
             },
             "sunshine_tomorrow": {

@@ -24,7 +24,8 @@ and is now maintained on its own: see [Credits](#credits).
 * **Current conditions** from a SwissMetNet weather station every 10 minutes,
   and optionally rain from a separate precipitation station closer to you.
 * **Forecast summaries** such as snow tonight, sunshine tomorrow or rain in the
-  next hour, as sensors for dashboards and automations.
+  next hour, as sensors for dashboards and automations, and whether tomorrow or
+  the day after is a bluebird day for skiing.
 * **Weather warnings** of MeteoSwiss for the place, at its height, with a link to
   the warning on a map.
 * **Pollen** measurements from the closest pollen station.
@@ -142,7 +143,8 @@ place; each place can be added once.
 * **Reconfigure** (in the entry's menu) changes the postal code or place and the
   stations; entities and their history are kept.
 * **Configure** (the cog) turns hourly temperatures, the freezing level, climate
-  normals and Föhn on or off, and sets the Föhn stations and thresholds.
+  normals and Föhn on or off, and sets the Föhn stations and thresholds and,
+  under *Bluebird days*, the limits of the bluebird sensors.
 
   <img src="docs/options.png" alt="Options" width="460">
 
@@ -206,6 +208,8 @@ Every forecast has sensors summarising it.  All times are local
 | Snow next 24 hours, Snow next 48 hours | The same, from the current hour on |
 | Sunshine tomorrow 9–15, Sunshine tomorrow | Hours of sunshine |
 | Strongest gust tomorrow 9–15 | km/h |
+| Snow until the day after tomorrow | mm of water as above, from today's midnight to 08:00 the day after tomorrow |
+| Sunshine day after tomorrow 9–15, Strongest gust day after tomorrow 9–15 | As for tomorrow, a day later |
 | Precipitation next hour, Chance of rain next hour | For the hour after the current one; the chance of rain is MeteoSwiss's for the three hours up to its end |
 | Lowest temperature tonight | °C, 18:00 to 08:00 from the current hour on |
 | Highest temperature today, Lowest temperature today, Precipitation today | MeteoSwiss's forecast for the day |
@@ -238,6 +242,83 @@ template:
         unit_of_measurement: °C
         state: "{{ daily['weather.altdorf_ur'].forecast[1].temperature }}"
 ```
+
+#### Bluebird days
+
+A bluebird day has fresh snow, then sun and little wind.  Two binary sensors
+on each forecast judge the place's own forecast.  By default:
+
+| Sensor | On with | and between 9 and 15 that day |
+|---|---|---|
+| Bluebird tomorrow | 20 mm of snow (as water, roughly 20 cm of powder) tonight | 4½ hours of sun, gusts under 40 km/h |
+| Ptarmigan | 15 mm of snow from today's midnight to 08:00 the day after tomorrow | 2 hours of sun the day after tomorrow, gusts under 40 km/h |
+
+*Ptarmigan* looks a day further ahead, with looser rules: a maybe-bluebird.
+Each place has its own limits, under *Configure → Bluebird days*: a summit
+may want more snow than a pass, and a valley less sun.  A sensor has the
+values it was judged on as the attributes `snow`, `sunshine`
+and `max_gust`, and is unavailable when one of them is unknown (they need
+*Hourly temperatures*).  They suit a mountain added as a place more than a
+valley, which often stays grey while the peaks get sun.
+
+##### Several places
+
+A summit gets the snow and the wind, while the sun can be better a little
+lower, or at a pass nearby.  Each place's sensors carry their values, so a
+template binary sensor can combine them: here the snow and the wind on Gross
+Windgällen, and the sun of the sunniest of three places.
+
+```yaml
+template:
+  - binary_sensor:
+      - name: Ptarmigan Uri
+        unique_id: ptarmigan_uri
+        icon: mdi:bird
+        state: >
+          {% set peak = 'binary_sensor.gross_windgallen_ptarmigan' %}
+          {% set places = ['binary_sensor.gross_windgallen_ptarmigan',
+                           'binary_sensor.oberalppass_ptarmigan',
+                           'binary_sensor.andermatt_ptarmigan'] %}
+          {% set sun = places | map('state_attr', 'sunshine')
+                              | select('is_number') | list %}
+          {{ state_attr(peak, 'snow') | float(0) >= 15
+             and (sun | max if sun else 0) >= 2
+             and state_attr(peak, 'max_gust') | float(99) < 40 }}
+```
+
+Change the numbers for other limits; for tomorrow, read the
+`bluebird_tomorrow` sensors instead.  The same template works as a
+*Template → Binary sensor* helper in the UI.  Its defaults keep it off while
+the summit's values are unknown: no snow and a strong wind.
+
+##### A notification
+
+The evening before, or two days ahead with *Ptarmigan*:
+
+```yaml
+alias: Bluebird day coming
+triggers:
+  - trigger: state
+    entity_id:
+      - binary_sensor.gross_windgallen_bluebird_tomorrow
+      - binary_sensor.gross_windgallen_ptarmigan
+    to: "on"
+    for: "01:00:00"
+actions:
+  - action: notify.notify
+    data:
+      title: "{{ trigger.to_state.name }}"
+      message: >
+        About {{ trigger.to_state.attributes.snow | round(0) | int }} cm of
+        fresh snow, {{ trigger.to_state.attributes.sunshine }} h of sun between
+        9 and 15, gusts up to
+        {{ trigger.to_state.attributes.max_gust | round(0) | int }} km/h.
+mode: queued
+```
+
+*For* waits an hour, so that one forecast run in its favour, quickly
+revised, does not notify.  To be told at a fixed hour instead, trigger at
+18:00 and add a state condition on the sensors.
 
 ### Weather warnings
 

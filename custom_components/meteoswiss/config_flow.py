@@ -11,6 +11,7 @@ from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry, ConfigFlowResult
 from homeassistant.const import CONF_NAME
 from homeassistant.core import callback
+from homeassistant.data_entry_flow import section
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.issue_registry import IssueSeverity
@@ -25,6 +26,11 @@ from homeassistant.helpers.selector import (
 )
 
 from custom_components.meteoswiss.const import (
+    BLUEBIRD_DEFAULTS,
+    BLUEBIRD_SECTION,
+    CONF_BLUEBIRD_GUST,
+    CONF_BLUEBIRD_SNOW,
+    CONF_BLUEBIRD_SUNSHINE,
     CONF_CLIMATE_NORMALS,
     CONF_FOEHN,
     CONF_FOEHN_NORTH,
@@ -42,6 +48,9 @@ from custom_components.meteoswiss.const import (
     CONF_POSTCODE,
     CONF_PRECIPITATION_NAME,
     CONF_PRECIPITATION_STATION,
+    CONF_PTARMIGAN_GUST,
+    CONF_PTARMIGAN_SNOW,
+    CONF_PTARMIGAN_SUNSHINE,
     CONF_RADAR,
     CONF_REAL_TIME_NAME,
     CONF_REAL_TIME_PRECIPITATION_NAME,
@@ -769,6 +778,7 @@ class MeteoSwissOptionsFlow(OptionsFlowBase):
             CONF_CLIMATE_NORMALS: DEFAULT_CLIMATE_NORMALS,
             CONF_RADAR: DEFAULT_RADAR,
             **FOEHN_DEFAULTS,
+            **BLUEBIRD_DEFAULTS,
             **entry.options,
         }
         ogd = MeteoSwissOGD(async_get_clientsession(self.hass), USER_AGENT)
@@ -783,6 +793,13 @@ class MeteoSwissOptionsFlow(OptionsFlowBase):
 
         errors = {}
         if user_input is not None:
+            # The section's values are kept flat, like the others.  Without
+            # it (a form from before it), the limits stay as they were.
+            user_input = {
+                **{k: current[k] for k in BLUEBIRD_DEFAULTS},
+                **{k: v for k, v in user_input.items() if k != BLUEBIRD_SECTION},
+                **user_input.get(BLUEBIRD_SECTION, {}),
+            }
             if user_input[CONF_FOEHN_SOUTH] == user_input[CONF_FOEHN_NORTH]:
                 errors[CONF_FOEHN_NORTH] = "same_foehn_station"
             if not (
@@ -797,6 +814,29 @@ class MeteoSwissOptionsFlow(OptionsFlowBase):
 
         def required(key: str) -> vol.Required:
             return vol.Required(key, default=current[key])
+
+        def limit(key: str, maximum: float, step: float, unit: str) -> tuple:
+            return required(key), NumberSelector(
+                NumberSelectorConfig(
+                    min=0,
+                    max=maximum,
+                    step=step,
+                    unit_of_measurement=unit,
+                    mode=NumberSelectorMode.BOX,
+                )
+            )
+
+        bluebird = dict(
+            limit(key, maximum, step, unit)
+            for key, maximum, step, unit in (
+                (CONF_BLUEBIRD_SNOW, 200, 1, "mm"),
+                (CONF_BLUEBIRD_SUNSHINE, 6, 0.5, "h"),
+                (CONF_BLUEBIRD_GUST, 200, 5, "km/h"),
+                (CONF_PTARMIGAN_SNOW, 200, 1, "mm"),
+                (CONF_PTARMIGAN_SUNSHINE, 6, 0.5, "h"),
+                (CONF_PTARMIGAN_GUST, 200, 5, "km/h"),
+            )
+        )
 
         options = [
             SelectOptionDict(value=abbr, label=label)
@@ -838,6 +878,9 @@ class MeteoSwissOptionsFlow(OptionsFlowBase):
                             unit_of_measurement="hPa",
                             mode=NumberSelectorMode.BOX,
                         )
+                    ),
+                    vol.Optional(BLUEBIRD_SECTION): section(
+                        vol.Schema(bluebird), {"collapsed": True}
                     ),
                 }
             ),

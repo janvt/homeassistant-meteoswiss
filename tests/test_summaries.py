@@ -102,6 +102,28 @@ class TestTomorrow:
         assert length(summaries.tomorrow(now)) == hours
 
 
+class TestDayAfterTomorrow:
+    def test_midday(self):
+        window = summaries.day_after_tomorrow(utc(2026, 10, 20, 12), *summaries.MIDDAY)
+        assert window == (utc(2026, 10, 22, 7), utc(2026, 10, 22, 13))
+
+    def test_follows_the_local_date(self):
+        # 00:30 local on the 21st (still the 20th in UTC): it is the 23rd.
+        window = summaries.day_after_tomorrow(utc(2026, 10, 20, 22, 30))
+        assert window == (utc(2026, 10, 22, 22), utc(2026, 10, 23, 22))
+
+    def test_snow_until_then_runs_from_midnight_to_eight(self):
+        window = summaries.until_day_after_tomorrow(utc(2026, 10, 20, 12))
+        # 00:00 local on the 20th to 08:00 local on the 22nd (summer time).
+        assert window == (utc(2026, 10, 19, 22), utc(2026, 10, 22, 6))
+        assert length(window) == 56
+
+    def test_snow_until_then_across_the_clocks_going_back(self):
+        window = summaries.until_day_after_tomorrow(utc(2026, 10, 24, 12))
+        assert window == (utc(2026, 10, 23, 22), utc(2026, 10, 26, 7))
+        assert length(window) == 57
+
+
 def test_coming_hours_start_with_the_current_hour():
     assert summaries.coming_hours(utc(2026, 10, 20, 12, 30), 24) == (
         utc(2026, 10, 20, 12),

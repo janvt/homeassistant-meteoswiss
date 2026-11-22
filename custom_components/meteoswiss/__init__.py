@@ -65,7 +65,13 @@ from custom_components.meteoswiss.radar import Radar
 from custom_components.meteoswiss.usage import MonthToDate
 
 _LOGGER = logging.getLogger(__name__)
-PLATFORMS = [Platform.IMAGE, Platform.SENSOR, Platform.SWITCH, Platform.WEATHER]
+PLATFORMS = [
+    Platform.BINARY_SENSOR,
+    Platform.IMAGE,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.WEATHER,
+]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> Literal[True]:

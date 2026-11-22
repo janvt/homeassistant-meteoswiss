@@ -129,6 +129,28 @@
                     "freezing_level": "En sensor for den varslede høyden til nullgradersgrensen. MeteoSwiss publiserer den i en fil for hele Sveits (33 MB), der bare radene for dette stedet leses: omtrent 0,5 MB hver tredje time, 4 MB per dag.",
                     "climate_normals": "Sensorer som sammenligner i dag og denne måneden ved værstasjonen med normalene for 1991–2020, beregnet fra stasjonens egen måleserie, og rekorden for datoen. Måleserien (omtrent 1,4 MB) lastes ned når Home Assistant starter, og sjekkes deretter bare for endringer én gang i uken; årets dager hver sjette time.",
                     "radar": "Sensorer for regn og hagl akkurat nå på dette stedet, fra værradaren til MeteoSwiss, hvert 5. minutt: raskere og nærmere enn nedbørsstasjonen, for eksempel for å lukke vinduer. Også regnet den siste timen, radaren justert etter regnmålerne, og et animert bilde av de siste 20 minuttene med regn rundt stedet. Laster ned 15 til 35 MB per dag, for alle steder samlet, og opptil 150 MB mer på en dag med vedvarende regn."
+                },
+                "sections": {
+                    "bluebird_days": {
+                        "name": "Bluebird-dager",
+                        "description": "Grensene for sensorene Bluebird i morgen og Fjellrype: nysnø, så sol mellom 9 og 15 og lite vind. Snø er i mm vann; 1 mm er svært grovt 1 cm puddersnø.",
+                        "data": {
+                            "bluebird_snow": "Bluebird i morgen: snø i natt",
+                            "bluebird_sunshine": "Bluebird i morgen: sol",
+                            "bluebird_gust": "Bluebird i morgen: vindkast under",
+                            "ptarmigan_snow": "Fjellrype: snø",
+                            "ptarmigan_sunshine": "Fjellrype: sol",
+                            "ptarmigan_gust": "Fjellrype: vindkast under"
+                        },
+                        "data_description": {
+                            "bluebird_snow": "Minst så mye snø fra 18 til 08.",
+                            "bluebird_sunshine": "Minst så mange timer sol i morgen mellom 9 og 15.",
+                            "bluebird_gust": "Det sterkeste vindkastet i morgen mellom 9 og 15 må holde seg under dette.",
+                            "ptarmigan_snow": "Minst så mye snø fra midnatt i dag til 08 i overmorgen.",
+                            "ptarmigan_sunshine": "Minst så mange timer sol i overmorgen mellom 9 og 15.",
+                            "ptarmigan_gust": "Det sterkeste vindkastet i overmorgen mellom 9 og 15 må holde seg under dette."
+                        }
+                    }
                 }
             }
         },
@@ -138,6 +160,14 @@
         }
     },
     "entity": {
+        "binary_sensor": {
+            "bluebird_tomorrow": {
+                "name": "Bluebird i morgen"
+            },
+            "ptarmigan": {
+                "name": "Fjellrype"
+            }
+        },
         "sensor": {
             "snow_tonight": {
                 "name": "Snø i natt"
@@ -156,6 +186,15 @@
             },
             "max_gust_tomorrow_midday": {
                 "name": "Sterkeste vindkast i morgen 9–15"
+            },
+            "snow_until_day_after_tomorrow": {
+                "name": "Snø fram til i overmorgen"
+            },
+            "sunshine_day_after_tomorrow_midday": {
+                "name": "Sol i overmorgen 9–15"
+            },
+            "max_gust_day_after_tomorrow_midday": {
+                "name": "Sterkeste vindkast i overmorgen 9–15"
             },
             "precipitation_next_hour": {
                 "name": "Nedbør neste time"
