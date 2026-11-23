@@ -801,6 +801,29 @@ class TestBlocks:
         assert len(session.requests) <= 217 + 5
         assert session.ranged_bytes < 217 * (2 * ogd.BLOCK_MARGIN + ogd.BLOCK_ROW)
 
+    async def test_the_last_row_of_a_file_shorter_at_its_end_is_read(self):
+        # As in the run of 12:00 on 23 November 2026: the last block is shorter
+        # than in the run before, so the last point's row in it is expected a
+        # little past the end of the file.
+        runs = ["202610201100", RUN]
+        files = self.files(runs)
+        last = HOURS[-1]
+
+        def short_at_the_end(point_id: int, ts: str) -> str:
+            return "1" if ts == last else self.temperature(1)(point_id, ts)
+
+        files[url("tre200h0")] = body = time_major_csv(
+            "tre200h0", self.POINTS, HOURS, short_at_the_end
+        )
+        client, _ = make_client(files)
+        point = Point(*self.POINTS[-1], "x", "", 0, 0)
+        await client.get_hourly_rows([point], runs[0], "tre200h0")
+
+        rows = await client.get_hourly_rows([point], RUN, "tre200h0")
+
+        assert rows[point.key] == self.expected(body, point.key)
+        assert rows[point.key][last] == "1"
+
     async def test_a_new_day_reads_the_layout_again(self):
         tomorrow = "202610210000"
         files = self.files(["202610202300", tomorrow])

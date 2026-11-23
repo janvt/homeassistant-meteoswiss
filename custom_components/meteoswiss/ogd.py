@@ -1383,7 +1383,14 @@ class MeteoSwissOGD:
             if guess is None:
                 raise _Lost
             if total is not None and guess - blocks.margin >= total:
-                break
+                # A block after the last would put the row about as far past
+                # the end as it is into a block: then there is no such block.
+                # Less far, the last block is shorter than before and the row
+                # is among its last ones, so the end of the file is read.
+                into = blocks.order[key] / len(blocks.order) * blocks.length
+                if guess - total >= into / 2:
+                    break
+                guess = total - 1
             found = await self._block_row(url, blocks, key, block, guess, total, budget)
             if found is None:
                 break  # past the last block
