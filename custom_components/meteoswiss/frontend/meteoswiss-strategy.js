@@ -89,7 +89,7 @@ const SECTIONS = [
   ["downloads", ["downloads", "downloaded", "downloaded_this_month"]],
 ];
 
-// The headings, in the integration's languages.  Romansh is in German.
+// The headings, in the integration's languages.
 const HEADINGS = {
   en: {
     forecast: "Forecast",
@@ -161,22 +161,7 @@ const HEADINGS = {
     more: "Más",
     nothing: "Todavía no hay ningún lugar de MeteoSwiss configurado.",
   },
-  nb: {
-    forecast: "Værvarsel",
-    warnings: "Farevarsler",
-    today: "I dag",
-    tomorrow: "I morgen",
-    day_after_tomorrow: "I overmorgen",
-    radar: "Radar",
-    foehn: "Føhn",
-    pollen: "Pollen",
-    climate: "Sammenlignet med normalen",
-    downloads: "Nedlastinger",
-    more: "Mer",
-    nothing: "Ingen MeteoSwiss-steder er satt opp ennå.",
-  },
 };
-HEADINGS.rm = HEADINGS.de;
 
 export function headings(hass) {
   const language = (hass.locale?.language || hass.language || "en").split("-")[0];

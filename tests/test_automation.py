@@ -21,9 +21,7 @@ pytestmark = [
 ]
 
 COMPONENT = Path(__file__).parent.parent / "custom_components" / "meteoswiss"
-LANGUAGES = sorted(
-    p.stem for p in (COMPONENT / "translations").glob("*.json") if p.stem != "rm"
-)
+LANGUAGES = sorted(p.stem for p in (COMPONENT / "translations").glob("*.json"))
 KEYS = (
     "weather_warning",
     "weather_warning_next_24h",
