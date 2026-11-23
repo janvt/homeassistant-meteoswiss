@@ -24,9 +24,9 @@
             "title": "MeteoSvizzera usa più dati del necessario",
             "description": "L'integrazione MeteoSvizzera ha scaricato molto più del solito nell'ultimo giorno ({usage} MB). Di solito significa che MeteoSvizzera ha cambiato il modo in cui pubblica le previsioni. Aggiorna l'integrazione: è probabile che sia disponibile una correzione. Questo avviso scompare da solo."
         },
-        "source_unavailable": {
-            "title": "MeteoSwiss: {source} non è disponibile",
-            "description": "{source} non ha potuto essere scaricato, nemmeno dopo nuovi tentativi: {error}\n\nDi solito si tratta di un problema passeggero del server o della connessione Internet. L’integrazione continua a provare a ogni aggiornamento e nel frattempo mostra gli ultimi valori che ha. Questo avviso scompare da solo non appena funziona di nuovo."
+        "service_unavailable": {
+            "title": "{service} non è raggiungibile",
+            "description": "Una parte di ciò che usa MeteoSwiss non ha potuto essere scaricata da {service}, nemmeno dopo nuovi tentativi.\n\nNon disponibile: {sources}\n\nUltimo errore: {error}\n\nDi solito si tratta di un problema passeggero del server o della connessione Internet. L’integrazione continua a provare a ogni aggiornamento e nel frattempo mostra gli ultimi valori che ha. Questo avviso scompare da solo non appena tutto funziona di nuovo."
         }
     },
     "config": {

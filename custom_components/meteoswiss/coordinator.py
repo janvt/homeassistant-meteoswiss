@@ -50,7 +50,7 @@ from custom_components.meteoswiss.ogd import (
     UnknownPointError,
     distance_km,
 )
-from custom_components.meteoswiss.outages import Outages
+from custom_components.meteoswiss.outages import METEOALARM, SWISSTOPO, Outages
 from custom_components.meteoswiss.pause import Pauses
 from custom_components.meteoswiss.radar import RAIN_RATE, Radar
 from custom_components.meteoswiss.radar_loop import RadarLoop
@@ -459,9 +459,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 datetime.datetime.now(datetime.timezone.utc),
             )
         except AlertError as exc:
-            self.outages.failed("Weather warnings", exc)
+            self.outages.failed("Weather warnings", exc, service=METEOALARM)
             return None
-        self.outages.worked("Weather warnings")
+        self.outages.worked("Weather warnings", service=METEOALARM)
         return warnings
 
     async def _async_get_today(self) -> dict[str, float | None]:
@@ -766,7 +766,13 @@ class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
             hass,
             location,
             radar.usage,
-            Outages(_LOGGER, hass, place=name, owner=f"{entry.entry_id} radar loop"),
+            Outages(
+                _LOGGER,
+                hass,
+                place=name,
+                owner=f"{entry.entry_id} radar loop",
+                service=SWISSTOPO,
+            ),
         )
         entry.async_on_unload(self.loop.outages.clear)
         # Set by the entry's coordinator; see its async_set_paused.

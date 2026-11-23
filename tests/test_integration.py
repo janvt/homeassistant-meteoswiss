@@ -470,8 +470,12 @@ async def test_a_station_without_data_is_reported_after_an_hour(
     fake_ogd.station_error = OGDError("gone")
 
     await refresh_after(hass, frozen_now, 5)
-    # Unavailable straight away, once tried again (see fetch.retrying)...
-    assert issues(hass) and all(i.startswith("unavailable_") for i in issues(hass))
+    # Unavailable straight away, once tried again (see fetch.retrying): one
+    # repair for MeteoSwiss, however many of its files fail...
+    assert issues(hass) == {"unavailable_meteoswiss"}
+    (issue,) = (i for (d, i_id), i in ir.async_get(hass).issues.items() if d == DOMAIN)
+    assert "Station SMA" in issue.translation_placeholders["sources"]
+    assert "Föhn station" in issue.translation_placeholders["sources"]
     await refresh_after(hass, frozen_now, 50)
     assert not issues(hass) - unavailable(hass)
 

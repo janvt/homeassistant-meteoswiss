@@ -43,8 +43,8 @@ and is now maintained on its own: see [Credits](#credits).
   Assistant location.  Stations, place and options can be changed later without
   losing entities or history.
 * Requests that fail for a moment are tried again, and a repair notice says
-  what cannot be fetched until it can, or when a station or a forecast stops
-  publishing.
+  which server cannot be reached and what is missing until it can, or when a
+  station or a forecast stops publishing.
 * Translations in English, German, French, Italian, Spanish and Norwegian.
 
 ## Installation
@@ -670,14 +670,15 @@ yourself.
 MeteoSwiss*.**  MeteoSwiss could not be reached when the entry started.  It
 tries again by itself; the message and the log say why it failed.
 
-**A repair notice says *MeteoSwiss: … is unavailable*.**  A file could not
-be fetched, even after trying again twice within a few seconds: a server
-error, a timeout or no connection.  The notice names what and says why.  The
-integration goes on trying with every update and keeps the values it has
-until then; the notice goes away by itself once it works.  If it stays, check
-that Home Assistant can reach `data.geo.admin.ch` (forecasts, stations,
-radar), `feeds.meteoalarm.org` (warnings) and `wms.geo.admin.ch` (the radar
-loop's map).
+**A repair notice says *… cannot be reached*.**  Files could not be fetched
+from MeteoSwiss (`data.geo.admin.ch`), MeteoAlarm (`feeds.meteoalarm.org`,
+the warnings) or swisstopo (`wms.geo.admin.ch`, the radar loop's map), even
+after trying again twice within a few seconds: a server error, a timeout or no
+connection.  There is one notice per server, which lists what is unavailable
+and the last error.  The integration goes on trying with every update and
+keeps the values it has until then; the notice goes away by itself once
+everything works.  If it stays, check that Home Assistant can reach that
+server.
 
 **A station's sensors are unavailable.**  Its values are older than 90
 minutes, or it stopped publishing.  After an hour without data a repair notice

@@ -27,7 +27,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from custom_components.meteoswiss.const import USER_AGENT
 from custom_components.meteoswiss.fetch import retrying
-from custom_components.meteoswiss.outages import Outages
+from custom_components.meteoswiss.outages import SWISSTOPO, Outages
 from custom_components.meteoswiss.radar import INTERVAL, REQUEST_TIMEOUT, Image, lv95
 from custom_components.meteoswiss.usage import Usage
 
@@ -131,7 +131,7 @@ class RadarLoop:
         self._location = location
         # The map counts with the radar's own downloads.
         self._usage = usage
-        self.outages = outages or Outages(_LOGGER)
+        self.outages = outages or Outages(_LOGGER, service=SWISSTOPO)
         self._frames: dict[datetime.datetime, np.ndarray] = {}
         self._box: Box | None = None
         # None until a map is in hand: the loop is drawn on a blank one then.

@@ -20,7 +20,7 @@ from urllib.parse import quote
 import aiohttp
 
 from custom_components.meteoswiss.fetch import retrying
-from custom_components.meteoswiss.outages import Outages
+from custom_components.meteoswiss.outages import METEOALARM, Outages
 from custom_components.meteoswiss.usage import Usage
 
 if TYPE_CHECKING:
@@ -226,7 +226,7 @@ class MeteoAlarm:
         self._fetched: datetime.datetime | None = None
         self._details: dict[str, _Details | None] = {}
         self._lock = asyncio.Lock()
-        self.outages = Outages(_LOGGER, hass)
+        self.outages = Outages(_LOGGER, hass, service=METEOALARM)
         self.usage = Usage()
 
     @property
