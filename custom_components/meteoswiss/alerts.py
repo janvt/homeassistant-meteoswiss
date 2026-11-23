@@ -12,16 +12,23 @@ import asyncio
 import datetime
 import logging
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import TypedDict
+from typing import TYPE_CHECKING, TypedDict, TypeVar
 from urllib.parse import quote
 
 import aiohttp
 
+from custom_components.meteoswiss.fetch import retrying
 from custom_components.meteoswiss.outages import Outages
 from custom_components.meteoswiss.usage import Usage
 
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
 _LOGGER = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 FEED_URL = "https://feeds.meteoalarm.org/feeds/meteoalarm-legacy-atom-switzerland"
 # The feed is about 800 kB and cannot be fetched conditionally, so it is
@@ -207,14 +214,19 @@ def in_force(
 class MeteoAlarm:
     """Fetches the warnings that cover a place."""
 
-    def __init__(self, session: aiohttp.ClientSession, user_agent: str) -> None:
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        user_agent: str,
+        hass: HomeAssistant | None = None,
+    ) -> None:
         self._session = session
         self._headers = {"User-Agent": user_agent}
         self._entries: list[_Entry] | None = None
         self._fetched: datetime.datetime | None = None
         self._details: dict[str, _Details | None] = {}
         self._lock = asyncio.Lock()
-        self._outages = Outages(_LOGGER)
+        self.outages = Outages(_LOGGER, hass)
         self.usage = Usage()
 
     @property
@@ -222,15 +234,21 @@ class MeteoAlarm:
         """Bytes of warnings downloaded in the last day."""
         return self.usage.downloaded
 
-    async def _get(self, url: str) -> bytes:
-        try:
+    async def _get(self, url: str, parse: Callable[[bytes], T]) -> T:
+        """A file, parsed.  An answer that cannot be parsed is asked for again:
+        a server that fails for a moment can say so with status 200."""
+
+        async def attempt() -> T:
             async with self._session.get(
                 url, headers=self._headers, timeout=REQUEST_TIMEOUT
             ) as response:
                 response.raise_for_status()
                 body = await response.read()
                 self.usage.count(response, len(body))
-                return body
+            return parse(body)
+
+        try:
+            return await retrying(attempt, url, also=(ET.ParseError,))
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise AlertError(f"Cannot fetch {url}: {exc}") from exc
 
@@ -243,7 +261,7 @@ class MeteoAlarm:
                 or abs(now - self._fetched) >= FEED_CACHE
             ):
                 try:
-                    self._entries = parse_feed(await self._get(FEED_URL))
+                    self._entries = await self._get(FEED_URL, parse_feed)
                     self._fetched = now
                     # Details are only kept for the warnings still listed.
                     listed = {e.identifier for e in self._entries}
@@ -253,11 +271,11 @@ class MeteoAlarm:
                 except (AlertError, ET.ParseError) as exc:
                     if self._entries is None:
                         raise AlertError(str(exc)) from exc
-                    self._outages.failed(
+                    self.outages.failed(
                         "Weather warning feed", f"{exc}; keeping the previous one"
                     )
                 else:
-                    self._outages.worked("Weather warning feed")
+                    self.outages.worked("Weather warning feed")
             return self._entries
 
     async def _details_of(self, entry: _Entry) -> _Details | None:
@@ -267,12 +285,12 @@ class MeteoAlarm:
             if entry.details_url:
                 source = f"Details of the weather warning for {entry.region}"
                 try:
-                    details = parse_details(await self._get(entry.details_url))
+                    details = await self._get(entry.details_url, parse_details)
                 except (AlertError, ET.ParseError) as exc:
-                    self._outages.failed(source, exc)
+                    self.outages.failed(source, exc)
                     # Try again with the next update rather than keeping None.
                     return None
-                self._outages.worked(source)
+                self.outages.worked(source)
             self._details[entry.identifier] = details
         return self._details[entry.identifier]
 

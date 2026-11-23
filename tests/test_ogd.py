@@ -2,6 +2,7 @@
 
 import datetime
 
+import aiohttp
 import pytest
 
 from custom_components.meteoswiss import ogd
@@ -211,6 +212,18 @@ class TestPointValues:
             rows = await client._streamed_point_values(url(file), [prefix])
             assert rows[prefix] == expected
         assert len(expected) == 50
+
+    async def test_a_stream_cut_off_is_read_again_from_the_start(self):
+        body = time_major_csv("p", BIG_POINTS, HOURS[:50], value)
+        client, session = make_client({url("p"): body})
+        session.chunk_size = 1000
+        session.failures[url("p")] = [aiohttp.ClientPayloadError("dropped")]
+        prefix = f"{BIG_POINTS[0][0]};{BIG_POINTS[0][1]};"
+
+        rows = await client._streamed_point_values(url("p"), [prefix])
+
+        assert rows[prefix] == ogd._rows_with_prefix(body.decode(), prefix)
+        assert len(session.requests) == 2
 
     async def test_streaming_does_not_match_inside_a_row(self):
         # Point 1;2 must not match the row of point 11;2 or 21;2.
@@ -530,6 +543,33 @@ class TestStationNow:
             await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
             == {}
         )
+
+    @pytest.mark.parametrize("failure", [500, 502, 503, 429])
+    async def test_a_server_error_is_tried_again(self, failure):
+        body = self.HEADER + "SMA;20.10.2026 11:40;10.0;75;0.2\n"
+        client, session = make_client({self.FILE: body.encode()})
+        session.failures[self.FILE] = [failure, failure]
+
+        result = await client.get_station_now(
+            "SMA", StationType.WEATHER, now=STATIONS_NOW
+        )
+
+        assert result["tre200s0"] == 10.0
+        assert len(session.requests) == 3
+
+    async def test_a_server_that_stays_down_is_an_error(self):
+        client, session = make_client({self.FILE: self.HEADER.encode()})
+        session.failures[self.FILE] = [500] * 3
+
+        with pytest.raises(ogd.OGDError, match="500"):
+            await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+
+    async def test_a_missing_file_is_not_asked_for_again(self):
+        client, session = make_client({})
+
+        with pytest.raises(ogd.OGDError):
+            await client.get_station_now("SMA", StationType.WEATHER, now=STATIONS_NOW)
+        assert len(session.requests) == 1
 
     async def test_no_rows_yet(self):
         client, _ = make_client({self.FILE: self.HEADER.encode()})

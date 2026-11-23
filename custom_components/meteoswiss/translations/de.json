@@ -23,6 +23,10 @@
         "high_usage": {
             "title": "MeteoSchweiz braucht mehr Daten als nötig",
             "description": "Die MeteoSchweiz-Integration hat am letzten Tag viel mehr als üblich heruntergeladen ({usage} MB). Meist hat MeteoSchweiz geändert, wie die Prognose veröffentlicht wird. Aktualisiere die Integration: Eine Korrektur ist wahrscheinlich verfügbar. Dieser Hinweis verschwindet von selbst."
+        },
+        "source_unavailable": {
+            "title": "MeteoSwiss: {source} ist nicht verfügbar",
+            "description": "{source} konnte auch nach erneuten Versuchen nicht abgerufen werden: {error}\n\nMeist ist das ein vorübergehendes Problem des Servers oder der Internetverbindung. Die Integration versucht es bei jeder Aktualisierung weiter und zeigt bis dahin die letzten Werte, die sie hat. Dieser Hinweis verschwindet von selbst, sobald es wieder klappt."
         }
     },
     "config": {

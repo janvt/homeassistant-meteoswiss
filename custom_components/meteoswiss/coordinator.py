@@ -219,7 +219,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         self._forecast_checked: datetime.datetime | None = None
         # Refreshes the forecast while the stations go on updating.
         self._forecast_task: asyncio.Task | None = None
-        self._outages = Outages(_LOGGER)
+        self.outages = Outages(
+            _LOGGER, hass, place=forecast_name, owner=config_entry.entry_id
+        )
         _LOGGER.debug("Client obtained")
 
         super().__init__(
@@ -257,10 +259,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             async with asyncio.timeout(FORECAST_TIMEOUT):
                 forecast = await self._async_get_forecast()
         except TimeoutError:
-            self._outages.failed("Forecast", "timed out; keeping the previous one")
+            self.outages.failed("Forecast", "timed out; keeping the previous one")
             return
         except Exception as exc:
-            self._outages.failed(
+            self.outages.failed(
                 "Forecast", f"{exc!r}; keeping the previous one", trace=True
             )
             return
@@ -306,10 +308,14 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             self._forecast_checked = now
         except OGDError as exc:
             if self._forecast is None:
+                # Logged by the coordinator, which fails the update.  A place
+                # MeteoSwiss does not know has its own repair.
+                if not isinstance(exc, UnknownPointError):
+                    self.outages.failed("Forecast", exc, log=False)
                 raise
-            self._outages.failed("Forecast", f"{exc}; keeping the previous one")
+            self.outages.failed("Forecast", f"{exc}; keeping the previous one")
             return self._forecast
-        self._outages.worked("Forecast")
+        self.outages.worked("Forecast")
         return self._forecast
 
     @callback
@@ -453,9 +459,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 datetime.datetime.now(datetime.timezone.utc),
             )
         except AlertError as exc:
-            self._outages.failed("Weather warnings", exc)
+            self.outages.failed("Weather warnings", exc)
             return None
-        self._outages.worked("Weather warnings")
+        self.outages.worked("Weather warnings")
         return warnings
 
     async def _async_get_today(self) -> dict[str, float | None]:
@@ -467,9 +473,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         try:
             today = await self.client.get_station_today(station)
         except OGDError as exc:
-            self._outages.failed(source, exc)
+            self.outages.failed(source, exc)
             return {}
-        self._outages.worked(source)
+        self.outages.worked(source)
         return today
 
     @callback
@@ -496,9 +502,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 self._climate = await self.client.get_climate(station)
             self._climate_checked = now
         except (OGDError, TimeoutError) as exc:
-            self._outages.failed(source, str(exc) or "timed out")
+            self.outages.failed(source, str(exc) or "timed out")
             return
-        self._outages.worked(source)
+        self.outages.worked(source)
         if self.data is not None:
             self.async_set_updated_data({**self.data, "climate": self._climate})
 
@@ -516,10 +522,10 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             try:
                 now = await self.client.get_station_now(abbr, StationType.WEATHER)
             except OGDError as exc:
-                self._outages.failed(source, exc)
+                self.outages.failed(source, exc)
                 now = {}
             else:
-                self._outages.worked(source)
+                self.outages.worked(source)
             pressures[side] = now.get("pp0qffs0")
             pressures[f"{side}_station"] = abbr
         return pressures
@@ -538,9 +544,9 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                 )
             pollen = await self.client.get_pollen_now(self.pollen_station)
         except OGDError as exc:
-            self._outages.failed(source, exc)
+            self.outages.failed(source, exc)
             return {}
-        self._outages.worked(source)
+        self.outages.worked(source)
         return pollen
 
     async def async_set_paused(self, paused: bool) -> None:
@@ -605,13 +611,16 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
                             station, station_type
                         )
                     except OGDError as exc:
-                        self._outages.failed(source, exc)
+                        self.outages.failed(source, exc)
                         measured = {}
                     else:
                         if measured:
-                            self._outages.worked(source)
+                            self.outages.worked(source)
                         else:
-                            self._outages.failed(source, "no real-time data")
+                            # Its own repair after an hour: station_no_data.
+                            self.outages.failed(
+                                source, "no real-time data", repair=False
+                            )
                     condition_by_station[station] = measured
                 pollen = await self._async_get_pollen()
                 foehn = await self._async_get_foehn()
@@ -696,7 +705,8 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
 
         no_forecast = f"Forecast for {self.forecast_name}"
         if not data["forecast"]:
-            self._outages.failed(no_forecast, "MeteoSwiss provided none")
+            # Its own repair after an hour: postcode_no_data or point_no_data.
+            self.outages.failed(no_forecast, "MeteoSwiss provided none", repair=False)
             if self.first_error[CONF_POSTCODE] is None:
                 self.first_error[CONF_POSTCODE] = time.time()
 
@@ -705,7 +715,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             if not self.error_raised[CONF_POSTCODE] and last_error > m:
                 self._async_create_no_forecast_issue()
         else:
-            self._outages.worked(no_forecast)
+            self.outages.worked(no_forecast)
             if self.error_raised[CONF_POSTCODE]:
                 ir.async_delete_issue(self.hass, DOMAIN, self._no_forecast_issue_id)
             self.first_error[CONF_POSTCODE] = None
@@ -752,7 +762,13 @@ class MeteoSwissRadarCoordinator(DataUpdateCoordinator[RadarReadings]):
         )
         self._radar = radar
         self.location = location
-        self.loop = RadarLoop(hass, location, radar.usage)
+        self.loop = RadarLoop(
+            hass,
+            location,
+            radar.usage,
+            Outages(_LOGGER, hass, place=name, owner=f"{entry.entry_id} radar loop"),
+        )
+        entry.async_on_unload(self.loop.outages.clear)
         # Set by the entry's coordinator; see its async_set_paused.
         self.paused = False
 

@@ -133,6 +133,37 @@ def test_level_between_takes_the_most_severe_in_force():
 
 
 class TestGetWarnings:
+    @pytest.mark.parametrize(
+        "failure",
+        # As on 23 November 2026; whether with status 500 or 200 is unknown.
+        [500, b"Internal Server Error"],
+        ids=["an error", "an error sent as a feed"],
+    )
+    async def test_a_feed_that_fails_for_a_moment_is_asked_for_again(self, failure):
+        files = {alerts.FEED_URL: feed(WIND), "https://cap.test/wind": details()}
+        meteoalarm, session = client(files)
+        session.failures[alerts.FEED_URL] = [failure]
+
+        warnings = await meteoalarm.get_warnings(*ALTDORF, "de", NOW)
+
+        assert [w["type"] for w in warnings] == ["wind"]
+
+    async def test_a_feed_that_stays_down_is_an_error(self):
+        meteoalarm, session = client({alerts.FEED_URL: feed(WIND)})
+        session.failures[alerts.FEED_URL] = [b"Internal Server Error"] * 3
+
+        with pytest.raises(alerts.AlertError):
+            await meteoalarm.get_warnings(*ALTDORF, "de", NOW)
+
+    async def test_details_that_fail_for_a_moment_are_asked_for_again(self):
+        files = {alerts.FEED_URL: feed(WIND), "https://cap.test/wind": details()}
+        meteoalarm, session = client(files)
+        session.failures["https://cap.test/wind"] = [503]
+
+        (warning,) = await meteoalarm.get_warnings(*ALTDORF, "de", NOW)
+
+        assert warning["level"] is not None
+
     async def test_what_is_downloaded_is_counted(self):
         files = {
             alerts.FEED_URL: feed(WIND),
