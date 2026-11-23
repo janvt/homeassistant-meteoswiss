@@ -13,9 +13,11 @@ its budget: see .github/workflows/live.yaml, which runs them twice a day.
 
 from __future__ import annotations
 
+import asyncio
 import collections
 import datetime
 import json
+import xml.etree.ElementTree as ET
 
 import numpy as np
 import pytest
@@ -59,6 +61,11 @@ def within_budget(kind: str, case: str, transferred: int, whole: int, places: in
     )
 
 
+# The warnings feed is fetched this many times, this many seconds apart.
+FEED_TRIES = 3
+FEED_RETRY_AFTER = 30
+
+
 async def test_the_servers_support_what_the_reading_relies_on(http, latest_run):
     headers = {"User-Agent": USER_AGENT}
     forecast = MeteoSwissOGD._run_url(latest_run, "jww003i0")
@@ -82,9 +89,23 @@ async def test_the_servers_support_what_the_reading_relies_on(http, latest_run):
         station, headers={**headers, "If-None-Match": etag}
     ) as response:
         assert response.status in (304, 200)  # 200 if a new row came just now
-    # The warnings feed.
-    async with http.get(alerts.FEED_URL, headers=headers) as response:
-        assert alerts.parse_feed(await response.read()) is not None
+    # The warnings feed.  It comes from MeteoAlarm, whose server can fail for a
+    # moment, as with "Internal Server Error" on 23 November 2026: the
+    # integration keeps the warnings it has then, so only a longer outage fails.
+    # Whether it was sent as an error or not is unknown, so a body that is not
+    # a feed is tried again too.
+    for attempt in range(FEED_TRIES):
+        if attempt:
+            await asyncio.sleep(FEED_RETRY_AFTER)
+        async with http.get(alerts.FEED_URL, headers=headers) as response:
+            status, body = response.status, await response.read()
+        try:
+            entries = alerts.parse_feed(body) if status == 200 else None
+        except ET.ParseError:
+            entries = None
+        if entries is not None:
+            break
+    assert entries is not None, f"MeteoAlarm answered {status}: {body[:200]!r}"
 
 
 @pytest.mark.parametrize("parameter", ["tre200h0", "zprfr0hs"])
