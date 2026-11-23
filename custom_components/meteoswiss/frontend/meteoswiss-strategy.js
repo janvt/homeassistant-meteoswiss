@@ -147,20 +147,6 @@ const HEADINGS = {
     more: "Altro",
     nothing: "Non è ancora configurato alcun luogo MeteoSwiss.",
   },
-  es: {
-    forecast: "Previsión",
-    warnings: "Avisos",
-    today: "Hoy",
-    tomorrow: "Mañana",
-    day_after_tomorrow: "Pasado mañana",
-    radar: "Radar",
-    foehn: "Foehn",
-    pollen: "Polen",
-    climate: "Comparado con lo normal",
-    downloads: "Descargas",
-    more: "Más",
-    nothing: "Todavía no hay ningún lugar de MeteoSwiss configurado.",
-  },
 };
 
 export function headings(hass) {
