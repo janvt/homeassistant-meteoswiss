@@ -5,7 +5,7 @@ import math
 import numpy as np
 import pytest
 
-from custom_components.meteoswiss import radar
+from custom_components.meteoswiss import fetch, radar
 from custom_components.meteoswiss.radar_loop import (
     FRAMES,
     HALF_KM,
@@ -150,12 +150,16 @@ WMS_ERROR = (
 
 
 @pytest.mark.parametrize(
-    ("content", "content_type"),
-    [(WMS_ERROR, "text/xml"), (b"not a png", "image/png")],
+    ("content", "content_type", "tries"),
+    [
+        # An error report may be a passing one: asked for again at once.
+        (WMS_ERROR, "text/xml", 1 + len(fetch.RETRY_DELAYS)),
+        (b"not a png", "image/png", 1),
+    ],
     ids=["an error report", "an unreadable image"],
 )
 async def test_a_bad_map_is_a_blank_one_and_asked_again(
-    hass, aioclient_mock, content, content_type
+    hass, aioclient_mock, content, content_type, tries
 ):
     aioclient_mock.get(
         MAP_URL.split("?")[0], content=content, headers={"content-type": content_type}
@@ -169,7 +173,7 @@ async def test_a_bad_map_is_a_blank_one_and_asked_again(
     assert await loop.gif() is gif
     loop.add(rain(time=SLOT + radar.INTERVAL))
     assert (await loop.gif()).startswith(b"GIF89a")
-    assert aioclient_mock.call_count == 2
+    assert aioclient_mock.call_count == 2 * tries
 
 
 def test_no_data_is_hatched_and_dry_is_clear():

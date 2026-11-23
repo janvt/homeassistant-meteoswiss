@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import datetime
 import hashlib
+import logging
 import re
 from unittest.mock import MagicMock
 
@@ -20,30 +21,43 @@ from custom_components.meteoswiss.ogd import (
     UnknownPostcodeError,
     distance_km,
 )
+from custom_components.meteoswiss.outages import Outages
 from custom_components.meteoswiss.usage import Usage
 
 UTC = datetime.timezone.utc
 
 
 class FakeContent:
-    def __init__(self, body: bytes, chunk_size: int) -> None:
+    def __init__(
+        self, body: bytes, chunk_size: int, broken: BaseException | None = None
+    ) -> None:
         self.body = body
         self.chunk_size = chunk_size
+        # Raised after the first chunk, like a connection that drops.
+        self.broken = broken
 
     async def iter_chunked(self, n: int):
         # Ignores n: small chunks exercise rows split across chunk boundaries.
         for start in range(0, len(self.body), self.chunk_size):
             yield self.body[start : start + self.chunk_size]
+            if self.broken is not None:
+                raise self.broken
 
 
 class FakeResponse:
     def __init__(
-        self, status: int, body: bytes = b"", headers=None, chunk_size: int = 1000
+        self,
+        status: int,
+        body: bytes = b"",
+        headers=None,
+        chunk_size: int = 1000,
+        broken: BaseException | None = None,
     ) -> None:
         self.status = status
         self.body = body
         self.headers = headers or {}
-        self.content = FakeContent(body, chunk_size)
+        self.content = FakeContent(body, chunk_size, broken)
+        self.broken = broken
 
     async def __aenter__(self) -> FakeResponse:
         return self
@@ -56,6 +70,8 @@ class FakeResponse:
             raise aiohttp.ClientResponseError(MagicMock(), (), status=self.status)
 
     async def read(self) -> bytes:
+        if self.broken is not None:
+            raise self.broken
         return self.body
 
 
@@ -71,12 +87,28 @@ class FakeSession:
         self.headers: list[dict[str, str]] = []
         # The size of each response's body.
         self.served: list[int] = []
+        # By URL, answers given before the file, in turn, like a server that
+        # fails for a moment: a status, a body sent with status 200, or an
+        # exception raised partway through the file.
+        self.failures: dict[str, list[int | bytes | BaseException]] = {}
 
     def _respond(self, method: str, url: str, headers) -> FakeResponse:
         headers = headers or {}
         byte_range = headers.get("Range")
         self.requests.append((method, url, byte_range))
         self.headers.append(dict(headers))
+        if self.failures.get(url):
+            failure = self.failures[url].pop(0)
+            if isinstance(failure, int):
+                return FakeResponse(failure, b"Error")
+            if isinstance(failure, BaseException):
+                return FakeResponse(
+                    200,
+                    self.files[url],
+                    chunk_size=self.chunk_size,
+                    broken=failure,
+                )
+            return FakeResponse(200, failure)
         body = self.files.get(url)
         if body is None:
             return FakeResponse(403)
@@ -463,8 +495,9 @@ class FakeMeteoAlarm:
     error: Exception | None = None
     calls: list = []
 
-    def __init__(self, session, user_agent) -> None:
+    def __init__(self, session, user_agent, hass=None) -> None:
         self.usage = Usage()
+        self.outages = Outages(logging.getLogger(__name__), hass)
 
     @classmethod
     def reset(cls) -> None:
@@ -488,8 +521,9 @@ class FakeRadar:
     images: dict = {}
     calls: list = []
 
-    def __init__(self, session, user_agent) -> None:
+    def __init__(self, session, user_agent, hass=None) -> None:
         self.usage = Usage()
+        self.outages = Outages(logging.getLogger(__name__), hass)
 
     @classmethod
     def reset(cls) -> None:

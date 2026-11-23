@@ -23,6 +23,10 @@
         "high_usage": {
             "title": "MeteoSwiss bruker mer data enn nødvendig",
             "description": "MeteoSwiss-integrasjonen lastet ned mye mer enn vanlig det siste døgnet ({usage} MB). Det betyr som regel at MeteoSwiss har endret hvordan varselet publiseres. Oppdater integrasjonen: en retting er sannsynligvis tilgjengelig. Dette varselet forsvinner av seg selv."
+        },
+        "service_unavailable": {
+            "title": "{service} kan ikke nås",
+            "description": "Noe av det MeteoSwiss bruker, kunne ikke hentes fra {service}, heller ikke etter nye forsøk.\n\nUtilgjengelig: {sources}\n\nSiste feil: {error}\n\nDette er vanligvis et forbigående problem hos serveren eller med internettforbindelsen. Integrasjonen fortsetter å prøve ved hver oppdatering og viser frem til da de siste verdiene den har. Dette varselet forsvinner av seg selv når alt virker igjen."
         }
     },
     "config": {

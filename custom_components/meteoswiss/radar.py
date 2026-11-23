@@ -16,13 +16,17 @@ import json
 import logging
 import math
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import numpy as np
 
+from custom_components.meteoswiss.fetch import retrying
 from custom_components.meteoswiss.outages import Outages
 from custom_components.meteoswiss.usage import Usage
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -227,7 +231,12 @@ def latest_slot(now: datetime.datetime) -> datetime.datetime:
 class Radar:
     """Fetches the latest radar images, once for all entries."""
 
-    def __init__(self, session: aiohttp.ClientSession, user_agent: str) -> None:
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        user_agent: str,
+        hass: HomeAssistant | None = None,
+    ) -> None:
         self._session = session
         self._headers = {"User-Agent": user_agent}
         self._images: dict[str, Image] = {}
@@ -241,7 +250,7 @@ class Radar:
         self._dry_since: dict[tuple[float, float], datetime.datetime] = {}
         self._noted: dict[tuple[float, float], datetime.datetime] = {}
         self._lock = asyncio.Lock()
-        self._outages = Outages(_LOGGER)
+        self.outages = Outages(_LOGGER, hass)
         self.usage = Usage()
 
     @property
@@ -255,7 +264,8 @@ class Radar:
 
     async def _fetch(self, url: str) -> bytes | None:
         """A file, or None if it is not (yet) published."""
-        try:
+
+        async def attempt() -> bytes | None:
             async with self._session.get(
                 url, headers=self._headers, timeout=REQUEST_TIMEOUT
             ) as response:
@@ -267,6 +277,9 @@ class Radar:
                 body = await response.read()
                 self.usage.count(response, len(body))
                 return body
+
+        try:
+            return await retrying(attempt, url)
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise RadarError(f"Cannot fetch {url}: {exc}") from exc
 
@@ -387,12 +400,12 @@ class Radar:
                 try:
                     await self._refresh(key, now)
                 except RadarError as exc:
-                    self._outages.failed(f"Radar {key}", exc)
+                    self.outages.failed(f"Radar {key}", exc)
                 else:
                     if key == RAIN_RATE and (stopped := self._stopped(now)):
-                        self._outages.failed(f"Radar {key}", stopped)
+                        self.outages.failed(f"Radar {key}", stopped)
                     else:
-                        self._outages.worked(f"Radar {key}")
+                        self.outages.worked(f"Radar {key}")
                 if key == RAIN_RATE:
                     self._note_rain(lat, lon)
         values: dict[str, tuple[float | None, datetime.datetime] | None] = {}

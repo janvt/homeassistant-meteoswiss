@@ -5,10 +5,13 @@ from __future__ import annotations
 import asyncio
 import datetime
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from custom_components.meteoswiss.ogd import MeteoSwissOGD, OGDError, Point
 from custom_components.meteoswiss.outages import Outages
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,7 +24,9 @@ REFRESH_INTERVAL = datetime.timedelta(hours=3)
 class SharedDownloads:
     """Reads each large file for all entries, keeping the rows of their points."""
 
-    def __init__(self, client: MeteoSwissOGD) -> None:
+    def __init__(
+        self, client: MeteoSwissOGD, hass: HomeAssistant | None = None
+    ) -> None:
         self._client = client
         self._lock = asyncio.Lock()
         # The point and parameters each entry needs, by entry ID.
@@ -30,7 +35,7 @@ class SharedDownloads:
         self._rows: dict[str, dict[tuple[int, int], dict[str, str]]] = {}
         self._fetched: dict[str, datetime.datetime] = {}
         self._runs: dict[str, str] = {}
-        self._outages = Outages(_LOGGER)
+        self.outages = Outages(_LOGGER, hass)
 
     def register(self, owner: str, point: Point, parameters: set[str]) -> None:
         self._wanted[owner] = (point, frozenset(parameters))
@@ -88,7 +93,7 @@ class SharedDownloads:
                     )
                     self._rows[parameter] = {**rows, **more}
             except OGDError as exc:
-                self._outages.failed(f"Forecast file {parameter}", exc)
+                self.outages.failed(f"Forecast file {parameter}", exc)
             else:
-                self._outages.worked(f"Forecast file {parameter}")
+                self.outages.worked(f"Forecast file {parameter}")
             return self._rows.get(parameter, {}).get(point.key)

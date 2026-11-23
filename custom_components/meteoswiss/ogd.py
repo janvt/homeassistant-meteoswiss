@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import datetime
+import functools
 import io
 import logging
 import math
@@ -24,6 +25,7 @@ from typing import Any, TypedDict
 import aiohttp
 
 from custom_components.meteoswiss import climate
+from custom_components.meteoswiss.fetch import retrying
 from custom_components.meteoswiss.usage import (
     REQUEST_OVERHEAD,
     USAGE_PERIOD,
@@ -630,7 +632,8 @@ class MeteoSwissOGD:
             # The server ignores ranges of files it would compress and sends
             # them whole instead.
             headers["Accept-Encoding"] = "identity"
-        try:
+
+        async def attempt() -> tuple[bytes, int]:
             async with self._session.get(
                 url, headers=headers, timeout=REQUEST_TIMEOUT
             ) as response:
@@ -653,9 +656,12 @@ class MeteoSwissOGD:
                 content_range = response.headers.get("Content-Range", "")
                 if "/" in content_range:
                     total = int(content_range.rsplit("/", 1)[1])
+                return body, total
+
+        try:
+            return await retrying(attempt, url)
         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
-        return body, total
 
     async def _get_changed(self, url: str) -> bytes | None:
         """Fetch a whole file, or None if it has not changed since the last time."""
@@ -667,7 +673,8 @@ class MeteoSwissOGD:
                 headers["If-None-Match"] = etag
             if modified:
                 headers["If-Modified-Since"] = modified
-        try:
+
+        async def attempt() -> bytes | None:
             async with self._session.get(
                 url, headers=headers, timeout=REQUEST_TIMEOUT
             ) as response:
@@ -681,20 +688,27 @@ class MeteoSwissOGD:
                     response.headers.get("ETag"),
                     response.headers.get("Last-Modified"),
                 )
+                return body
+
+        try:
+            return await retrying(attempt, url)
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
-        return body
 
     async def _size(self, url: str) -> int | None:
         """The size of a file, uncompressed, None if the server does not say."""
         headers = {**self._headers, "Accept-Encoding": "identity"}
-        try:
+
+        async def attempt() -> int:
             async with self._session.head(
                 url, headers=headers, timeout=REQUEST_TIMEOUT
             ) as response:
                 self._count(response, 0)
                 response.raise_for_status()
                 return int(response.headers["Content-Length"])
+
+        try:
+            return await retrying(attempt, url)
         except (aiohttp.ClientError, asyncio.TimeoutError, KeyError, ValueError):
             return None
 
@@ -956,19 +970,26 @@ class MeteoSwissOGD:
     ) -> list[tuple[datetime.datetime, dict[str, float | None]]]:
         """The hours of a station history file (see parse_station_hours), none
         if there is no such file, e.g. for a decade before the station."""
-        try:
+
+        async def attempt() -> bytes | None:
             async with self._session.get(
                 url, headers=self._headers, timeout=STREAM_TIMEOUT
             ) as response:
                 # The file store answers 403 for files it does not have.
                 if response.status in (403, 404):
                     self._count(response, 0)
-                    return []
+                    return None
                 response.raise_for_status()
                 body = await response.read()
                 self._count(response, len(body))
+                return body
+
+        try:
+            body = await retrying(attempt, url)
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
+        if body is None:
+            return []
         return await asyncio.get_running_loop().run_in_executor(
             None, parse_station_hours, body.decode("windows-1252"), columns, since
         )
@@ -1010,18 +1031,23 @@ class MeteoSwissOGD:
             run = (now - datetime.timedelta(hours=back)).strftime("%Y%m%d%H00")
             url = self._run_url(run, DAILY_PARAMETERS["symbol"])
             try:
-                async with self._session.head(
-                    url, headers=self._headers, timeout=REQUEST_TIMEOUT
-                ) as response:
-                    self._count(response, 0)
-                    # Files that do not exist (yet) are answered with 403.
-                    if response.status in (403, 404):
-                        continue
-                    response.raise_for_status()
+                if await retrying(functools.partial(self._published, url), url):
                     return run
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 raise OGDError(f"Cannot find the latest forecast run: {exc}") from exc
         raise OGDError("No forecast run published in the last few hours")
+
+    async def _published(self, url: str) -> bool:
+        """Whether a forecast file is published."""
+        async with self._session.head(
+            url, headers=self._headers, timeout=REQUEST_TIMEOUT
+        ) as response:
+            self._count(response, 0)
+            # Files that do not exist (yet) are answered with 403.
+            if response.status in (403, 404):
+                return False
+            response.raise_for_status()
+            return True
 
     async def _point_values(self, url: str, point: Point) -> dict[str, str]:
         """Timestamp to value of one point in a forecast file."""
@@ -1428,12 +1454,13 @@ class MeteoSwissOGD:
     ) -> dict[str, dict[str, str]]:
         """Stream a whole file, keeping only the rows starting with the prefixes."""
         needles = {prefix: b"\n" + prefix.encode("latin-1") for prefix in prefixes}
-        rows: dict[str, list[bytes]] = {prefix: [] for prefix in prefixes}
 
-        # Carries the incomplete last line of a chunk, after its line break.
-        tail = b""
-        received = 0
-        try:
+        async def attempt() -> tuple[dict[str, list[bytes]], bytes]:
+            # From the start again with each try.
+            rows: dict[str, list[bytes]] = {prefix: [] for prefix in prefixes}
+            # Carries the incomplete last line of a chunk, after its line break.
+            tail = b""
+            received = 0
             async with self._session.get(
                 url, headers=self._headers, timeout=STREAM_TIMEOUT
             ) as response:
@@ -1449,6 +1476,10 @@ class MeteoSwissOGD:
                     tail = data[cut:]
                     received += len(chunk)
                 self._count(response, received)
+            return rows, tail
+
+        try:
+            rows, tail = await retrying(attempt, url)
         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
             raise OGDError(f"Cannot fetch {url}: {exc}") from exc
         for prefix, needle in needles.items():

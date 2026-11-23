@@ -137,8 +137,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         hass.data[DATA_CLIENT] = MeteoSwissOGD(
             async_get_clientsession(hass), USER_AGENT
         )
-        hass.data[DATA_DOWNLOADS] = SharedDownloads(hass.data[DATA_CLIENT])
-        hass.data[DATA_ALERTS] = MeteoAlarm(async_get_clientsession(hass), USER_AGENT)
+        hass.data[DATA_DOWNLOADS] = SharedDownloads(hass.data[DATA_CLIENT], hass)
+        hass.data[DATA_ALERTS] = MeteoAlarm(
+            async_get_clientsession(hass), USER_AGENT, hass
+        )
         hass.data[DATA_CLIENT].usage.on_count = month.add
         hass.data[DATA_ALERTS].usage.on_count = month.add
     coordinator = MeteoSwissDataUpdateCoordinator(
@@ -172,12 +174,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) -
         paused=entry.entry_id in hass.data[DATA_PAUSES],
     )
     await coordinator.async_config_entry_first_refresh()
+    # Not before: a setup that fails keeps its repair until a retry works.
+    entry.async_on_unload(coordinator.outages.clear)
     point = coordinator.data["point"]
     # Before the update listener, which would reload the entry for it.
     _async_set_unique_id(hass, entry, point)
     if entry.options.get(CONF_RADAR, DEFAULT_RADAR) and point is not None:
         if DATA_RADAR not in hass.data:
-            hass.data[DATA_RADAR] = Radar(async_get_clientsession(hass), USER_AGENT)
+            hass.data[DATA_RADAR] = Radar(
+                async_get_clientsession(hass), USER_AGENT, hass
+            )
             hass.data[DATA_RADAR].usage.on_count = hass.data[DATA_MONTH].add
         coordinator.radar = MeteoSwissRadarCoordinator(
             hass, entry, hass.data[DATA_RADAR], point.name, radar_location(hass, point)
@@ -275,10 +281,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: MeteoSwissConfigEntry) 
         ]
         if not others:
             # The last entry: what was downloaded for all of them can go.
-            hass.data.pop(DATA_DOWNLOADS)
             hass.data.pop(DATA_CLIENT)
-            hass.data.pop(DATA_ALERTS)
-            hass.data.pop(DATA_RADAR, None)
+            for shared in (
+                hass.data.pop(DATA_DOWNLOADS),
+                hass.data.pop(DATA_ALERTS),
+                hass.data.pop(DATA_RADAR, None),
+            ):
+                if shared is not None:
+                    shared.outages.clear()
             await hass.data.pop(DATA_MONTH).async_save()
             hass.data.pop(DATA_PAUSES)
 

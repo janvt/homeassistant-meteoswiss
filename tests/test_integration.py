@@ -458,6 +458,11 @@ def issues(hass):
     }
 
 
+def unavailable(hass):
+    """The repairs of sources that could not be fetched (see outages.Outages)."""
+    return {i for i in issues(hass) if i.startswith("unavailable_")}
+
+
 async def test_a_station_without_data_is_reported_after_an_hour(
     hass, entry, fake_ogd, frozen_now
 ):
@@ -465,11 +470,18 @@ async def test_a_station_without_data_is_reported_after_an_hour(
     fake_ogd.station_error = OGDError("gone")
 
     await refresh_after(hass, frozen_now, 5)
+    # Unavailable straight away, once tried again (see fetch.retrying): one
+    # repair for MeteoSwiss, however many of its files fail...
+    assert issues(hass) == {"unavailable_meteoswiss"}
+    (issue,) = (i for (d, i_id), i in ir.async_get(hass).issues.items() if d == DOMAIN)
+    assert "Station SMA" in issue.translation_placeholders["sources"]
+    assert "Föhn station" in issue.translation_placeholders["sources"]
     await refresh_after(hass, frozen_now, 50)
-    assert not issues(hass)
+    assert not issues(hass) - unavailable(hass)
 
+    # ... and after an hour, the advice to choose another station.
     await refresh_after(hass, frozen_now, 15)
-    assert issues(hass) == {
+    assert issues(hass) - unavailable(hass) == {
         "SMA_real_time_name_provides_no_data_meteoswiss",
         "ABE_real_time_precipitation_name_provides_no_data_meteoswiss",
     }
@@ -478,6 +490,33 @@ async def test_a_station_without_data_is_reported_after_an_hour(
     fake_ogd.station_error = None
     await refresh_after(hass, frozen_now, 5)
     assert not issues(hass)
+
+
+async def test_unloading_an_entry_takes_its_repairs(hass, entry, fake_ogd, frozen_now):
+    await setup(hass, entry)
+    fake_ogd.station_error = OGDError("gone")
+    await refresh_after(hass, frozen_now, 5)
+    assert unavailable(hass)
+
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+    assert not unavailable(hass)
+
+
+async def test_a_forecast_that_cannot_be_fetched_is_a_repair_until_it_can(
+    hass, entry, fake_ogd
+):
+    fake_ogd.forecast_error = OGDError("500 Internal Server Error")
+    entry.add_to_hass(hass)
+
+    assert not await hass.config_entries.async_setup(entry.entry_id)
+    assert entry.state is ConfigEntryState.SETUP_RETRY
+    assert len(unavailable(hass)) == 1
+
+    fake_ogd.forecast_error = None
+    await hass.config_entries.async_reload(entry.entry_id)
+    assert entry.state is ConfigEntryState.LOADED
+    assert not unavailable(hass)
 
 
 async def test_an_unknown_postcode_is_reported_straight_away(hass, entry_data):

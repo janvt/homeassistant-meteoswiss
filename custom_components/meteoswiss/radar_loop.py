@@ -26,6 +26,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from custom_components.meteoswiss.const import USER_AGENT
+from custom_components.meteoswiss.fetch import retrying
+from custom_components.meteoswiss.outages import SWISSTOPO, Outages
 from custom_components.meteoswiss.radar import INTERVAL, REQUEST_TIMEOUT, Image, lv95
 from custom_components.meteoswiss.usage import Usage
 
@@ -54,6 +56,8 @@ MAP_URL = (
     "&LAYERS=ch.swisstopo.pixelkarte-grau&STYLES=&CRS=EPSG:2056"
     "&BBOX={0:.0f},{1:.0f},{2:.0f},{3:.0f}&WIDTH={4}&HEIGHT={4}&FORMAT=image/png"
 )
+
+MAP_SOURCE = "Map of the radar loop"
 
 # (lower bound in mm/h, colour, opacity).  Light rain lets the map show
 # through; heavy rain is nearly opaque.
@@ -121,11 +125,13 @@ class RadarLoop:
         hass: HomeAssistant,
         location: tuple[float, float],
         usage: Usage | None = None,
+        outages: Outages | None = None,
     ) -> None:
         self._hass = hass
         self._location = location
         # The map counts with the radar's own downloads.
         self._usage = usage
+        self.outages = outages or Outages(_LOGGER, service=SWISSTOPO)
         self._frames: dict[datetime.datetime, np.ndarray] = {}
         self._box: Box | None = None
         # None until a map is in hand: the loop is drawn on a blank one then.
@@ -176,11 +182,11 @@ class RadarLoop:
             return gif
 
     async def _fetch_map(self, box: Box) -> bytes | None:
-        try:
+        url = MAP_URL.format(*box, SIZE)
+
+        async def attempt() -> bytes:
             async with async_get_clientsession(self._hass).get(
-                MAP_URL.format(*box, SIZE),
-                headers={"User-Agent": USER_AGENT},
-                timeout=REQUEST_TIMEOUT,
+                url, headers={"User-Agent": USER_AGENT}, timeout=REQUEST_TIMEOUT
             ) as response:
                 body = await response.read()
                 if self._usage is not None:
@@ -188,16 +194,21 @@ class RadarLoop:
                 response.raise_for_status()
                 # An error is answered with status 200 and an XML report.
                 if not (response.content_type or "").startswith("image/"):
-                    _LOGGER.debug(
-                        "No map for the radar loop: %s %s",
-                        response.content_type,
-                        body[:300],
-                    )
-                    return None
+                    raise NotAMapError(f"{response.content_type} {body[:300]!r}")
                 return body
-        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
-            _LOGGER.debug("Cannot fetch the map of the radar loop: %s", exc)
+
+        try:
+            body = await retrying(attempt, url, also=(NotAMapError,))
+        except (aiohttp.ClientError, asyncio.TimeoutError, NotAMapError) as exc:
+            # The loop is drawn without it, and it is tried again.
+            self.outages.failed(MAP_SOURCE, str(exc) or "timed out")
             return None
+        self.outages.worked(MAP_SOURCE)
+        return body
+
+
+class NotAMapError(Exception):
+    """An answer to the map's request that is not an image."""
 
 
 def prepare_map(content: bytes | None) -> PILImage.Image | None:

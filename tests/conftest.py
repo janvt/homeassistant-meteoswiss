@@ -17,6 +17,13 @@ def _enable_custom_integrations(enable_custom_integrations):
 
 
 @pytest.fixture(autouse=True)
+def _retry_at_once():
+    """Try failed requests again without waiting (see fetch.RETRY_DELAYS)."""
+    with patch("custom_components.meteoswiss.fetch.RETRY_DELAYS", (0, 0)):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _no_deprecated_usage(caplog):
     """Fail on what Home Assistant reports as deprecated, which it only logs
     for custom integrations until the version that breaks it."""
