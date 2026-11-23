@@ -45,7 +45,7 @@ and is now maintained on its own: see [Credits](#credits).
 * Requests that fail for a moment are tried again, and a repair notice says
   which server cannot be reached and what is missing until it can, or when a
   station or a forecast stops publishing.
-* Translations in English, German, French, Italian, Spanish and Norwegian.
+* Translations in English, German, French and Italian.
 
 ## Installation
 
