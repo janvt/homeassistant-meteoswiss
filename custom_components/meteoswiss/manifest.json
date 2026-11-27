@@ -19,5 +19,5 @@
     "requirements": [
         "pyfive==1.2.1"
     ],
-    "version": "2.5.0"
+    "version": "2.5.1"
 }
