@@ -360,7 +360,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
     def device_info(self) -> DeviceInfo:
         """The device that groups the entities of the entry."""
         return DeviceInfo(
-            identifiers={(DOMAIN, self.config_entry.entry_id)},
+            identifiers={self._forecast_identifier},
             name=self.forecast_name,
             manufacturer="MeteoSwiss",
             model="Mountain forecast" if self.is_mountain else "Postal code forecast",
@@ -387,7 +387,7 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
             name = self.real_time_precipitation_station_name
             model = "Precipitation station"
         return DeviceInfo(
-            identifiers={(DOMAIN, f"{self.config_entry.entry_id}-{station_type}")},
+            identifiers={self._station_identifier(station_type)},
             name=name,
             manufacturer="MeteoSwiss",
             model=model,
@@ -396,18 +396,28 @@ class MeteoSwissDataUpdateCoordinator(DataUpdateCoordinator[MeteoSwissClientResu
         )
 
     @property
+    def _forecast_identifier(self) -> tuple[str, str]:
+        return (DOMAIN, self.config_entry.entry_id)
+
+    def _station_identifier(self, station_type: StationType) -> tuple[str, str]:
+        return (DOMAIN, f"{self.config_entry.entry_id}-{station_type}")
+
+    @property
     def device_identifiers(self) -> set[tuple[str, str]]:
-        """The identifiers of the entry's devices: its forecast and stations."""
-        devices = [self.device_info] + [
-            self.station_device_info(station_type)
+        """The identifiers of the entry's devices: its forecast and stations.
+
+        Not read from their DeviceInfo: a dict up to Home Assistant 2026.11,
+        a dataclass whose keys are deprecated from 2026.12.
+        """
+        return {self._forecast_identifier} | {
+            self._station_identifier(station_type)
             for station_type, station in (
                 (StationType.WEATHER, self.weather_station),
                 (StationType.PRECIPITATION, self.precipitation_station),
                 (StationType.POLLEN, self.pollen_station),
             )
             if station
-        ]
-        return {i for device in devices for i in device["identifiers"]}
+        }
 
     @property
     def is_mountain(self) -> bool:
